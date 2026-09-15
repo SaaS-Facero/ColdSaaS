@@ -17,7 +17,7 @@ const brand = {
     cobaltDark: "#0033B8",
     steel: "#8A8F98",
     verifiedGreen: "#00C48C",
-    ink: "#0B0E14",
+    ink: "#0A0E1A",
     inkSoft: "#161B26",
     paper: "#FFFFFF",
     paperSoft: "#F5F6F8",
@@ -76,7 +76,7 @@ function page({ brand, hero, socialProof }) {
     --paper: ${colors.paper};
     --paper-soft: ${colors.paperSoft};
     --border: ${colors.border};
-    color-scheme: light dark;
+    color-scheme: dark;
   }
 
   * { box-sizing: border-box; }
@@ -84,18 +84,14 @@ function page({ brand, hero, socialProof }) {
   html, body {
     margin: 0;
     padding: 0;
-    background: var(--paper);
-    color: var(--ink);
+    background: var(--ink);
+    color: var(--paper-soft);
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Inter, Arial, sans-serif;
   }
 
   body {
-    background: var(--paper);
-    color: var(--ink);
-  }
-
-  @media (prefers-color-scheme: dark) {
-    body { background: var(--ink); color: var(--paper-soft); }
+    background: var(--ink);
+    color: var(--paper-soft);
   }
 
   .wrap {
@@ -120,18 +116,11 @@ function page({ brand, hero, socialProof }) {
     letter-spacing: 0.06em;
     text-transform: uppercase;
     color: var(--cobalt);
-    background: rgba(0, 71, 255, 0.08);
-    border: 1px solid rgba(0, 71, 255, 0.18);
+    background: rgba(0, 71, 255, 0.16);
+    border: 1px solid rgba(0, 71, 255, 0.32);
     border-radius: 999px;
     padding: 6px 14px;
     margin-bottom: 20px;
-  }
-
-  @media (prefers-color-scheme: dark) {
-    .hero__eyebrow {
-      background: rgba(0, 71, 255, 0.16);
-      border-color: rgba(0, 71, 255, 0.32);
-    }
   }
 
   .hero__title {
@@ -227,12 +216,8 @@ function page({ brand, hero, socialProof }) {
 
   .btn--secondary {
     background: transparent;
-    color: var(--ink);
-    border-color: var(--border);
-  }
-
-  @media (prefers-color-scheme: dark) {
-    .btn--secondary { color: var(--paper-soft); border-color: var(--borderDark, #2A3140); }
+    color: var(--paper-soft);
+    border-color: #2A3140;
   }
 
   .btn--secondary:hover,
@@ -245,11 +230,7 @@ function page({ brand, hero, socialProof }) {
 
   .proof {
     padding-block: 28px 48px;
-    border-top: 1px solid var(--border);
-  }
-
-  @media (prefers-color-scheme: dark) {
-    .proof { border-top-color: #232936; }
+    border-top: 1px solid #232936;
   }
 
   .proof__label {
@@ -299,16 +280,12 @@ function page({ brand, hero, socialProof }) {
     width: 14px;
     height: 14px;
     flex-shrink: 0;
-    color: var(--verified-green);
+    color: var(--cobalt);
   }
 
   .proof__item strong {
-    color: var(--ink);
+    color: var(--paper-soft);
     font-weight: 800;
-  }
-
-  @media (prefers-color-scheme: dark) {
-    .proof__item strong { color: var(--paper-soft); }
   }
 </style>
 </head>
