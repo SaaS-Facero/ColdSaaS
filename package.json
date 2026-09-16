@@ -1,8 +1,8 @@
 {
-  "name": "richsaas-landing",
+  "name": "coldtrend-landing",
   "version": "1.0.0",
   "private": true,
-  "description": "Landing page statique pour RichSaaS.ai",
+  "description": "Landing page statique pour ColdTrend.",
   "type": "module",
   "scripts": {
     "build": "node scripts/build.mjs"

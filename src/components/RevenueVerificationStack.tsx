@@ -1,5 +1,5 @@
 /**
- * RevenueVerificationStack — hero centerpiece for RichSaaS.ai
+ * RevenueVerificationStack — hero centerpiece for ColdTrend
  * =============================================================================
  *
  * PHASE 1 — PLAN (written before any code below)
@@ -12,7 +12,7 @@
  *      --verified      #00C48C   TrustMRR / "verified" accent (used sparingly,
  *                                only where a fact has been cross-checked)
  *      --verified-soft #00E39F   gradient partner for verified surfaces
- *      --graphite      #3A414E   RichSaaS.ai app-icon surface, secondary text
+ *      --graphite      #3A414E   ColdTrend app-icon surface, secondary text
  *      --ink           #0A0E1A   lock-screen wallpaper base
  *      --ink-deep      #050710   wallpaper gradient floor
  *      --paper         #F5F6F8   primary light text on dark glass
@@ -50,7 +50,7 @@
  *    - Timestamps are computed from real elapsed time (Date.now() - createdAt)
  *      and re-rendered every 5s, so a card visibly ages: "à l'instant" -> "1
  *      min" -> "2 min" ... rather than being frozen text.
- *    - Content cycles through a 10-item pool of Stripe / TrustMRR / RichSaaS.ai
+ *    - Content cycles through a 10-item pool of Stripe / TrustMRR / ColdTrend
  *      events with MRR values in a gently ascending band (1 850€ → 21 400€ —
  *      no 200€-to-90 000€ whiplash). Each full pass over the pool applies a
  *      small deterministic ±2.5% jitter to the amount (seeded by name+pass),
@@ -73,7 +73,7 @@
  *        don't wobble.
  *      - DEFAULT: generic bell / checkmark stock icons for every card.
  *        CORRECTION: source-specific icon+gradient app-icon glyphs (Stripe =
- *        card, TrustMRR = shield-check, RichSaaS.ai = trend-line) so the icon
+ *        card, TrustMRR = shield-check, ColdTrend = trend-line) so the icon
  *        itself carries the "who verified this" information.
  *      - DEFAULT: a perfectly regular `setInterval` tick, which reads as an
  *        obviously looping demo. CORRECTION: randomized 2.4–3.2s delay
@@ -138,7 +138,7 @@ const REDUCED_TRANSITION: Transition = { duration: 0.28, ease: "easeOut" };
 // Content model — written by hand, not lorem-ipsum'd
 // -----------------------------------------------------------------------------
 
-type Source = "stripe" | "trustmrr" | "richsaas";
+type Source = "stripe" | "trustmrr" | "coldtrend";
 type Kind = "sale" | "verify" | "listed";
 
 interface NotificationTemplate {
@@ -153,11 +153,11 @@ const TEMPLATES: NotificationTemplate[] = [
   { source: "stripe", saasName: "Loopnotes", mrr: 1_850, kind: "sale" },
   { source: "trustmrr", saasName: "Loopnotes", mrr: 1_850, kind: "verify" },
   { source: "stripe", saasName: "Fleetbase", mrr: 3_200, kind: "sale" },
-  { source: "richsaas", saasName: "Fleetbase", mrr: 3_200, kind: "listed" },
+  { source: "coldtrend", saasName: "Fleetbase", mrr: 3_200, kind: "listed" },
   { source: "stripe", saasName: "Numio", mrr: 6_100, kind: "sale" },
   { source: "trustmrr", saasName: "Numio", mrr: 6_100, kind: "verify" },
   { source: "stripe", saasName: "Ledgerly", mrr: 11_200, kind: "sale" },
-  { source: "richsaas", saasName: "Ledgerly", mrr: 11_200, kind: "listed" },
+  { source: "coldtrend", saasName: "Ledgerly", mrr: 11_200, kind: "listed" },
   { source: "stripe", saasName: "Craftpanel", mrr: 21_400, kind: "sale" },
   { source: "trustmrr", saasName: "Craftpanel", mrr: 21_400, kind: "verify" },
 ];
@@ -184,8 +184,8 @@ const SOURCE_META: Record<Source, { label: string; icon: LucideIcon; gradient: s
     gradient: `linear-gradient(135deg, ${COLOR.verified} 0%, ${COLOR.verifiedSoft} 100%)`,
     shadow: "rgba(0, 196, 140, 0.45)",
   },
-  richsaas: {
-    label: "RichSaaS.ai",
+  coldtrend: {
+    label: "ColdTrend",
     icon: TrendingUp,
     gradient: `linear-gradient(135deg, ${COLOR.graphite} 0%, ${COLOR.graphiteSoft} 100%)`,
     shadow: "rgba(10, 14, 26, 0.55)",
