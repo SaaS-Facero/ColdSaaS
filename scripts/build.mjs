@@ -264,6 +264,19 @@ const quiz = {
   // mais suit la même mécanique d'avancement dans le moteur JS ci-dessous.
   questions: [
     {
+      // Première question du quiz, pas un gate avant — même barre de
+      // progression, même carte, même style de bouton que les autres
+      // questions. Voir resolve-identity (supabase/functions/) : un seul
+      // appel serveur qui gère "nouveau compte ou existant" en une fois, et
+      // la transition vers la question 2 démarre AVANT sa réponse
+      // (transition optimiste, cf. handleAuthSubmit dans le script plus bas).
+      id: "auth",
+      stepName: "auth",
+      type: "auth",
+      title: "Pour garder ta sélection au chaud.",
+      subtext: "Un compte pour retrouver tes résultats plus tard — pas de confirmation par email, pas d'attente."
+    },
+    {
       id: "intention",
       stepName: "intention",
       title: "Tu veux racheter un SaaS qui tourne déjà, ou t'inspirer d'un concept pour repartir de zéro ?",
@@ -337,13 +350,6 @@ const quiz = {
           followup: "Alors autant commencer avec des chiffres vérifiés plutôt que des idées générées — tu gagnes le détour."
         }
       ]
-    },
-    {
-      id: "capture",
-      stepName: "capture",
-      type: "capture",
-      title: "Dernière étape avant ta sélection.",
-      subtext: "On t'envoie ton résultat par email, avec le détail des SaaS qui correspondent à ton profil. Rien d'autre, pas de newsletter forcée."
     }
   ]
 };
@@ -1437,6 +1443,104 @@ function page({ brand, hero, socialProof, notificationStack, pricing, comparison
     display: block;
   }
 
+  /* ---- Écran "auth" (première question du quiz, pas un gate à part) ---- */
+
+  .quiz-auth-mesh {
+    position: absolute;
+    inset: -20% -10% auto -10%;
+    height: 260px;
+    z-index: -1;
+    background:
+      radial-gradient(60% 80% at 15% 20%, rgba(0, 71, 255, 0.22), transparent 60%),
+      radial-gradient(50% 70% at 85% 0%, rgba(0, 196, 140, 0.14), transparent 60%);
+    filter: blur(30px);
+    pointer-events: none;
+  }
+
+  .quiz-auth-field {
+    opacity: 0;
+    transform: translateY(10px);
+    animation: quiz-auth-field-in 420ms cubic-bezier(0.22, 1.26, 0.36, 1) forwards;
+  }
+
+  .quiz-auth-field--1 { animation-delay: 80ms; }
+  .quiz-auth-field--2 { animation-delay: 180ms; }
+
+  @keyframes quiz-auth-field-in {
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .quiz-auth-field {
+      animation: none;
+      opacity: 1;
+      transform: none;
+    }
+  }
+
+  .quiz-banner {
+    display: none;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 12px 14px;
+    border-radius: 12px;
+    font-size: 13px;
+    line-height: 1.4;
+    margin-bottom: 16px;
+  }
+
+  .quiz-banner.is-visible {
+    display: flex;
+  }
+
+  .quiz-banner--alert {
+    background: rgba(217, 96, 90, 0.14);
+    border: 1px solid rgba(217, 96, 90, 0.35);
+    color: var(--paper-soft);
+  }
+
+  .quiz-banner__action {
+    flex-shrink: 0;
+    background: none;
+    border: none;
+    color: #fff;
+    font-weight: 700;
+    text-decoration: underline;
+    font-size: 13px;
+    font-family: inherit;
+    cursor: pointer;
+    padding: 0;
+  }
+
+  /* ---- Badge "connecté" (brand-bar) ---- */
+
+  .connected-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--verified-green);
+    background: rgba(0, 196, 140, 0.12);
+    border: 1px solid rgba(0, 196, 140, 0.3);
+    border-radius: 999px;
+    padding: 4px 10px;
+    margin-top: 6px;
+    opacity: 0;
+    transform: scale(0.85);
+    transition: opacity 320ms cubic-bezier(0.34, 1.56, 0.64, 1), transform 320ms cubic-bezier(0.34, 1.56, 0.64, 1);
+  }
+
+  .connected-badge.is-visible {
+    opacity: 1;
+    transform: scale(1);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .connected-badge { transition: opacity 200ms ease-out; transform: none; }
+  }
+
   .quiz-result-meta {
     font-size: 13px;
     color: var(--steel);
@@ -1654,12 +1758,11 @@ function page({ brand, hero, socialProof, notificationStack, pricing, comparison
 
   ${renderQuizOverlay({ quiz, pricing, stripeLink: STRIPE_PAYMENT_LINK })}
 
-  <!-- Identité partagée quiz <-> /inscription <-> /connexion : voir
-       ensure-identity.js pour la garantie de convergence (jamais deux
-       comptes pour une même personne selon le point d'entrée). -->
+  <!-- Le quiz résout l'identité côté serveur (supabase/functions/resolve-identity),
+       pas via ensure-identity.js (utilisé uniquement par /inscription pour
+       les visites directes hors quiz). -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="/js/supabase-client.js"></script>
-  <script src="/js/ensure-identity.js"></script>
   <script src="/js/auth-state.js"></script>
 
   <script>
@@ -2017,10 +2120,10 @@ function page({ brand, hero, socialProof, notificationStack, pricing, comparison
         if (!nextBtn) return;
         var id = screenEl.getAttribute("data-id");
 
-        if (id === "capture") {
-          var emailInput = document.getElementById("quiz-input-email");
-          var consentInput = document.getElementById("quiz-rgpd-consent");
-          nextBtn.disabled = !(EMAIL_RE.test(emailInput.value.trim()) && consentInput.checked);
+        if (id === "auth") {
+          var authEmailInput = document.getElementById("quiz-auth-email");
+          var authPasswordInput = document.getElementById("quiz-auth-password");
+          nextBtn.disabled = !(EMAIL_RE.test(authEmailInput.value.trim()) && authPasswordInput.value.length >= 6);
           return;
         }
 
@@ -2138,10 +2241,10 @@ function page({ brand, hero, socialProof, notificationStack, pricing, comparison
         answers.matchCount = matchCount;
         resultScreen.setAttribute("data-match-count", String(matchCount));
 
+        persistQuizAnswers();
+
         var titleEl = document.getElementById("quiz-result-title");
-        titleEl.textContent = answers.prenom
-          ? "Ok " + answers.prenom + ", voici ce qu'on a trouvé."
-          : "Voici ce qu'on a trouvé.";
+        titleEl.textContent = "Voici ce qu'on a trouvé.";
 
         var metaParts = [];
         var sectorText = sectorSummary();
@@ -2180,7 +2283,7 @@ function page({ brand, hero, socialProof, notificationStack, pricing, comparison
         var currentId = currentEl.getAttribute("data-id");
         trackEvent("funnel_step_complete", {
           step_number: currentQuestionIndex + 1,
-          answer: currentId === "capture" ? "submitted" : answers[currentId]
+          answer: answers[currentId]
         });
 
         navHistory.push(currentQuestionIndex);
@@ -2198,97 +2301,180 @@ function page({ brand, hero, socialProof, notificationStack, pricing, comparison
         }
       }
 
-      function submitCapture() {
-        var prenomInput = document.getElementById("quiz-input-prenom");
-        var emailInput = document.getElementById("quiz-input-email");
-        var errorEl = document.getElementById("quiz-email-error");
+      // ---- Écran "auth" (première question) : resolve-identity + transition
+      // optimiste --------------------------------------------------------
+      //
+      // Un seul appel à l'Edge Function resolve-identity (voir
+      // supabase/functions/resolve-identity/) gère "nouveau compte ou
+      // existant" côté serveur, avec service_role — jamais côté client.
+      // La transition vers la question 2 démarre AVANT sa réponse : l'appel
+      // réseau se termine en arrière-plan pendant que la personne lit déjà
+      // la question suivante. Si ça échoue (mauvais mot de passe pour un
+      // email existant, par exemple), une bannière discrète permet de
+      // revenir corriger sans bloquer bêtement en avant.
+      var authResolutionPromise = null;
+
+      function handleAuthSubmit() {
+        var emailInput = document.getElementById("quiz-auth-email");
+        var passwordInput = document.getElementById("quiz-auth-password");
         var email = emailInput.value.trim();
+        var password = passwordInput.value;
+        if (!EMAIL_RE.test(email) || password.length < 6) return;
 
-        if (!EMAIL_RE.test(email)) {
-          emailInput.classList.add("is-invalid");
-          errorEl.textContent = "Format d'email invalide.";
-          emailInput.focus();
-          return;
-        }
-        emailInput.classList.remove("is-invalid");
-        errorEl.textContent = "";
-
-        answers.prenom = prenomInput.value.trim();
+        hideAuthBanner();
         answers.email = email;
-        answers.matchCount = seededMatchCount(answers);
+        trackEvent("funnel_step_complete", { step_number: currentQuestionIndex + 1, answer: "submitted" });
 
-        trackEvent("lead_captured", { email_domain: email.split("@")[1] || "" });
+        // Transition optimiste — identique à goForwardFromQuestion, mais
+        // déclenchée AVANT que resolveIdentityRequest() n'ait répondu.
+        navHistory.push(currentQuestionIndex);
+        var next = findNextQuestionIndex(currentQuestionIndex);
+        currentQuestionIndex = next;
+        updateBackVisibility();
+        setProgress(next);
+        var screenEl = questionScreens[next];
+        updateNextEnabled(screenEl);
+        transitionTo(screenEl, "forward");
 
-        // L'appel réseau ne doit jamais bloquer ni faire échouer la progression
-        // du funnel côté utilisateur : erreurs avalées silencieusement (log
-        // uniquement). C'est le même compromis que l'ancien insertLead().
-        saveProfileForCurrentIdentity({
-          prenom: answers.prenom,
-          email: answers.email,
-          intention: answers.intention || null,
-          budget: answers.budget || null,
-          temps: answers.temps || null,
-          secteur: answers.secteur || [],
-          deja_cherche: answers.dejaCherche === "yes",
-          match_count: answers.matchCount
-        });
-
-        goForwardFromQuestion();
+        authResolutionPromise = resolveIdentityRequest(email, password);
       }
 
-      // Convergence d'identité (voir /js/ensure-identity.js) : le quiz et
-      // /inscription appellent la MÊME fonction avant de traiter quoi que ce
-      // soit comme "nouveau", pour qu'une personne qui abandonne le quiz puis
-      // revient directement sur /inscription ne se retrouve jamais avec deux
-      // comptes distincts. profiles.id = auth.users.id, la ligne existe déjà
-      // (trigger on_auth_user_created, cf. supabase/migrations) donc on met
-      // à jour plutôt qu'on insère.
-      function saveProfileForCurrentIdentity(fields) {
-        try {
-          if (!window.ColdTrendEnsureIdentity || !window.ColdTrendSupabase) {
-            console.warn("[ColdTrend] identité Supabase indisponible, capture ignorée.");
-            return;
-          }
-          window.ColdTrendEnsureIdentity()
-            .then(function (user) {
-              if (!user) return;
-              var supabase = window.ColdTrendSupabase;
-              // updateUser({ email }) attache l'email au compte anonyme en
-              // cours (ne bloque jamais sur la confirmation) — même logique
-              // que web/lib/auth/AuthContext.tsx captureEmail(). Le cas rare
-              // "email déjà utilisé par un autre compte" n'est pas géré
-              // spécifiquement ici (contrairement à /inscription) : on
-              // continue quand même pour ne pas casser le funnel.
-              // TODO: proposer une reconnexion inline si error.message
-              // indique "email_exists", comme le fait SignupForm côté web/.
-              supabase.auth.updateUser({ email: fields.email }).catch(function (err) {
-                console.warn("[ColdTrend] updateUser(email) échoué :", err);
-              });
-              supabase
-                .from("profiles")
-                .update({
-                  prenom: fields.prenom,
-                  intention: fields.intention,
-                  budget: fields.budget,
-                  temps: fields.temps,
-                  secteur: fields.secteur,
-                  deja_cherche: fields.deja_cherche,
-                  match_count: fields.match_count,
-                  funnel_last_step: 6
-                })
-                .eq("id", user.id)
-                .then(function (res) {
-                  if (res.error) {
-                    console.warn("[ColdTrend] mise à jour profiles échouée :", res.error.message);
-                  }
-                });
-            })
-            .catch(function (err) {
-              console.warn("[ColdTrend] ensureIdentity a échoué :", err);
-            });
-        } catch (err) {
-          console.warn("[ColdTrend] saveProfileForCurrentIdentity a échoué :", err);
+      function resolveIdentityRequest(email, password) {
+        var supabase = window.ColdTrendSupabase;
+        if (!supabase) {
+          showAuthBanner("Service indisponible pour le moment.");
+          return Promise.resolve(false);
         }
+
+        return fetch(supabase.supabaseUrl + "/functions/v1/resolve-identity", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            apikey: supabase.supabaseKey,
+            Authorization: "Bearer " + supabase.supabaseKey
+          },
+          body: JSON.stringify({ email: email, password: password })
+        })
+          .then(function (res) {
+            return res.json().then(function (body) {
+              return { ok: res.ok, body: body };
+            });
+          })
+          .then(function (result) {
+            if (!result.ok || !result.body.session) {
+              showAuthBanner((result.body && result.body.error) || "Un souci avec ton compte.");
+              return false;
+            }
+            return supabase.auth
+              .setSession({
+                access_token: result.body.session.access_token,
+                refresh_token: result.body.session.refresh_token
+              })
+              .then(function () {
+                showConnectedBadge();
+                return true;
+              });
+          })
+          .catch(function (err) {
+            console.warn("[ColdTrend] resolve-identity a échoué :", err);
+            showAuthBanner("Un souci avec ton compte.");
+            return false;
+          });
+      }
+
+      function showAuthBanner(message) {
+        var banner = document.getElementById("quiz-auth-banner");
+        var textEl = document.getElementById("quiz-auth-banner-text");
+        if (!banner || !textEl) return;
+        textEl.textContent = message;
+        banner.classList.add("is-visible");
+      }
+
+      function hideAuthBanner() {
+        var banner = document.getElementById("quiz-auth-banner");
+        if (banner) banner.classList.remove("is-visible");
+      }
+
+      function showConnectedBadge() {
+        var badge = document.getElementById("quiz-connected-badge");
+        if (badge) badge.classList.add("is-visible");
+      }
+
+      function fixAuthAndGoBack() {
+        hideAuthBanner();
+        navHistory = [];
+        currentQuestionIndex = 0;
+        setProgress(0, true);
+        updateBackVisibility();
+        var authScreen = questionScreens[0];
+        var emailInput = document.getElementById("quiz-auth-email");
+        var passwordInput = document.getElementById("quiz-auth-password");
+        emailInput.value = answers.email || "";
+        passwordInput.value = "";
+        updateNextEnabled(authScreen);
+        transitionTo(authScreen, "back");
+        passwordInput.focus();
+      }
+
+      // Sauvegarde les réponses du quiz dans profiles une fois le résultat
+      // atteint — attend d'abord la résolution de resolve-identity (déjà
+      // presque certainement terminée à ce stade, vu le temps passé sur les
+      // questions suivantes) pour être sûr d'avoir une session valide.
+      function persistQuizAnswers() {
+        var supabase = window.ColdTrendSupabase;
+        if (!supabase) return;
+        var pending = authResolutionPromise || Promise.resolve(true);
+        pending
+          .then(function () {
+            return supabase.auth.getUser();
+          })
+          .then(function (userRes) {
+            var user = userRes.data ? userRes.data.user : null;
+            if (!user) return;
+            return supabase
+              .from("profiles")
+              .update({
+                intention: answers.intention || null,
+                budget: answers.budget || null,
+                temps: answers.temps || null,
+                secteur: answers.secteur || [],
+                deja_cherche: answers.dejaCherche === "yes",
+                match_count: answers.matchCount,
+                funnel_last_step: 6,
+                converted: true
+              })
+              .eq("id", user.id)
+              .then(function (res) {
+                if (res.error) {
+                  console.warn("[ColdTrend] mise à jour profiles échouée :", res.error.message);
+                }
+              });
+          })
+          .catch(function (err) {
+            console.warn("[ColdTrend] persistQuizAnswers a échoué :", err);
+          });
+      }
+
+      // Si une session non-anonyme existe déjà (retour sur un appareil déjà
+      // connecté — la session est persistée nativement en localStorage par
+      // le SDK), l'écran auth est sauté : pas besoin de redemander un
+      // compte à quelqu'un qui en a déjà un.
+      function determineStartIndex() {
+        var supabase = window.ColdTrendSupabase;
+        if (!supabase) return Promise.resolve(0);
+        return supabase.auth
+          .getSession()
+          .then(function (res) {
+            var user = res.data.session ? res.data.session.user : null;
+            if (user && !user.is_anonymous) {
+              showConnectedBadge();
+              return findNextQuestionIndex(0);
+            }
+            return 0;
+          })
+          .catch(function () {
+            return 0;
+          });
       }
 
       function openQuiz() {
@@ -2297,6 +2483,7 @@ function page({ brand, hero, socialProof, notificationStack, pricing, comparison
         currentQuestionIndex = 0;
         currentScreenEl = null;
         reachedResult = false;
+        authResolutionPromise = null;
 
         stage.querySelectorAll(".quiz-option, .quiz-chip").forEach(function (btn) {
           btn.classList.remove("is-selected");
@@ -2304,19 +2491,13 @@ function page({ brand, hero, socialProof, notificationStack, pricing, comparison
         stage.querySelectorAll(".quiz-next").forEach(function (btn) {
           btn.disabled = true;
         });
-        var emailInput = document.getElementById("quiz-input-email");
-        var prenomInput = document.getElementById("quiz-input-prenom");
-        var consentInput = document.getElementById("quiz-rgpd-consent");
-        var privacyDetail = document.getElementById("quiz-privacy-detail");
-        var privacyToggle = document.getElementById("quiz-privacy-toggle");
-        if (emailInput) {
-          emailInput.value = "";
-          emailInput.classList.remove("is-invalid");
-        }
-        if (prenomInput) prenomInput.value = "";
-        if (consentInput) consentInput.checked = false;
-        if (privacyDetail) privacyDetail.classList.remove("is-open");
-        if (privacyToggle) privacyToggle.setAttribute("aria-expanded", "false");
+        var authEmailInput = document.getElementById("quiz-auth-email");
+        var authPasswordInput = document.getElementById("quiz-auth-password");
+        if (authEmailInput) authEmailInput.value = "";
+        if (authPasswordInput) authPasswordInput.value = "";
+        hideAuthBanner();
+        var badge = document.getElementById("quiz-connected-badge");
+        if (badge) badge.classList.remove("is-visible");
         var followupEl = document.getElementById("quiz-followup");
         if (followupEl) followupEl.classList.remove("is-visible");
 
@@ -2325,7 +2506,14 @@ function page({ brand, hero, socialProof, notificationStack, pricing, comparison
         resetScreensVisualState();
         setProgress(0, true);
         updateBackVisibility();
-        transitionTo(questionScreens[0], "forward");
+
+        determineStartIndex().then(function (startIndex) {
+          currentQuestionIndex = startIndex;
+          setProgress(startIndex, true);
+          var screenEl = questionScreens[startIndex];
+          updateNextEnabled(screenEl);
+          transitionTo(screenEl, "forward");
+        });
       }
 
       function closeQuiz() {
@@ -2338,12 +2526,8 @@ function page({ brand, hero, socialProof, notificationStack, pricing, comparison
       }
 
       stage.addEventListener("click", function (e) {
-        if (e.target.closest("#quiz-privacy-toggle")) {
-          var detail = document.getElementById("quiz-privacy-detail");
-          var toggle = e.target.closest("#quiz-privacy-toggle");
-          var willOpen = !detail.classList.contains("is-open");
-          detail.classList.toggle("is-open", willOpen);
-          toggle.setAttribute("aria-expanded", String(willOpen));
+        if (e.target.closest("#quiz-auth-banner-fix")) {
+          fixAuthAndGoBack();
           return;
         }
 
@@ -2385,8 +2569,8 @@ function page({ brand, hero, socialProof, notificationStack, pricing, comparison
           return;
         }
 
-        if (e.target.closest("#quiz-capture-submit")) {
-          submitCapture();
+        if (e.target.closest("#quiz-auth-submit")) {
+          handleAuthSubmit();
           return;
         }
 
@@ -2402,24 +2586,16 @@ function page({ brand, hero, socialProof, notificationStack, pricing, comparison
       });
 
       stage.addEventListener("input", function (e) {
-        if (e.target.id === "quiz-input-email" || e.target.id === "quiz-input-prenom") {
-          var captureScreen = e.target.closest(".quiz-screen");
-          if (e.target.id === "quiz-input-email") e.target.classList.remove("is-invalid");
-          updateNextEnabled(captureScreen);
-        }
-      });
-
-      stage.addEventListener("change", function (e) {
-        if (e.target.id === "quiz-rgpd-consent") {
+        if (e.target.id === "quiz-auth-email" || e.target.id === "quiz-auth-password") {
           updateNextEnabled(e.target.closest(".quiz-screen"));
         }
       });
 
       stage.addEventListener("keydown", function (e) {
         if (e.key !== "Enter") return;
-        if (e.target.id === "quiz-input-prenom" || e.target.id === "quiz-input-email") {
+        if (e.target.id === "quiz-auth-email" || e.target.id === "quiz-auth-password") {
           e.preventDefault();
-          var submitBtn = document.getElementById("quiz-capture-submit");
+          var submitBtn = document.getElementById("quiz-auth-submit");
           if (submitBtn && !submitBtn.disabled) submitBtn.click();
         }
       });
@@ -2520,28 +2696,31 @@ function renderQuizQuestionScreen(question, index) {
     ? ` data-skip-field="${question.skipIf.field}" data-skip-equals="${question.skipIf.equals}"`
     : "";
 
-  if (question.type === "capture") {
+  if (question.type === "auth") {
+    // Première question du parcours, pas un gate à part : même carte, même
+    // bouton "Continuer" (classe .quiz-next partagée avec les autres
+    // écrans). Le fond en mesh-gradient (.quiz-auth-mesh) et le stagger
+    // d'apparition des deux champs (.quiz-auth-field--1/--2) sont les seuls
+    // éléments visuels propres à cet écran.
     return `<div class="quiz-screen" data-screen="question" data-index="${index}" data-id="${question.id}" data-step-name="${question.stepName}"${skipAttrs}>
+          <div class="quiz-auth-mesh" aria-hidden="true"></div>
           <h2 class="quiz-question-title">${question.title}</h2>
           <p class="quiz-subtext">${question.subtext}</p>
-          <div class="quiz-field">
-            <label class="quiz-label" for="quiz-input-prenom">Prénom</label>
-            <input class="quiz-input" id="quiz-input-prenom" name="prenom" type="text" autocomplete="given-name" />
+          <div class="quiz-banner quiz-banner--alert" id="quiz-auth-banner" role="alert">
+            <span id="quiz-auth-banner-text"></span>
+            <button type="button" class="quiz-banner__action" id="quiz-auth-banner-fix">Corriger</button>
           </div>
-          <div class="quiz-field">
-            <label class="quiz-label" for="quiz-input-email">Email</label>
-            <input class="quiz-input" id="quiz-input-email" name="email" type="email" autocomplete="email" required />
-            <span class="quiz-field__error" id="quiz-email-error" aria-live="polite"></span>
+          <div class="quiz-field quiz-auth-field quiz-auth-field--1">
+            <label class="quiz-label" for="quiz-auth-email">Email</label>
+            <input class="quiz-input" id="quiz-auth-email" name="email" type="email" autocomplete="email" required />
           </div>
-          <div class="quiz-checkbox-row">
-            <input class="quiz-checkbox" id="quiz-rgpd-consent" type="checkbox" required />
-            <label for="quiz-rgpd-consent">J'accepte de recevoir mon résultat par email. <button type="button" class="quiz-privacy-toggle" id="quiz-privacy-toggle" aria-expanded="false">Politique de confidentialité</button></label>
-          </div>
-          <div class="quiz-privacy-detail" id="quiz-privacy-detail">
-            Ton email sert uniquement à t'envoyer ton résultat et l'accès après paiement — aucune newsletter, aucun partage à des tiers. Tu peux demander la suppression de tes données à tout moment en répondant à l'email reçu.
+          <div class="quiz-field quiz-auth-field quiz-auth-field--2">
+            <label class="quiz-label" for="quiz-auth-password">Mot de passe</label>
+            <input class="quiz-input" id="quiz-auth-password" name="password" type="password" autocomplete="new-password" minlength="6" required />
+            <span class="quiz-field__error" id="quiz-auth-error" aria-live="polite"></span>
           </div>
           <div class="quiz-footer">
-            <button class="btn btn--primary quiz-next" id="quiz-capture-submit" type="button" disabled>Voir mon résultat</button>
+            <button class="btn btn--primary quiz-next" id="quiz-auth-submit" type="button" disabled>Continuer</button>
           </div>
         </div>`;
   }
@@ -2569,6 +2748,7 @@ function renderQuizOverlay({ quiz, pricing, stripeLink }) {
   return `<div class="quiz-overlay" id="quiz-overlay" role="dialog" aria-modal="true" aria-label="Trouver ton SaaS">
     <div class="quiz-header">
       <button class="quiz-back" id="quiz-back-btn" type="button">${ICON_ARROW_LEFT} Retour</button>
+      <span class="connected-badge" id="quiz-connected-badge" aria-live="polite">${ICON_CHECK_SMALL} Connecté</span>
       <button class="quiz-close" id="quiz-close-btn" type="button" aria-label="Fermer">${ICON_CLOSE}</button>
     </div>
     <div class="quiz-progress" id="quiz-progress">
