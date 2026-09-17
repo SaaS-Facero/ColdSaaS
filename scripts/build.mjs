@@ -1745,27 +1745,23 @@ function page({ brand, hero, socialProof, notificationStack, pricing, comparison
      récent. La carte principale (opaque) occulte naturellement tout ce qui
      passe "derrière" elle, donc pas de confusion de plan à gérer en plus. */
 
-  .proof-stage {
-    position: relative;
-  }
-
+  /* Enfant direct de #quiz-stage (pas de .quiz-screen, limité à 520px de
+     large) : occupe toute la largeur de l'écran pour peupler les côtés
+     gauche/droit pendant que la carte reste au centre sur son étroite
+     colonne. Toujours dans le DOM, visible uniquement pendant l'écran
+     "proof" (voir transitionTo() : classe .is-visible togglée en JS). */
   .proof-bg {
     position: absolute;
-    inset: -16px -20px auto -20px;
-    height: 300px;
+    inset: 0;
     overflow: hidden;
     z-index: 0;
     pointer-events: none;
-    border-radius: 14px;
+    opacity: 0;
+    transition: opacity 300ms ease;
   }
 
-  .proof-bg::after {
-    content: "";
-    position: absolute;
-    inset: 0;
-    /* Adoucit juste les bords, ne doit jamais recouvrir les bandes : le
-       centre transparent doit couvrir la quasi-totalité de la zone. */
-    background: radial-gradient(ellipse 75% 85% at 50% 46%, transparent 55%, rgba(10, 14, 26, 0.6) 100%);
+  .proof-bg.is-visible {
+    opacity: 1;
   }
 
   .proof-bg__band {
@@ -1777,26 +1773,26 @@ function page({ brand, hero, socialProof, notificationStack, pricing, comparison
   .proof-bg__track {
     display: flex;
     align-items: center;
-    gap: 24px;
+    gap: 28px;
     width: max-content;
   }
 
   .proof-bg__band--far {
-    top: 6%;
+    top: 10%;
     filter: blur(6px);
-    opacity: 0.16;
+    opacity: 0.14;
   }
 
   .proof-bg__band--mid {
-    top: 42%;
+    top: 46%;
     filter: blur(2.5px);
-    opacity: 0.28;
+    opacity: 0.22;
   }
 
   .proof-bg__band--near {
-    top: 76%;
+    top: 80%;
     filter: blur(0.5px);
-    opacity: 0.4;
+    opacity: 0.3;
   }
 
   .proof-mini {
@@ -2689,7 +2685,10 @@ function page({ brand, hero, socialProof, notificationStack, pricing, comparison
 
         currentScreenEl = nextEl;
 
-        if (nextEl.getAttribute("data-id") === "proof") {
+        var isProofScreen = nextEl.getAttribute("data-id") === "proof";
+        var proofBgEl = document.getElementById("proof-bg");
+        if (proofBgEl) proofBgEl.classList.toggle("is-visible", isProofScreen);
+        if (isProofScreen) {
           var proofCardEl = document.getElementById("proof-card");
           if (proofCardEl && !proofCardEl.classList.contains("is-animating")) {
             proofCardEl.classList.add("is-animating");
@@ -3457,15 +3456,15 @@ function renderProofBackground() {
     return cards + "\n              " + cards;
   }
 
-  return `<div class="proof-bg" aria-hidden="true">
+  return `<div class="proof-bg" id="proof-bg" aria-hidden="true">
             <div class="proof-bg__band proof-bg__band--far"><div class="proof-bg__track">
-              ${track(5, -1)}
+              ${track(8, -1)}
             </div></div>
             <div class="proof-bg__band proof-bg__band--mid"><div class="proof-bg__track">
-              ${track(5, -1)}
+              ${track(8, -1)}
             </div></div>
             <div class="proof-bg__band proof-bg__band--near"><div class="proof-bg__track">
-              ${track(5, 2)}
+              ${track(8, 3)}
             </div></div>
           </div>`;
 }
@@ -3515,8 +3514,6 @@ function renderQuizQuestionScreen(question, index) {
     return `<div class="quiz-screen" data-screen="question" data-index="${index}" data-id="${question.id}" data-step-name="${question.stepName}"${skipAttrs}>
           <h2 class="quiz-question-title">${question.title}</h2>
           <p class="quiz-subtext">${question.subtext}</p>
-          <div class="proof-stage">
-          ${renderProofBackground()}
           <div class="proof-card" id="proof-card">
             <div class="proof-card__watermark" aria-hidden="true">
               <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -3548,7 +3545,6 @@ function renderQuizQuestionScreen(question, index) {
               <span class="proof-card__redaction proof-card__redaction--3" aria-hidden="true"><span class="proof-card__redaction-fill"></span></span>
             </div>
             <p class="proof-card__note">Nom et montant exact masqués ici — la fiche complète est débloquée avec ton accès, jamais un chiffre inventé.</p>
-          </div>
           </div>
           <svg width="0" height="0" style="position:absolute" aria-hidden="true">
             <filter id="proof-roughen" x="-20%" y="-100%" width="140%" height="300%">
@@ -3598,6 +3594,7 @@ function renderQuizOverlay({ quiz, pricing, stripeLink }) {
       <button type="button" class="quiz-banner__action" id="quiz-auth-banner-fix">Corriger</button>
     </div>
     <div class="quiz-stage" id="quiz-stage">
+      ${renderProofBackground()}
       ${questionScreens}
 
       <div class="quiz-screen quiz-result" data-screen="result" data-step-name="resultat">
