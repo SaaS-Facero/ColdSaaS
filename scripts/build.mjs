@@ -1598,23 +1598,71 @@ function page({ brand, hero, socialProof, notificationStack, pricing, comparison
     .connected-badge { transition: opacity 200ms ease-out; transform: none; }
   }
 
-  /* ---- Carte "preuve redactée" ---- */
+  /* ---- Carte "preuve redactée" — relevé de vérification caviardé ---- */
 
   .proof-card {
+    position: relative;
+    overflow: hidden;
     margin: 4px 0 24px;
-    padding: 18px 20px;
-    border-radius: 16px;
-    background: rgba(255, 255, 255, 0.03);
-    border: 1px dashed rgba(255, 255, 255, 0.18);
+    padding: 20px 22px;
+    border-radius: 14px;
+    background:
+      repeating-linear-gradient(0deg, rgba(255,255,255,0.012) 0px, rgba(255,255,255,0.012) 1px, transparent 1px, transparent 3px),
+      #12151f;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    box-shadow: 0 20px 40px -20px rgba(0, 0, 0, 0.5);
+    transform: perspective(800px);
+    transform-style: preserve-3d;
+    transition: transform 160ms ease-out;
+    opacity: 1;
+  }
+
+  .proof-card__watermark {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 120px;
+    height: 120px;
+    transform: translate(-50%, -50%) rotate(-14deg);
+    color: var(--cobalt);
+    opacity: 0.06;
+    pointer-events: none;
+  }
+
+  .proof-card__scanline {
+    position: absolute;
+    left: 0;
+    right: 0;
+    height: 40%;
+    background: linear-gradient(180deg, transparent, rgba(0, 71, 255, 0.16), transparent);
+    opacity: 0;
+    pointer-events: none;
+    transform: translateY(-100%);
+  }
+
+  .proof-card__sheen {
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    background: radial-gradient(circle at var(--mx, 50%) var(--my, 50%), rgba(255, 255, 255, 0.22), transparent 45%);
+    mix-blend-mode: overlay;
+    opacity: 0;
+    transition: opacity 200ms ease;
+    pointer-events: none;
+  }
+
+  .proof-card.is-hovering .proof-card__sheen {
+    opacity: 1;
   }
 
   .proof-card__header {
+    position: relative;
     display: flex;
     align-items: center;
     justify-content: space-between;
     margin-bottom: 14px;
     padding-bottom: 14px;
-    border-bottom: 1px dashed rgba(255, 255, 255, 0.12);
+    border-bottom: 1px dashed rgba(255, 255, 255, 0.14);
   }
 
   .proof-card__badge {
@@ -1626,9 +1674,9 @@ function page({ brand, hero, socialProof, notificationStack, pricing, comparison
     color: var(--verified-green);
   }
 
-  .proof-card__badge svg {
-    width: 13px;
-    height: 13px;
+  .proof-card__badge-check {
+    width: 14px;
+    height: 14px;
   }
 
   .proof-card__source {
@@ -1639,11 +1687,12 @@ function page({ brand, hero, socialProof, notificationStack, pricing, comparison
   }
 
   .proof-card__row {
+    position: relative;
     display: flex;
-    align-items: baseline;
+    align-items: center;
     justify-content: space-between;
     gap: 12px;
-    padding: 6px 0;
+    padding: 7px 0;
   }
 
   .proof-card__label {
@@ -1651,14 +1700,24 @@ function page({ brand, hero, socialProof, notificationStack, pricing, comparison
     color: var(--steel);
   }
 
-  .proof-card__value {
-    font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
-    font-size: 14px;
-    color: var(--paper-soft);
+  .proof-card__redaction {
+    display: inline-block;
+    height: 15px;
+    border-radius: 2px;
+    cursor: not-allowed;
   }
 
-  .proof-card__value--redacted {
-    letter-spacing: 0.02em;
+  .proof-card__redaction--1 { width: 130px; }
+  .proof-card__redaction--2 { width: 92px; }
+  .proof-card__redaction--3 { width: 150px; }
+
+  .proof-card__redaction-fill {
+    display: block;
+    width: 100%;
+    height: 100%;
+    background: #0c0c0c;
+    filter: url(#proof-roughen);
+    clip-path: inset(0 0 0 0);
   }
 
   .proof-card__note {
@@ -1666,6 +1725,95 @@ function page({ brand, hero, socialProof, notificationStack, pricing, comparison
     font-size: 12px;
     line-height: 1.5;
     color: var(--steel);
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    .proof-card.is-animating {
+      animation: proof-card-land 550ms cubic-bezier(0.34, 1.56, 0.64, 1) both;
+    }
+
+    .proof-card.is-animating .proof-card__watermark {
+      opacity: 0;
+      animation: proof-watermark-in 1400ms ease-out 250ms forwards;
+    }
+
+    .proof-card.is-animating .proof-card__badge-check path {
+      stroke-dasharray: 20;
+      stroke-dashoffset: 20;
+      animation: proof-check-draw 420ms ease-out 650ms forwards;
+    }
+
+    .proof-card.is-animating .proof-card__badge {
+      animation: proof-badge-flash 320ms ease-out 1060ms both;
+    }
+
+    .proof-card.is-animating .proof-card__redaction--1 .proof-card__redaction-fill {
+      clip-path: inset(0 100% 0 0);
+      animation: proof-marker-fill 420ms linear 950ms forwards;
+    }
+
+    .proof-card.is-animating .proof-card__redaction--2 .proof-card__redaction-fill {
+      clip-path: inset(0 100% 0 0);
+      animation: proof-marker-fill 420ms linear 1250ms forwards;
+    }
+
+    .proof-card.is-animating .proof-card__redaction--3 .proof-card__redaction-fill {
+      clip-path: inset(0 100% 0 0);
+      animation: proof-marker-fill 420ms linear 1550ms forwards;
+    }
+
+    .proof-card.is-animating .proof-card__scanline {
+      animation: proof-scanline 3200ms ease-in-out 2050ms infinite;
+    }
+
+    .proof-card__redaction:hover .proof-card__redaction-fill,
+    .proof-card__redaction:focus-visible .proof-card__redaction-fill {
+      animation: proof-redaction-jitter 260ms ease-in-out;
+    }
+  }
+
+  @keyframes proof-card-land {
+    0% { opacity: 0; transform: perspective(800px) translateY(18px) scale(0.97); }
+    100% { opacity: 1; transform: perspective(800px) translateY(0) scale(1); }
+  }
+
+  @keyframes proof-watermark-in {
+    to { opacity: 0.06; }
+  }
+
+  @keyframes proof-check-draw {
+    to { stroke-dashoffset: 0; }
+  }
+
+  @keyframes proof-badge-flash {
+    0% { text-shadow: none; }
+    45% { text-shadow: 0 0 12px rgba(0, 196, 140, 0.85); }
+    100% { text-shadow: none; }
+  }
+
+  @keyframes proof-marker-fill {
+    0% { clip-path: inset(0 100% 0 0); }
+    22% { clip-path: inset(0 68% 0 0); }
+    38% { clip-path: inset(0 74% 0 0); }
+    55% { clip-path: inset(0 42% 0 0); }
+    70% { clip-path: inset(0 48% 0 0); }
+    88% { clip-path: inset(0 8% 0 0); }
+    100% { clip-path: inset(0 0 0 0); }
+  }
+
+  @keyframes proof-scanline {
+    0%, 100% { transform: translateY(-100%); opacity: 0; }
+    12% { opacity: 0.6; }
+    50% { transform: translateY(150%); opacity: 0.6; }
+    62% { opacity: 0; }
+  }
+
+  @keyframes proof-redaction-jitter {
+    0%, 100% { transform: translateX(0) rotate(0); }
+    20% { transform: translateX(-1.5px) rotate(-0.4deg); }
+    40% { transform: translateX(1.5px) rotate(0.4deg); }
+    60% { transform: translateX(-1px) rotate(0); }
+    80% { transform: translateX(1px) rotate(0); }
   }
 
   .quiz-result-meta {
@@ -2360,6 +2508,13 @@ function page({ brand, hero, socialProof, notificationStack, pricing, comparison
 
         currentScreenEl = nextEl;
 
+        if (nextEl.getAttribute("data-id") === "proof") {
+          var proofCardEl = document.getElementById("proof-card");
+          if (proofCardEl && !proofCardEl.classList.contains("is-animating")) {
+            proofCardEl.classList.add("is-animating");
+          }
+        }
+
         var stepName = nextEl.getAttribute("data-step-name");
         if (stepName) {
           var stepIndexAttr = nextEl.getAttribute("data-index");
@@ -2367,6 +2522,44 @@ function page({ brand, hero, socialProof, notificationStack, pricing, comparison
           trackEvent("funnel_step_view", { step_number: stepNumber, step_name: stepName });
         }
       }
+
+      // Tilt 3D + reflet suivant le curseur — carte "preuve" uniquement,
+      // amplitude plafonnée à 6°, transform only. N'active rien sur tactile
+      // (pas de mousemove) ni en prefers-reduced-motion.
+      (function initProofCardTilt() {
+        var card = document.getElementById("proof-card");
+        if (!card || reduceMotion) return;
+        if (!window.matchMedia("(hover: hover) and (pointer: fine)").matches) return;
+
+        var TILT_MAX_DEG = 6;
+        var pendingFrame = null;
+
+        card.addEventListener("mousemove", function (e) {
+          if (pendingFrame) return;
+          pendingFrame = window.requestAnimationFrame(function () {
+            pendingFrame = null;
+            var rect = card.getBoundingClientRect();
+            var px = (e.clientX - rect.left) / rect.width;
+            var py = (e.clientY - rect.top) / rect.height;
+            var rotateY = Math.max(-TILT_MAX_DEG, Math.min(TILT_MAX_DEG, (px - 0.5) * TILT_MAX_DEG * 2));
+            var rotateX = Math.max(-TILT_MAX_DEG, Math.min(TILT_MAX_DEG, (0.5 - py) * TILT_MAX_DEG * 2));
+            card.style.transform = "perspective(800px) rotateX(" + rotateX.toFixed(2) + "deg) rotateY(" + rotateY.toFixed(2) + "deg)";
+            card.style.setProperty("--mx", (px * 100).toFixed(1) + "%");
+            card.style.setProperty("--my", (py * 100).toFixed(1) + "%");
+          });
+        });
+
+        card.addEventListener("mouseenter", function () {
+          card.classList.add("is-hovering");
+          card.style.willChange = "transform";
+        });
+
+        card.addEventListener("mouseleave", function () {
+          card.classList.remove("is-hovering");
+          card.style.transform = "perspective(800px)";
+          card.style.willChange = "";
+        });
+      })();
 
       function easeOutExpo(t) {
         return t === 1 ? 1 : 1 - Math.pow(2, -10 * t);
@@ -3086,32 +3279,53 @@ function renderQuizQuestionScreen(question, index) {
   }
 
   if (question.type === "proof") {
-    // Preuve redactée plutôt qu'un chiffre inventé ou une affirmation
-    // textuelle : on montre littéralement la NATURE de la preuve (source
-    // croisée, montant, nom) sans révéler l'identité du SaaS — rien n'est
-    // fabriqué, juste partiellement masqué.
+    // Concept : un relevé de vérification caviardé, pas une carte marketing
+    // polie. Le filigrane, le sceau qui se grave et les barres noircies à
+    // bord irrégulier matérialisent littéralement "la donnée existe, elle
+    // est vraie, elle est juste protégée" — rien n'est fabriqué, juste
+    // partiellement masqué. Voir initProofCard() plus bas pour le tilt 3D,
+    // la séquence d'entrée orchestrée et le tremblement au survol.
     return `<div class="quiz-screen" data-screen="question" data-index="${index}" data-id="${question.id}" data-step-name="${question.stepName}"${skipAttrs}>
           <h2 class="quiz-question-title">${question.title}</h2>
           <p class="quiz-subtext">${question.subtext}</p>
-          <div class="proof-card">
+          <div class="proof-card" id="proof-card">
+            <div class="proof-card__watermark" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M12 3l7 3v5c0 4.5-3 8-7 10-4-2-7-5.5-7-10V6l7-3z" stroke="currentColor" stroke-width="1.5"/>
+                <path d="M9 12l2 2 4-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+            </div>
+            <div class="proof-card__scanline" aria-hidden="true"></div>
+            <div class="proof-card__sheen" aria-hidden="true"></div>
             <div class="proof-card__header">
-              <span class="proof-card__badge">${ICON_CHECK_SMALL} Vérifié</span>
+              <span class="proof-card__badge">
+                <svg class="proof-card__badge-check" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                  <path d="M20 6L9 17l-5-5" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+                Vérifié
+              </span>
               <span class="proof-card__source">Stripe × TrustMRR</span>
             </div>
             <div class="proof-card__row">
               <span class="proof-card__label">SaaS</span>
-              <span class="proof-card__value proof-card__value--redacted">████████████</span>
+              <span class="proof-card__redaction proof-card__redaction--1" tabindex="0" aria-label="Nom masqué"><span class="proof-card__redaction-fill"></span></span>
             </div>
             <div class="proof-card__row">
               <span class="proof-card__label">MRR mensuel</span>
-              <span class="proof-card__value proof-card__value--redacted">•••• 8 2•• €</span>
+              <span class="proof-card__redaction proof-card__redaction--2" tabindex="0" aria-label="Montant masqué"><span class="proof-card__redaction-fill"></span></span>
             </div>
             <div class="proof-card__row">
               <span class="proof-card__label">Historique</span>
-              <span class="proof-card__value proof-card__value--redacted">██ mois consécutifs</span>
+              <span class="proof-card__redaction proof-card__redaction--3" tabindex="0" aria-label="Ancienneté masquée"><span class="proof-card__redaction-fill"></span></span>
             </div>
             <p class="proof-card__note">Nom et montant exact masqués ici — la fiche complète est débloquée avec ton accès, jamais un chiffre inventé.</p>
           </div>
+          <svg width="0" height="0" style="position:absolute" aria-hidden="true">
+            <filter id="proof-roughen" x="-20%" y="-100%" width="140%" height="300%">
+              <feTurbulence type="fractalNoise" baseFrequency="0.9 0.6" numOctaves="2" seed="7" result="noise"></feTurbulence>
+              <feDisplacementMap in="SourceGraphic" in2="noise" scale="3" xChannelSelector="R" yChannelSelector="G"></feDisplacementMap>
+            </filter>
+          </svg>
           <div class="quiz-footer">
             <button class="btn btn--primary quiz-next" type="button">Continuer</button>
           </div>
