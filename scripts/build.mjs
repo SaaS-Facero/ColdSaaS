@@ -1584,6 +1584,117 @@ function page({ brand, hero, socialProof, notificationStack, pricing, comparison
     padding: 0;
   }
 
+  /* ---- Accumulateur de tags — la pièce d'UX qui évite de recommencer à
+     zéro pour corriger une réponse. Visible dès la première réponse
+     donnée, sur tous les écrans de question suivants et sur le résultat. */
+
+  .quiz-tags {
+    display: none;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin: 12px 20px 0;
+  }
+
+  .quiz-tags.is-visible {
+    display: flex;
+  }
+
+  .quiz-tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 12px;
+    border-radius: 999px;
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    background: rgba(255, 255, 255, 0.04);
+    color: var(--paper-soft);
+    font-size: 12px;
+    font-family: inherit;
+    cursor: pointer;
+    transition: transform 180ms cubic-bezier(0.22, 1.26, 0.36, 1), opacity 220ms ease, border-color 180ms ease;
+  }
+
+  .quiz-tag:hover,
+  .quiz-tag:focus-visible {
+    border-color: var(--cobalt-soft);
+  }
+
+  .quiz-tag:active {
+    transform: scale(0.96);
+  }
+
+  .quiz-tag__label {
+    color: var(--steel);
+  }
+
+  .quiz-tag.is-editing {
+    border-color: var(--cobalt);
+    box-shadow: 0 0 0 3px rgba(0, 71, 255, 0.2);
+  }
+
+  .quiz-tag.is-removing {
+    opacity: 0;
+    transform: scale(0.85);
+  }
+
+  /* Badge "à revérifier" — infrastructure posée, dormante : aucune paire de
+     questions du quiz actuel ne crée d'incohérence non résolue par un skip
+     automatique (voir audit), donc rien ne déclenche cette classe pour
+     l'instant. Prête pour une future question qui en aurait besoin. */
+  .quiz-tag.needs-review {
+    border-color: var(--amber, #d9a23d);
+  }
+
+  .quiz-tag__review-icon {
+    color: var(--amber, #d9a23d);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .quiz-tag {
+      transition: opacity 150ms ease;
+    }
+  }
+
+  .quiz-edit-bar {
+    display: none;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin: 12px 20px 0;
+    padding: 10px 14px;
+    border-radius: 12px;
+    background: rgba(0, 71, 255, 0.12);
+    border: 1px solid rgba(0, 71, 255, 0.35);
+    font-size: 13px;
+    color: var(--paper-soft);
+  }
+
+  .quiz-edit-bar.is-visible {
+    display: flex;
+  }
+
+  .quiz-toast {
+    position: absolute;
+    left: 50%;
+    bottom: 24px;
+    transform: translate(-50%, 12px);
+    padding: 10px 18px;
+    border-radius: 999px;
+    background: var(--verified-green);
+    color: #052e22;
+    font-size: 13px;
+    font-weight: 700;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 220ms ease, transform 220ms ease;
+    z-index: 5;
+  }
+
+  .quiz-toast.is-visible {
+    opacity: 1;
+    transform: translate(-50%, 0);
+  }
+
   /* ---- Badge "connecté" (brand-bar) ---- */
 
   .connected-badge {
@@ -2565,6 +2676,33 @@ function page({ brand, hero, socialProof, notificationStack, pricing, comparison
       var TIME_LABELS = ${JSON.stringify(quiz.timeLabels)};
       var EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
+      // ---- Accumulateur de tags — libellés d'affichage ----------------
+      var INTENTION_LABELS = { racheter: "Racheter", copier: "Copier" };
+      var DEJA_CHERCHE_LABELS = { yes: "Déjà cherché", no: "Nouvelle recherche" };
+      var QUESTION_LABELS = {
+        intention: "Intention",
+        budget: "Budget",
+        temps: "Temps",
+        secteur: "Secteur",
+        dejaCherche: "Recherche"
+      };
+      // Ordre d'affichage fixe des tags, indépendant de l'ordre dans lequel
+      // les questions ont été répondues.
+      var TAG_ORDER = ["intention", "budget", "temps", "secteur", "dejaCherche"];
+
+      function tagValueLabel(id) {
+        var value = answers[id];
+        if (value === undefined) return null;
+        if (id === "intention") return INTENTION_LABELS[value] || value;
+        if (id === "budget") return BUDGET_LABELS[value] || value;
+        if (id === "temps") return TIME_LABELS[value] || value;
+        if (id === "dejaCherche") return DEJA_CHERCHE_LABELS[value] || value;
+        if (id === "secteur") {
+          return (value || []).map(function (v) { return SECTOR_LABELS[v] || v; }).join(" + ") || null;
+        }
+        return String(value);
+      }
+
       var reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
       var ENTER_TRANSITION = reduceMotion
         ? "opacity 220ms ease-out"
@@ -2580,6 +2718,12 @@ function page({ brand, hero, socialProof, notificationStack, pricing, comparison
       var currentScreenEl = null;
       var currentQuestionIndex = 0;
       var reachedResult = false;
+      var transitionInProgress = false;
+      // editContext non-null pendant une édition ponctuelle depuis un tag :
+      // { questionId, returnIndex } où returnIndex est un index de
+      // questionScreens, ou la chaîne "result" si l'édition a été lancée
+      // depuis l'écran de résultat.
+      var editContext = null;
 
       function isSkipped(index) {
         var el = questionScreens[index];
@@ -2656,8 +2800,16 @@ function page({ brand, hero, socialProof, notificationStack, pricing, comparison
       }
 
       function transitionTo(nextEl, direction) {
+        // Verrou anti-race-condition : un clic rapide sur plusieurs tags
+        // (ou tag + bouton Retour) pendant qu'une transition est déjà en
+        // cours est ignoré plutôt que d'empiler des animations concurrentes
+        // qui laisseraient le state (currentQuestionIndex, editContext)
+        // incohérent avec ce qui est réellement affiché.
+        if (transitionInProgress) return;
         var prevEl = currentScreenEl;
         if (prevEl === nextEl) return;
+
+        transitionInProgress = true;
 
         var enterFrom = direction === "back" ? -24 : 24;
         var exitTo = direction === "back" ? 24 : -24;
@@ -2674,6 +2826,7 @@ function page({ brand, hero, socialProof, notificationStack, pricing, comparison
         nextEl.style.transform = "translateX(0)";
         window.setTimeout(function () {
           nextEl.style.pointerEvents = "auto";
+          transitionInProgress = false;
         }, ENTER_MS);
 
         if (prevEl) {
@@ -2840,6 +2993,11 @@ function page({ brand, hero, socialProof, notificationStack, pricing, comparison
       }
 
       function goForwardFromQuestion() {
+        if (editContext) {
+          handleEditSave();
+          return;
+        }
+
         var currentEl = questionScreens[currentQuestionIndex];
         var currentId = currentEl.getAttribute("data-id");
         trackEvent("funnel_step_complete", {
@@ -3077,6 +3235,152 @@ function page({ brand, hero, socialProof, notificationStack, pricing, comparison
           }
           updateNextEnabled(screenEl);
         });
+        renderTags();
+      }
+
+      // ---- Accumulateur de tags -----------------------------------------
+      var quizTagsEl = document.getElementById("quiz-tags");
+      var quizEditBarEl = document.getElementById("quiz-edit-bar");
+      var quizToastEl = document.getElementById("quiz-toast");
+
+      function showToast(message) {
+        if (!quizToastEl) return;
+        quizToastEl.textContent = message;
+        quizToastEl.classList.add("is-visible");
+        window.setTimeout(function () {
+          quizToastEl.classList.remove("is-visible");
+        }, 2200);
+      }
+
+      function renderTags() {
+        if (!quizTagsEl) return;
+        var html = "";
+        TAG_ORDER.forEach(function (id) {
+          var valueLabel = tagValueLabel(id);
+          if (valueLabel === null) return;
+          var isEditing = editContext && editContext.questionId === id;
+          html +=
+            '<button type="button" class="quiz-tag' +
+            (isEditing ? " is-editing" : "") +
+            '" data-tag-id="' +
+            id +
+            '" aria-label="Modifier la réponse : ' +
+            QUESTION_LABELS[id] +
+            " — " +
+            valueLabel +
+            '">' +
+            '<span class="quiz-tag__label">' +
+            QUESTION_LABELS[id] +
+            "</span> " +
+            valueLabel +
+            "</button>";
+        });
+        quizTagsEl.innerHTML = html;
+        quizTagsEl.classList.toggle("is-visible", html !== "");
+      }
+
+      // Retire un tag avec un fade-out visible avant de reconstruire la
+      // liste — jamais une disparition brutale, et toujours suite à une
+      // action que l'utilisateur vient de faire (ici : intention basculée
+      // vers "copier", qui rend budget inapplicable).
+      function fadeOutAndRemoveTag(id) {
+        var tagEl = quizTagsEl ? quizTagsEl.querySelector('[data-tag-id="' + id + '"]') : null;
+        if (!tagEl) {
+          renderTags();
+          return;
+        }
+        tagEl.classList.add("is-removing");
+        window.setTimeout(renderTags, 220);
+      }
+
+      // Unique dépendance réelle entre questions dans ce quiz (voir audit) :
+      // intention -> budget. Si intention passe à "copier" et que budget
+      // avait déjà une réponse, budget devient skip conditionnel (moteur
+      // existant, isSkipped()) : son tag doit disparaître proprement et sa
+      // réponse être purgée, jamais laissée en state fantôme.
+      function propagateAnswerDependencies(changedId) {
+        if (changedId === "intention" && answers.intention === "copier" && answers.budget !== undefined) {
+          delete answers.budget;
+          fadeOutAndRemoveTag("budget");
+        }
+      }
+
+      function hideEditBar() {
+        if (quizEditBarEl) quizEditBarEl.classList.remove("is-visible");
+      }
+
+      function showEditBar(questionId) {
+        if (!quizEditBarEl) return;
+        var textEl = document.getElementById("quiz-edit-bar-text");
+        if (textEl) textEl.textContent = "Tu modifies : " + QUESTION_LABELS[questionId];
+        quizEditBarEl.classList.add("is-visible");
+      }
+
+      // Clic sur un tag : saute directement à l'écran concerné, avec la
+      // réponse actuelle déjà visible (restoreAnswersUI), sans passer par
+      // tous les écrans intermédiaires ni perdre les réponses suivantes.
+      function enterEditMode(questionId) {
+        if (transitionInProgress) return;
+        var targetIndex = -1;
+        for (var i = 0; i < questionScreens.length; i += 1) {
+          if (questionScreens[i].getAttribute("data-id") === questionId) {
+            targetIndex = i;
+            break;
+          }
+        }
+        if (targetIndex === -1) return;
+
+        editContext = {
+          questionId: questionId,
+          returnIndex: currentScreenEl === resultScreen ? "result" : currentQuestionIndex
+        };
+
+        currentQuestionIndex = targetIndex;
+        setProgress(targetIndex, true);
+        var screenEl = questionScreens[targetIndex];
+        transitionTo(screenEl, "back");
+        restoreAnswersUI();
+        updateNextEnabled(screenEl);
+        showEditBar(questionId);
+      }
+
+      // Retour sans modification (l'utilisateur voulait juste vérifier) :
+      // pas de toast, rien n'a changé.
+      function exitEditModeViewOnly() {
+        if (!editContext || transitionInProgress) return;
+        var ctx = editContext;
+        editContext = null;
+        hideEditBar();
+        returnFromEdit(ctx);
+      }
+
+      // Réponse modifiée + Continuer cliqué : propage les dépendances,
+      // persiste, prévient explicitement ("Réponse mise à jour"), puis
+      // revient au point de départ de l'édition.
+      function handleEditSave() {
+        var ctx = editContext;
+        editContext = null;
+        hideEditBar();
+        propagateAnswerDependencies(ctx.questionId);
+        persistProgress(currentQuestionIndex);
+        showToast("Réponse mise à jour");
+        returnFromEdit(ctx, true);
+      }
+
+      function returnFromEdit(ctx, answersChanged) {
+        if (ctx.returnIndex === "result") {
+          // Le compteur ne doit jamais rester affiché avec une valeur
+          // devenue fausse après une correction : on force son recalcul
+          // plutôt que de réutiliser answers.matchCount mis en cache.
+          if (answersChanged) delete answers.matchCount;
+          goToResult();
+        } else {
+          currentQuestionIndex = ctx.returnIndex;
+          setProgress(ctx.returnIndex, true);
+          updateBackVisibility();
+          transitionTo(questionScreens[ctx.returnIndex], "back");
+        }
+        renderTags();
       }
 
       // Reconstruit navHistory jusqu'à startIndex (exclu) en respectant les
@@ -3142,6 +3446,12 @@ function page({ brand, hero, socialProof, notificationStack, pricing, comparison
         currentScreenEl = null;
         reachedResult = false;
         authResolutionPromise = null;
+        editContext = null;
+        hideEditBar();
+        if (quizTagsEl) {
+          quizTagsEl.innerHTML = "";
+          quizTagsEl.classList.remove("is-visible");
+        }
 
         stage.querySelectorAll(".quiz-option, .quiz-chip").forEach(function (btn) {
           btn.classList.remove("is-selected");
@@ -3218,6 +3528,8 @@ function page({ brand, hero, socialProof, notificationStack, pricing, comparison
               }
             }
           }
+          propagateAnswerDependencies(id);
+          renderTags();
           updateNextEnabled(screenEl);
           return;
         }
@@ -3255,6 +3567,14 @@ function page({ brand, hero, socialProof, notificationStack, pricing, comparison
 
       backBtn.addEventListener("click", function () {
         if (navHistory.length === 0) return;
+        // Le bouton Retour classique navigue dans l'historique normal du
+        // quiz, pas dans le point de retour d'une édition ponctuelle — les
+        // deux mécanismes ne doivent jamais se mélanger.
+        if (editContext) {
+          editContext = null;
+          hideEditBar();
+          renderTags();
+        }
         var prevIndex = navHistory.pop();
         currentQuestionIndex = prevIndex;
         setProgress(prevIndex, true);
@@ -3268,6 +3588,17 @@ function page({ brand, hero, socialProof, notificationStack, pricing, comparison
       openBtn.addEventListener("click", openQuiz);
       var authBannerFixBtn = document.getElementById("quiz-auth-banner-fix");
       if (authBannerFixBtn) authBannerFixBtn.addEventListener("click", fixAuthAndGoBack);
+
+      if (quizTagsEl) {
+        quizTagsEl.addEventListener("click", function (e) {
+          var tagBtn = e.target.closest(".quiz-tag");
+          if (!tagBtn) return;
+          enterEditMode(tagBtn.getAttribute("data-tag-id"));
+        });
+      }
+
+      var editBarReturnBtn = document.getElementById("quiz-edit-bar-return");
+      if (editBarReturnBtn) editBarReturnBtn.addEventListener("click", exitEditModeViewOnly);
 
       // ---- Google OAuth (position primaire sur l'écran auth) -----------
       // signInWithOAuth() redirige la page entière vers Google puis vers
@@ -3597,6 +3928,12 @@ function renderQuizOverlay({ quiz, pricing, stripeLink }) {
       <span id="quiz-auth-banner-text"></span>
       <button type="button" class="quiz-banner__action" id="quiz-auth-banner-fix">Corriger</button>
     </div>
+    <div class="quiz-tags" id="quiz-tags" aria-label="Tes réponses"></div>
+    <div class="quiz-edit-bar" id="quiz-edit-bar">
+      <span id="quiz-edit-bar-text"></span>
+      <button type="button" class="quiz-banner__action" id="quiz-edit-bar-return">Retour à mon résultat</button>
+    </div>
+    <div class="quiz-toast" id="quiz-toast" role="status" aria-live="polite"></div>
     <div class="quiz-stage" id="quiz-stage">
       ${renderProofBackground()}
       ${questionScreens}
