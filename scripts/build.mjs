@@ -4529,6 +4529,214 @@ html, body {
   gap: 14px;
   padding: 24px;
 }
+
+/* ---- /compte — le dossier personnel -------------------------------- */
+
+.dossier-shell {
+  min-height: 100dvh;
+  padding: 48px 24px;
+  display: flex;
+  justify-content: center;
+}
+
+.dossier {
+  width: 100%;
+  max-width: 560px;
+  opacity: 0;
+  transform: scale(0.98);
+}
+
+.dossier.is-revealed {
+  opacity: 1;
+  transform: scale(1);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .dossier {
+    transition: opacity 420ms cubic-bezier(0.22, 1, 0.36, 1), transform 420ms cubic-bezier(0.22, 1, 0.36, 1);
+  }
+}
+
+.dossier__top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 24px;
+}
+
+.dossier__day {
+  font-size: 12px;
+  color: var(--color-steel);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.dossier__header {
+  margin-bottom: 8px;
+}
+
+.dossier__title {
+  font-size: 22px;
+  font-weight: 800;
+  margin: 0 0 6px;
+}
+
+.dossier__narrative {
+  font-size: 15px;
+  line-height: 1.6;
+  color: var(--color-paper-soft);
+  margin: 0 0 8px;
+  min-height: 1.6em;
+}
+
+.dossier__narrative .is-typing-cursor {
+  display: inline-block;
+  width: 2px;
+  height: 1em;
+  background: var(--color-cobalt-soft);
+  margin-left: 1px;
+  vertical-align: -0.15em;
+  animation: dossier-caret-blink 0.85s steps(1) infinite;
+}
+
+@keyframes dossier-caret-blink {
+  0%, 45% { opacity: 1; }
+  50%, 100% { opacity: 0; }
+}
+
+.dossier__context {
+  font-size: 13px;
+  color: var(--color-steel);
+  margin: 0 0 32px;
+}
+
+.timeline {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.timeline__item {
+  position: relative;
+  padding: 0 0 28px 28px;
+  opacity: 0;
+  transform: translateY(8px);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .dossier.is-revealed .timeline__item {
+    animation: dossier-item-in 380ms cubic-bezier(0.22, 1.26, 0.36, 1) forwards;
+  }
+  .dossier:not(.is-revealed) .timeline__item {
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .timeline__item {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes dossier-item-in {
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.timeline__item::before {
+  content: "";
+  position: absolute;
+  left: 5px;
+  top: 4px;
+  bottom: -4px;
+  width: 1px;
+  background: rgba(255, 255, 255, 0.14);
+}
+
+.timeline__item:last-child::before {
+  display: none;
+}
+
+.timeline__dot {
+  position: absolute;
+  left: 0;
+  top: 2px;
+  width: 11px;
+  height: 11px;
+  border-radius: 50%;
+  border: 2px solid var(--color-steel);
+  background: var(--color-ink);
+}
+
+.timeline__item--done .timeline__dot {
+  border-color: var(--color-cobalt);
+  background: var(--color-cobalt);
+}
+
+.timeline__item--current .timeline__dot {
+  border-color: var(--color-cobalt);
+  background: var(--color-cobalt);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .timeline__item--current .timeline__dot {
+    animation: dossier-pulse 2s ease-in-out infinite;
+  }
+}
+
+@keyframes dossier-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(0, 71, 255, 0.45); }
+  50% { box-shadow: 0 0 0 6px rgba(0, 71, 255, 0); }
+}
+
+.timeline__item--upcoming .timeline__dot {
+  border-style: dashed;
+  background: transparent;
+}
+
+.timeline__label {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--color-paper-soft);
+  margin: 0 0 2px;
+}
+
+.timeline__item--upcoming .timeline__label {
+  color: var(--color-steel);
+}
+
+.timeline__meta {
+  font-size: 13px;
+  color: var(--color-steel);
+  line-height: 1.5;
+}
+
+.timeline__meta a {
+  color: var(--color-cobalt-soft);
+}
+
+.dossier__actions {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 32px;
+}
+
+.dossier__link-btn {
+  background: none;
+  border: none;
+  padding: 0;
+  font-size: 13px;
+  color: var(--color-steel);
+  text-decoration: underline;
+  cursor: pointer;
+  font-family: inherit;
+  text-align: left;
+}
+
+.dossier__link-btn--danger:hover {
+  color: var(--color-alert);
+}
 `;
 }
 
@@ -5252,29 +5460,203 @@ function reinitialiserMotDePassePage() {
 }
 
 function comptePage() {
-  // Pas de middleware possible sur du statique : la protection réelle tient
-  // dans l'ordre d'affichage — skeleton fidèle à la mise en page finale
-  // affiché immédiatement, contenu réel révélé seulement après vérification
-  // JS de la session, redirection sinon. Assume-le au lieu de le cacher.
+  // /compte n'affiche pas des données, il raconte une progression : le
+  // "dossier" de la personne, dans le même univers vérification/preuve que
+  // le reste du produit. Pas de middleware possible sur du statique : la
+  // protection réelle tient dans l'ordre d'affichage (skeleton fidèle à la
+  // mise en page finale, contenu révélé seulement après vérification JS).
   const body = `  <div class="account-skeleton" id="account-skeleton" aria-hidden="true">
     <div class="skeleton-line" style="width:120px;height:14px;"></div>
     <div class="skeleton-line" style="width:220px;height:26px;"></div>
     <div class="skeleton-line" style="width:180px;height:16px;"></div>
-    <div class="skeleton-line" style="width:160px;height:40px;border-radius:999px;"></div>
+    <div class="skeleton-line" style="width:100%;height:60px;"></div>
+    <div class="skeleton-line" style="width:100%;height:60px;"></div>
+    <div class="skeleton-line" style="width:100%;height:60px;"></div>
   </div>
-  <div class="account-shell" id="account-content" hidden>
-    <a class="auth-brand" href="/">${brand.name}</a>
-    <h1 class="auth-title">Ton compte</h1>
-    <p class="auth-subtitle" id="account-email"></p>
-    <p class="auth-subtitle" id="account-match" style="display:none;"></p>
-    <button class="btn-submit" type="button" id="signout-btn" style="max-width:220px;">
-      <span class="btn-submit__label">Se déconnecter</span>
-      <span class="btn-submit__spinner" aria-hidden="true"></span>
-      ${BTN_CHECK_SVG}
-    </button>
+  <div class="dossier-shell" id="account-content" hidden>
+    <div class="dossier" id="dossier">
+      <div class="dossier__top">
+        <a class="auth-brand" href="/">${brand.name}</a>
+        <span class="dossier__day" id="dossier-day"></span>
+      </div>
+      <div class="dossier__header">
+        <h1 class="dossier__title">Ton dossier</h1>
+      </div>
+      <p class="dossier__narrative" id="dossier-narrative"></p>
+      <p class="dossier__context" id="dossier-context"></p>
+
+      <ol class="timeline" id="dossier-timeline"></ol>
+
+      <div class="dossier__actions">
+        <button type="button" class="dossier__link-btn" id="resend-access-btn" style="display:none;">Renvoyer mon accès par email</button>
+        <button type="button" class="dossier__link-btn" id="signout-btn">Se déconnecter</button>
+        <button type="button" class="dossier__link-btn dossier__link-btn--danger" id="delete-account-btn">Supprimer mon compte</button>
+      </div>
+    </div>
   </div>
   <script>
     (function () {
+      var SESSION_SEEN_KEY = "coldtrend_dossier_seen";
+      var reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+      var INTENTION_LABELS = { racheter: "racheter", copier: "copier" };
+      var SECTOR_LABELS = ${JSON.stringify(quiz.sectorLabels)};
+      var BUDGET_LABELS = ${JSON.stringify(quiz.budgetLabels)};
+      var TIME_LABELS = ${JSON.stringify(quiz.timeLabels)};
+
+      function formatDateFr(iso) {
+        try {
+          return new Date(iso).toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" });
+        } catch (err) {
+          return "";
+        }
+      }
+
+      function daysSince(iso) {
+        var then = new Date(iso).getTime();
+        if (isNaN(then)) return 0;
+        return Math.max(0, Math.floor((Date.now() - then) / 86400000));
+      }
+
+      function sectorText(profile) {
+        var values = profile.secteur || [];
+        if (!values.length) return "généraliste";
+        return values.map(function (v) { return SECTOR_LABELS[v] || v; }).join(" et ");
+      }
+
+      // 4 gabarits de phrase distincts (pas un mad-libs identique pour
+      // tout le monde) — sélection déterministe par profil, pas aléatoire
+      // à chaque chargement. Toujours à la deuxième personne : aucun
+      // prénom n'est collecté par le parcours actuel (écran auth =
+      // email/mot de passe/Google uniquement).
+      function buildNarrative(profile) {
+        var intention = INTENTION_LABELS[profile.intention] || "trouver";
+        var secteur = sectorText(profile);
+        var temps = TIME_LABELS[profile.temps] || profile.temps || "un peu de temps";
+        var budgetPart = profile.budget ? ", avec un budget de " + (BUDGET_LABELS[profile.budget] || profile.budget) : "";
+
+        var seed = String(profile.intention) + String(profile.secteur) + String(profile.budget);
+        var hash = 0;
+        for (var i = 0; i < seed.length; i += 1) hash = (hash * 31 + seed.charCodeAt(i)) | 0;
+        var variant = Math.abs(hash) % 4;
+
+        var templates = [
+          "Tu cherches à " + intention + " un SaaS " + secteur + ", avec " + temps + " par semaine à y consacrer" + budgetPart + ".",
+          temps.charAt(0).toUpperCase() + temps.slice(1) + " par semaine, direction " + secteur + " — objectif " + intention + " un SaaS" + budgetPart + ".",
+          "Profil qualifié : " + intention + " un SaaS " + secteur + budgetPart + ", dans la limite de " + temps + " par semaine.",
+          profile.deja_cherche
+            ? "Tu avais déjà cherché avant ColdTrend — cette fois avec des chiffres vérifiés : " + secteur + ", " + temps + " par semaine" + budgetPart + "."
+            : "Première recherche, bien cadrée : SaaS " + secteur + ", " + temps + " par semaine" + budgetPart + "."
+        ];
+
+        return templates[variant];
+      }
+
+      function typeText(el, text, onDone) {
+        if (reduceMotion) {
+          el.textContent = text;
+          if (onDone) onDone();
+          return;
+        }
+        el.textContent = "";
+        var cursor = document.createElement("span");
+        cursor.className = "is-typing-cursor";
+        el.appendChild(cursor);
+        var i = 0;
+        var speed = Math.max(6, Math.min(18, Math.floor(600 / text.length)));
+        (function step() {
+          if (i <= text.length) {
+            el.textContent = text.slice(0, i);
+            el.appendChild(cursor);
+            i += 1;
+            window.setTimeout(step, speed);
+          } else {
+            cursor.remove();
+            if (onDone) onDone();
+          }
+        })();
+      }
+
+      function buildTimeline(user, profile) {
+        var items = [];
+
+        items.push({
+          status: "done",
+          label: "Dossier ouvert",
+          meta: "Le " + formatDateFr(user.created_at)
+        });
+
+        var hasAnswers = profile && (profile.intention || profile.temps);
+        items.push({
+          status: hasAnswers ? "done" : "current",
+          label: "Profil qualifié",
+          meta: hasAnswers
+            ? (profile.match_count ? profile.match_count + " SaaS correspondent à ce profil." : "Réponses enregistrées.")
+            : "Termine le quiz pour qualifier ton profil."
+        });
+
+        var paid = profile && profile.paid_at;
+        items.push({
+          status: paid ? "done" : "current",
+          label: paid ? "Accès débloqué" : "Accès en attente",
+          meta: paid
+            ? "Le " + formatDateFr(profile.paid_at)
+            : "Le paiement débloque l'accès à la base complète."
+        });
+
+        items.push({
+          status: "upcoming",
+          label: "Ressources consultées",
+          // Infrastructure dormante : aucun PDF n'existe encore dans le
+          // produit. Le traçage "Consulté le {date}" s'activera dès qu'une
+          // vraie pièce jointe existera — pas de contenu à inventer ici.
+          meta: "Aucune pièce jointe pour l'instant."
+        });
+
+        items.push({
+          status: "upcoming",
+          label: "À venir",
+          meta: "La suite de ton dossier s'écrit ici."
+        });
+
+        return items;
+      }
+
+      function renderTimeline(items) {
+        var listEl = document.getElementById("dossier-timeline");
+        listEl.innerHTML = items
+          .map(function (item, index) {
+            return (
+              '<li class="timeline__item timeline__item--' +
+              item.status +
+              '" style="animation-delay:' +
+              index * 90 +
+              'ms">' +
+              '<span class="timeline__dot" aria-hidden="true"></span>' +
+              '<p class="timeline__label">' +
+              item.label +
+              "</p>" +
+              '<p class="timeline__meta">' +
+              item.meta +
+              "</p>" +
+              "</li>"
+            );
+          })
+          .join("");
+      }
+
+      function contextLine(profile) {
+        var paid = profile && profile.paid_at;
+        if (!paid) {
+          var age = profile ? daysSince(profile.created_at || Date.now()) : 0;
+          return age < 1
+            ? "Ton dossier vient de s'ouvrir."
+            : (profile && profile.match_count ? profile.match_count + " SaaS trouvés pour toi, toujours disponibles." : "Ton profil est enregistré, à toi de le débloquer.");
+        }
+        var sincePaid = daysSince(profile.paid_at);
+        return sincePaid < 2 ? "Accès confirmé — bienvenue dans la base." : "Ton accès est actif depuis " + sincePaid + " jours.";
+      }
+
       async function check() {
         var supabase = window.ColdTrendSupabase;
         if (!supabase) {
@@ -5290,33 +5672,105 @@ function comptePage() {
           return;
         }
 
-        document.getElementById("account-email").textContent = user.email || "";
+        var profileRes = await supabase
+          .from("profiles")
+          .select("intention, budget, temps, secteur, deja_cherche, match_count, paid_at, created_at")
+          .eq("id", user.id)
+          .single();
+        var profile = profileRes.data || {};
+        if (!profile.created_at) profile.created_at = user.created_at;
 
-        var profileRes = await supabase.from("profiles").select("match_count").eq("id", user.id).single();
-        if (profileRes.data && profileRes.data.match_count) {
-          var matchEl = document.getElementById("account-match");
-          matchEl.textContent = profileRes.data.match_count + " SaaS correspondent à ton profil.";
-          matchEl.style.display = "block";
-        }
+        document.getElementById("dossier-day").textContent = "Jour " + (daysSince(profile.created_at) + 1);
+        document.getElementById("dossier-context").textContent = contextLine(profile);
+        renderTimeline(buildTimeline(user, profile));
 
         document.getElementById("account-skeleton").hidden = true;
         document.getElementById("account-content").hidden = false;
+
+        var narrativeEl = document.getElementById("dossier-narrative");
+        var narrative = profile.intention ? buildNarrative(profile) : "Termine le quiz pour que ton dossier se qualifie.";
+
+        var alreadySeen;
+        try {
+          alreadySeen = sessionStorage.getItem(SESSION_SEEN_KEY) === "1";
+        } catch (err) {
+          alreadySeen = false;
+        }
+
+        var dossierEl = document.getElementById("dossier");
+        window.requestAnimationFrame(function () {
+          dossierEl.classList.add("is-revealed");
+        });
+
+        if (alreadySeen || reduceMotion) {
+          narrativeEl.textContent = narrative;
+        } else {
+          typeText(narrativeEl, narrative);
+          try {
+            sessionStorage.setItem(SESSION_SEEN_KEY, "1");
+          } catch (err) {
+            /* pas grave si sessionStorage est indisponible */
+          }
+        }
+
+        if (profile.paid_at) {
+          document.getElementById("resend-access-btn").style.display = "inline";
+        }
       }
 
       check();
 
       document.getElementById("signout-btn").addEventListener("click", async function () {
-        var loadingState = initButtonLoadingState(this);
-        loadingState.start("Déconnexion…");
         await window.ColdTrendSupabase.auth.signOut();
         window.location.href = "/connexion";
+      });
+
+      async function callEdgeFunction(name) {
+        var supabase = window.ColdTrendSupabase;
+        var sessionRes = await supabase.auth.getSession();
+        var token = sessionRes.data.session ? sessionRes.data.session.access_token : null;
+        if (!token) return { error: "Session invalide." };
+        var res = await fetch(supabase.supabaseUrl + "/functions/v1/" + name, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            apikey: supabase.supabaseKey,
+            Authorization: "Bearer " + token
+          }
+        });
+        return res.json();
+      }
+
+      document.getElementById("resend-access-btn").addEventListener("click", async function () {
+        var btn = this;
+        btn.disabled = true;
+        var result = await callEdgeFunction("resend-access");
+        btn.disabled = false;
+        btn.textContent = result && result.success ? "Email envoyé." : "Échec de l'envoi, réessaie plus tard.";
+      });
+
+      document.getElementById("delete-account-btn").addEventListener("click", async function () {
+        var confirmed = window.confirm(
+          "Supprimer définitivement ton compte et toutes tes données ColdTrend ? Cette action est irréversible."
+        );
+        if (!confirmed) return;
+        var btn = this;
+        btn.disabled = true;
+        var result = await callEdgeFunction("delete-account");
+        if (result && result.success) {
+          await window.ColdTrendSupabase.auth.signOut();
+          window.location.href = "/";
+        } else {
+          btn.disabled = false;
+          btn.textContent = "Échec de la suppression, réessaie plus tard.";
+        }
       });
     })();
   </script>`;
 
   return authPageShell({
     title: "Mon compte",
-    description: "Ton compte ColdTrend.",
+    description: "Ton dossier ColdTrend.",
     bodyHtml: body
   });
 }
