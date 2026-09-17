@@ -1347,6 +1347,13 @@ function page({ brand, hero, socialProof, notificationStack, pricing, comparison
     margin-top: auto;
   }
 
+  /* Écran "proof" : peu de contenu, le bouton collé au fond de l'écran via
+     margin-top:auto crée un grand vide disproportionné en dessous de la
+     carte — on le garde juste sous elle à la place. */
+  .quiz-screen[data-id="proof"] .quiz-footer {
+    margin-top: 24px;
+  }
+
   .quiz-next {
     width: 100%;
   }
@@ -2447,8 +2454,11 @@ function page({ brand, hero, socialProof, notificationStack, pricing, comparison
         }
 
         if (id === "proof") {
-          // Écran purement informatif, rien à répondre : le bouton reste
-          // activé par défaut (pas d'attribut disabled dans le rendu).
+          // Écran purement informatif, rien à répondre — mais openQuiz()
+          // désactive TOUS les boutons .quiz-next à l'ouverture (y compris
+          // celui-ci), donc il faut le réactiver explicitement ici, pas
+          // juste "ne pas y toucher".
+          nextBtn.disabled = false;
           return;
         }
 
