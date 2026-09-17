@@ -2944,6 +2944,34 @@ function page({ brand, hero, socialProof, notificationStack, pricing, comparison
         }
       })();
 
+      // Retour depuis le lien de relance d'abandon (email envoyé par
+      // supabase/functions/send-abandon-emails) : ?resume=quiz redirige ici
+      // avec un magic link qui vient d'établir la session. On rouvre le
+      // quiz — determineStartIndex() se charge de reprendre au bon écran,
+      // exactement comme pour Google ou email/mot de passe.
+      (function resumeQuizFromRecoveryLink() {
+        var params = new URLSearchParams(window.location.search);
+        if (params.get("resume") !== "quiz") return;
+
+        params.delete("resume");
+        var cleanUrl = window.location.pathname + (params.toString() ? "?" + params.toString() : "");
+        window.history.replaceState({}, "", cleanUrl);
+
+        function tryResume() {
+          var supabase = window.ColdTrendSupabase;
+          if (!supabase) return;
+          supabase.auth.getSession().then(function (res) {
+            if (res.data.session) openQuiz();
+          });
+        }
+
+        if (window.ColdTrendSupabase) {
+          tryResume();
+        } else {
+          document.addEventListener("coldtrend:supabase-ready", tryResume, { once: true });
+        }
+      })();
+
       document.addEventListener("keydown", function (e) {
         if (e.key === "Escape" && overlay.classList.contains("is-open")) closeQuiz();
       });
