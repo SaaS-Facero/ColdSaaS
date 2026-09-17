@@ -2989,6 +2989,27 @@ function page({ brand, hero, socialProof, notificationStack, pricing, comparison
         var sectorText = sectorSummary() || "plusieurs secteurs";
         var budgetText = answers.budget ? ", budget " + (BUDGET_LABELS[answers.budget] || answers.budget) : "";
         teaserEl.textContent = matchCount + " SaaS correspondent à ton profil : " + sectorText + budgetText + ".";
+
+        // Attache l'identité au lien Stripe (client_reference_id) : sans ça,
+        // supabase/functions/stripe-webhook ne peut pas savoir quel profil
+        // vient de payer et ignore l'événement plutôt que de deviner.
+        var supabase = window.ColdTrendSupabase;
+        var payBtn = document.getElementById("quiz-pay-btn");
+        if (supabase && payBtn) {
+          supabase.auth.getUser().then(function (res) {
+            var user = res.data ? res.data.user : null;
+            if (!user) return;
+            try {
+              var url = new URL(payBtn.href);
+              url.searchParams.set("client_reference_id", user.id);
+              if (user.email) url.searchParams.set("prefilled_email", user.email);
+              payBtn.href = url.toString();
+            } catch (err) {
+              console.warn("[ColdTrend] impossible d'attacher client_reference_id au lien Stripe :", err);
+            }
+          });
+        }
+
         transitionTo(paymentScreen, "forward");
       }
 
