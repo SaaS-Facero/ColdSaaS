@@ -2240,9 +2240,9 @@ function page({ brand, hero, socialProof, notificationStack, pricing, comparison
       // /inscription appellent la MÊME fonction avant de traiter quoi que ce
       // soit comme "nouveau", pour qu'une personne qui abandonne le quiz puis
       // revient directement sur /inscription ne se retrouve jamais avec deux
-      // comptes distincts. `profiles.id` = `auth.users.id`, la ligne existe
-      // déjà (trigger `on_auth_user_created`, cf. supabase/migrations) donc on
-      // met à jour plutôt qu'on insère.
+      // comptes distincts. profiles.id = auth.users.id, la ligne existe déjà
+      // (trigger on_auth_user_created, cf. supabase/migrations) donc on met
+      // à jour plutôt qu'on insère.
       function saveProfileForCurrentIdentity(fields) {
         try {
           if (!window.ColdTrendEnsureIdentity || !window.ColdTrendSupabase) {
