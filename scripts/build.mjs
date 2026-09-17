@@ -3367,6 +3367,7 @@ function page({ brand, hero, socialProof, notificationStack, pricing, comparison
       });
     })();
   </script>
+  ${crispWidgetScript()}
 </body>
 </html>
 `;
@@ -3658,6 +3659,28 @@ const ICON_GOOGLE =
   '<svg width="18" height="18" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M23.52 12.27c0-.85-.08-1.66-.22-2.44H12v4.62h6.47a5.53 5.53 0 01-2.4 3.63v3h3.88c2.27-2.09 3.57-5.17 3.57-8.81z" fill="#4285F4"/><path d="M12 24c3.24 0 5.96-1.07 7.95-2.92l-3.88-3c-1.08.72-2.45 1.15-4.07 1.15-3.13 0-5.78-2.11-6.73-4.96H1.27v3.1A12 12 0 0012 24z" fill="#34A853"/><path d="M5.27 14.27a7.2 7.2 0 010-4.54v-3.1H1.27a12 12 0 000 10.74l4-3.1z" fill="#FBBC05"/><path d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.44-3.44C17.95 1.19 15.24 0 12 0A12 12 0 001.27 6.63l4 3.1C6.22 6.86 8.87 4.75 12 4.75z" fill="#EA4335"/></svg>';
 
 // ---------------------------------------------------------------------------
+// Widget de chat Crisp — présent sur toutes les pages (landing, quiz, succès,
+// pages d'auth). Le website ID est public par conception (identifiant
+// d'intégration, pas un secret) — safe à committer, comme l'anon key
+// Supabase. La couleur du lanceur ne se pilote PAS via JS côté Crisp
+// (uniquement Settings → Chatbox Settings → Chatbox Appearance → Advanced
+// Chatbox Customization dans leur dashboard) : renseigner #0047FF (cobalt,
+// couleur de marque) là-bas manuellement.
+function crispWidgetScript() {
+  return `<script type="text/javascript">
+window.$crisp = [];
+window.CRISP_WEBSITE_ID = "70b4bb4e-b6d9-44be-b1c3-a6a941ff5150";
+(function () {
+  var d = document;
+  var s = d.createElement("script");
+  s.src = "https://client.crisp.chat/l.js";
+  s.async = 1;
+  d.getElementsByTagName("head")[0].appendChild(s);
+})();
+</script>`;
+}
+
+// ---------------------------------------------------------------------------
 // Page succès — cible de la redirection post-paiement Stripe
 // ---------------------------------------------------------------------------
 // Le Payment Link Stripe redirige ici APRÈS paiement confirmé. Cette URL
@@ -3730,6 +3753,7 @@ function successPage({ brand, siteUrl }) {
     <p>Rien reçu sous 10 minutes ? Vérifie tes spams avant de nous écrire.</p>
     <a class="btn" href="${siteUrl}">Retour à l'accueil</a>
   </div>
+  ${crispWidgetScript()}
 </body>
 </html>
 `;
@@ -4411,6 +4435,7 @@ ${extraHead}
 <script src="/js/auth-ui.js"></script>
 <script src="/js/auth-state.js"></script>
 ${bodyHtml}
+${crispWidgetScript()}
 </body>
 </html>
 `;
