@@ -1175,6 +1175,7 @@ function page({ brand, hero, socialProof, notificationStack, pricing, comparison
     flex-direction: column;
     justify-content: flex-start;
     overflow-y: auto;
+    overflow-x: hidden;
     padding: 32px 4px 24px;
     max-width: 520px;
     margin: 0 auto;
