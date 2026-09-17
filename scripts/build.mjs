@@ -1350,6 +1350,10 @@ function page({ brand, hero, socialProof, notificationStack, pricing, comparison
   /* Écran "proof" : peu de contenu, le bouton collé au fond de l'écran via
      margin-top:auto crée un grand vide disproportionné en dessous de la
      carte — on le garde juste sous elle à la place. */
+  .quiz-screen[data-id="proof"] {
+    justify-content: center;
+  }
+
   .quiz-screen[data-id="proof"] .quiz-footer {
     margin-top: 24px;
   }
@@ -1758,7 +1762,9 @@ function page({ brand, hero, socialProof, notificationStack, pricing, comparison
     content: "";
     position: absolute;
     inset: 0;
-    background: radial-gradient(ellipse 60% 70% at 50% 46%, transparent 25%, var(--ink) 90%);
+    /* Adoucit juste les bords, ne doit jamais recouvrir les bandes : le
+       centre transparent doit couvrir la quasi-totalité de la zone. */
+    background: radial-gradient(ellipse 75% 85% at 50% 46%, transparent 55%, rgba(10, 14, 26, 0.6) 100%);
   }
 
   .proof-bg__band {
@@ -1777,19 +1783,19 @@ function page({ brand, hero, socialProof, notificationStack, pricing, comparison
   .proof-bg__band--far {
     top: 6%;
     filter: blur(6px);
-    opacity: 0.1;
+    opacity: 0.16;
   }
 
   .proof-bg__band--mid {
     top: 42%;
     filter: blur(2.5px);
-    opacity: 0.2;
+    opacity: 0.28;
   }
 
   .proof-bg__band--near {
     top: 76%;
     filter: blur(0.5px);
-    opacity: 0.3;
+    opacity: 0.4;
   }
 
   .proof-mini {
@@ -1938,8 +1944,7 @@ function page({ brand, hero, socialProof, notificationStack, pricing, comparison
       animation: proof-scanline 3200ms ease-in-out 2050ms infinite;
     }
 
-    .proof-card__redaction:hover .proof-card__redaction-fill,
-    .proof-card__redaction:focus-visible .proof-card__redaction-fill {
+    .proof-card__redaction:hover .proof-card__redaction-fill {
       animation: proof-redaction-jitter 260ms ease-in-out;
     }
   }
@@ -3531,15 +3536,15 @@ function renderQuizQuestionScreen(question, index) {
             </div>
             <div class="proof-card__row">
               <span class="proof-card__label">SaaS</span>
-              <span class="proof-card__redaction proof-card__redaction--1" tabindex="0" aria-label="Nom masqué"><span class="proof-card__redaction-fill"></span></span>
+              <span class="proof-card__redaction proof-card__redaction--1" aria-hidden="true"><span class="proof-card__redaction-fill"></span></span>
             </div>
             <div class="proof-card__row">
               <span class="proof-card__label">MRR mensuel</span>
-              <span class="proof-card__redaction proof-card__redaction--2" tabindex="0" aria-label="Montant masqué"><span class="proof-card__redaction-fill"></span></span>
+              <span class="proof-card__redaction proof-card__redaction--2" aria-hidden="true"><span class="proof-card__redaction-fill"></span></span>
             </div>
             <div class="proof-card__row">
               <span class="proof-card__label">Historique</span>
-              <span class="proof-card__redaction proof-card__redaction--3" tabindex="0" aria-label="Ancienneté masquée"><span class="proof-card__redaction-fill"></span></span>
+              <span class="proof-card__redaction proof-card__redaction--3" aria-hidden="true"><span class="proof-card__redaction-fill"></span></span>
             </div>
             <p class="proof-card__note">Nom et montant exact masqués ici — la fiche complète est débloquée avec ton accès, jamais un chiffre inventé.</p>
           </div>
