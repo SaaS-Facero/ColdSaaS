@@ -367,6 +367,7 @@ function page({ brand, hero, socialProof, notificationStack, pricing, comparison
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>${brand.name} — Preuve de revenus vérifiés</title>
 <meta name="description" content="${hero.subhead}" />
+<link rel="stylesheet" href="/css/design-tokens.css" />
 <style>
   :root {
     --cobalt: ${colors.cobalt};
@@ -458,6 +459,20 @@ function page({ brand, hero, socialProof, notificationStack, pricing, comparison
     font-size: 12px;
     color: var(--steel);
     font-style: italic;
+  }
+
+  .brand-bar__auth {
+    margin-top: 6px;
+    font-size: 12px;
+  }
+
+  .brand-bar__auth a {
+    color: var(--steel);
+    text-decoration: underline;
+  }
+
+  .brand-bar__auth a:hover {
+    color: var(--cobalt-soft);
   }
 
   .hero__eyebrow {
@@ -1557,6 +1572,7 @@ function page({ brand, hero, socialProof, notificationStack, pricing, comparison
           <div class="brand-bar">
             <span class="brand-bar__name">${brand.name}</span>
             <span class="brand-bar__tagline">${brand.tagline}</span>
+            <span class="brand-bar__auth" data-auth-slot></span>
           </div>
           <span class="hero__eyebrow">
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
@@ -1637,6 +1653,14 @@ function page({ brand, hero, socialProof, notificationStack, pricing, comparison
   </main>
 
   ${renderQuizOverlay({ quiz, pricing, stripeLink: STRIPE_PAYMENT_LINK })}
+
+  <!-- Identité partagée quiz <-> /inscription <-> /connexion : voir
+       ensure-identity.js pour la garantie de convergence (jamais deux
+       comptes pour une même personne selon le point d'entrée). -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="/js/supabase-client.js"></script>
+  <script src="/js/ensure-identity.js"></script>
+  <script src="/js/auth-state.js"></script>
 
   <script>
     (function () {
@@ -1941,8 +1965,6 @@ function page({ brand, hero, socialProof, notificationStack, pricing, comparison
       var BUDGET_LABELS = ${JSON.stringify(quiz.budgetLabels)};
       var TIME_LABELS = ${JSON.stringify(quiz.timeLabels)};
       var EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-      var SUPABASE_URL = ${JSON.stringify(SUPABASE_URL)};
-      var SUPABASE_ANON_KEY = ${JSON.stringify(SUPABASE_ANON_KEY)};
 
       var reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
       var ENTER_TRANSITION = reduceMotion
@@ -2198,11 +2220,11 @@ function page({ brand, hero, socialProof, notificationStack, pricing, comparison
         trackEvent("lead_captured", { email_domain: email.split("@")[1] || "" });
 
         // L'appel réseau ne doit jamais bloquer ni faire échouer la progression
-        // du funnel côté utilisateur : erreurs avalées silencieusement.
-        insertLead({
+        // du funnel côté utilisateur : erreurs avalées silencieusement (log
+        // uniquement). C'est le même compromis que l'ancien insertLead().
+        saveProfileForCurrentIdentity({
           prenom: answers.prenom,
           email: answers.email,
-          rgpd_consent: true,
           intention: answers.intention || null,
           budget: answers.budget || null,
           temps: answers.temps || null,
@@ -2214,22 +2236,58 @@ function page({ brand, hero, socialProof, notificationStack, pricing, comparison
         goForwardFromQuestion();
       }
 
-      function insertLead(payload) {
+      // Convergence d'identité (voir /js/ensure-identity.js) : le quiz et
+      // /inscription appellent la MÊME fonction avant de traiter quoi que ce
+      // soit comme "nouveau", pour qu'une personne qui abandonne le quiz puis
+      // revient directement sur /inscription ne se retrouve jamais avec deux
+      // comptes distincts. `profiles.id` = `auth.users.id`, la ligne existe
+      // déjà (trigger `on_auth_user_created`, cf. supabase/migrations) donc on
+      // met à jour plutôt qu'on insère.
+      function saveProfileForCurrentIdentity(fields) {
         try {
-          fetch(SUPABASE_URL + "/rest/v1/leads", {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              apikey: SUPABASE_ANON_KEY,
-              Authorization: "Bearer " + SUPABASE_ANON_KEY,
-              Prefer: "return=minimal"
-            },
-            body: JSON.stringify(payload)
-          }).catch(function (err) {
-            console.warn("[ColdTrend] insertion Supabase silencieusement échouée :", err);
-          });
+          if (!window.ColdTrendEnsureIdentity || !window.ColdTrendSupabase) {
+            console.warn("[ColdTrend] identité Supabase indisponible, capture ignorée.");
+            return;
+          }
+          window.ColdTrendEnsureIdentity()
+            .then(function (user) {
+              if (!user) return;
+              var supabase = window.ColdTrendSupabase;
+              // updateUser({ email }) attache l'email au compte anonyme en
+              // cours (ne bloque jamais sur la confirmation) — même logique
+              // que web/lib/auth/AuthContext.tsx captureEmail(). Le cas rare
+              // "email déjà utilisé par un autre compte" n'est pas géré
+              // spécifiquement ici (contrairement à /inscription) : on
+              // continue quand même pour ne pas casser le funnel.
+              // TODO: proposer une reconnexion inline si error.message
+              // indique "email_exists", comme le fait SignupForm côté web/.
+              supabase.auth.updateUser({ email: fields.email }).catch(function (err) {
+                console.warn("[ColdTrend] updateUser(email) échoué :", err);
+              });
+              supabase
+                .from("profiles")
+                .update({
+                  prenom: fields.prenom,
+                  intention: fields.intention,
+                  budget: fields.budget,
+                  temps: fields.temps,
+                  secteur: fields.secteur,
+                  deja_cherche: fields.deja_cherche,
+                  match_count: fields.match_count,
+                  funnel_last_step: 6
+                })
+                .eq("id", user.id)
+                .then(function (res) {
+                  if (res.error) {
+                    console.warn("[ColdTrend] mise à jour profiles échouée :", res.error.message);
+                  }
+                });
+            })
+            .catch(function (err) {
+              console.warn("[ColdTrend] ensureIdentity a échoué :", err);
+            });
         } catch (err) {
-          console.warn("[ColdTrend] insertion Supabase silencieusement échouée :", err);
+          console.warn("[ColdTrend] saveProfileForCurrentIdentity a échoué :", err);
         }
       }
 
@@ -2654,12 +2712,1275 @@ function successPage({ brand, siteUrl }) {
 `;
 }
 
+// =============================================================================
+// Système de compte — HTML/JS vanilla + supabase-js (CDN), sans framework
+// =============================================================================
+//
+// Pas de serveur qui rend les pages ici (site statique servi par Vercel) :
+// pas de middleware possible pour protéger /compte AVANT le rendu. La
+// protection réelle est un skeleton affiché immédiatement pendant que
+// `supabase.auth.getSession()` répond en JS, contenu affiché seulement après
+// vérification, redirection sinon (voir comptePage() plus bas).
+//
+// Chaque page est un rechargement complet (pas de SPA) : la transition douce
+// entre les 5 pages ne peut pas être une transition CSS classique (le DOM est
+// détruit/recréé). On utilise la View Transitions API multi-documents
+// (`@view-transition { navigation: auto; }` dans authCss()) : ignorée
+// silencieusement par les navigateurs qui ne la supportent pas (règle CSS
+// inconnue = no-op par spec), donc dégradation gracieuse par construction —
+// pas de JS applicatif à maintenir pour ça, pas de risque de casser la
+// navigation si l'API est absente.
+
+const AUTH_ALERT = "#D9605A"; // dérivé du graphite, jamais un rouge Bootstrap générique
+const AUTH_AMBER = "#D9A23D";
+
+function designTokensCss() {
+  return `:root {
+  --color-cobalt: ${brand.colors.cobalt};
+  --color-cobalt-soft: ${brand.colors.cobaltSoft};
+  --color-cobalt-dark: ${brand.colors.cobaltDark};
+  --color-verified-green: ${brand.colors.verifiedGreen};
+  --color-verified-green-soft: ${brand.colors.verifiedGreenSoft};
+  --color-graphite: ${brand.colors.graphite};
+  --color-graphite-soft: ${brand.colors.graphiteSoft};
+  --color-ink: ${brand.colors.ink};
+  --color-ink-deep: ${brand.colors.inkDeep};
+  --color-ink-soft: ${brand.colors.inkSoft};
+  --color-paper: ${brand.colors.paper};
+  --color-paper-soft: ${brand.colors.paperSoft};
+  --color-steel: ${brand.colors.steel};
+  --color-alert: ${AUTH_ALERT};
+  --color-alert-soft: rgba(217, 96, 90, 0.14);
+  --color-amber: ${AUTH_AMBER};
+  --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --ease-standard: cubic-bezier(0.22, 1, 0.36, 1);
+  --duration-fast: 150ms;
+  --duration-base: 300ms;
+  --radius-sm: 10px;
+  --radius-md: 14px;
+  --radius-lg: 20px;
+  color-scheme: dark;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root { --duration-fast: 1ms; --duration-base: 1ms; }
+}
+`;
+}
+
+// Un seul fichier de composants d'auth, importé par les 5 pages — c'est ce
+// qui empêche la divergence silencieuse (floating label légèrement différent
+// sur une page, rouge pas exactement le même ailleurs) qu'un HTML/CSS dupliqué
+// 5 fois produirait fatalement avec le temps.
+function authCss() {
+  return `@view-transition {
+  navigation: auto;
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  min-height: 100dvh;
+  background: var(--color-ink);
+  color: var(--color-paper-soft);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Inter, Arial, sans-serif;
+}
+
+.auth-shell {
+  min-height: 100dvh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+}
+
+.auth-card {
+  width: 100%;
+  max-width: 420px;
+  background: var(--color-ink-soft);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: var(--radius-lg);
+  padding: 32px 28px;
+  view-transition-name: auth-card;
+}
+
+.auth-brand {
+  display: block;
+  font-size: 13px;
+  font-weight: 800;
+  color: var(--color-paper-soft);
+  text-decoration: none;
+  margin-bottom: 20px;
+}
+
+.auth-title {
+  font-size: 22px;
+  font-weight: 800;
+  margin: 0 0 8px;
+  letter-spacing: -0.01em;
+}
+
+.auth-subtitle {
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--color-steel);
+  margin: 0 0 24px;
+}
+
+.field {
+  position: relative;
+  margin-bottom: 20px;
+}
+
+.field input {
+  width: 100%;
+  padding: 19px 40px 7px 14px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: var(--radius-sm);
+  color: var(--color-paper-soft);
+  font-size: 15px;
+  font-family: inherit;
+  transition: box-shadow var(--duration-fast) ease, border-color var(--duration-fast) ease;
+}
+
+.field input:focus {
+  outline: none;
+  border-color: var(--color-cobalt);
+  box-shadow: 0 0 0 3px rgba(0, 71, 255, 0.15);
+}
+
+.field label {
+  position: absolute;
+  left: 14px;
+  top: 19px;
+  font-size: 15px;
+  line-height: 1;
+  color: var(--color-steel);
+  pointer-events: none;
+  transform-origin: left top;
+  transition: transform var(--duration-base) var(--ease-spring), color var(--duration-fast) ease;
+}
+
+.field.is-filled label,
+.field input:focus + label {
+  transform: translateY(-11px) scale(0.78);
+  color: var(--color-cobalt-soft);
+}
+
+.field__check {
+  position: absolute;
+  right: 14px;
+  top: 16px;
+  width: 18px;
+  height: 18px;
+  color: var(--color-verified-green);
+  transform: scale(0);
+  transition: transform var(--duration-base) var(--ease-spring);
+}
+
+.field.is-valid .field__check {
+  transform: scale(1);
+}
+
+.field__error {
+  max-height: 0;
+  opacity: 0;
+  overflow: hidden;
+  color: var(--color-alert);
+  font-size: 13px;
+  line-height: 1.4;
+  margin-top: 0;
+  transition: max-height var(--duration-base) ease, opacity var(--duration-base) ease, margin-top var(--duration-base) ease;
+}
+
+.field__error.is-visible {
+  max-height: 40px;
+  opacity: 1;
+  margin-top: 6px;
+}
+
+.pw-strength {
+  display: flex;
+  gap: 6px;
+  margin: -10px 0 16px;
+}
+
+.pw-strength__seg {
+  flex: 1;
+  height: 4px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.1);
+  overflow: hidden;
+}
+
+.pw-strength__seg-fill {
+  display: block;
+  height: 100%;
+  width: 0%;
+  background: var(--color-alert);
+  transition: width var(--duration-base) var(--ease-standard), background var(--duration-base) ease;
+}
+
+.pw-strength__label {
+  font-size: 12px;
+  color: var(--color-steel);
+  margin: -10px 0 16px;
+  min-height: 14px;
+}
+
+.field-hint {
+  font-size: 12px;
+  color: var(--color-steel);
+  margin: -12px 0 16px;
+}
+
+.checkbox-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin: 4px 0 20px;
+}
+
+.checkbox-row input {
+  margin-top: 2px;
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+  accent-color: var(--color-cobalt);
+}
+
+.checkbox-row label {
+  font-size: 13px;
+  color: var(--color-paper-soft);
+  line-height: 1.5;
+}
+
+.btn-submit {
+  position: relative;
+  width: 100%;
+  padding: 15px;
+  border-radius: 999px;
+  border: none;
+  background: var(--color-cobalt);
+  color: #fff;
+  font-weight: 700;
+  font-size: 15px;
+  font-family: inherit;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  transition: background var(--duration-fast) ease, transform var(--duration-fast) ease;
+}
+
+.btn-submit:hover:not(:disabled) {
+  background: var(--color-cobalt-dark);
+}
+
+.btn-submit:active:not(:disabled) {
+  transform: scale(0.98);
+}
+
+.btn-submit:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.btn-submit__label {
+  transition: opacity var(--duration-fast) ease;
+}
+
+.btn-submit__spinner {
+  width: 15px;
+  height: 15px;
+  border-radius: 50%;
+  border: 2px solid rgba(255, 255, 255, 0.35);
+  border-top-color: #fff;
+  display: none;
+  animation: auth-spin 0.7s linear infinite;
+}
+
+.btn-submit.is-loading .btn-submit__spinner {
+  display: inline-block;
+}
+
+.btn-submit__check {
+  display: none;
+  width: 16px;
+  height: 16px;
+}
+
+.btn-submit.is-success .btn-submit__check {
+  display: inline-block;
+}
+
+.btn-submit.is-success .btn-submit__spinner {
+  display: none;
+}
+
+.btn-submit__check path {
+  stroke-dasharray: 20;
+  stroke-dashoffset: 20;
+  transition: stroke-dashoffset 320ms var(--ease-standard);
+}
+
+.btn-submit.is-success .btn-submit__check path {
+  stroke-dashoffset: 0;
+}
+
+@keyframes auth-spin {
+  to { transform: rotate(360deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .btn-submit__spinner { animation-duration: 1.4s; }
+}
+
+.auth-footer {
+  margin-top: 20px;
+  font-size: 13px;
+  color: var(--color-steel);
+  text-align: center;
+}
+
+.auth-footer a {
+  color: var(--color-cobalt-soft);
+  text-decoration: underline;
+}
+
+.auth-banner {
+  border-radius: var(--radius-sm);
+  padding: 12px 14px;
+  font-size: 13px;
+  line-height: 1.5;
+  margin-bottom: 20px;
+}
+
+.auth-banner--info {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: var(--color-paper-soft);
+}
+
+.auth-banner--success {
+  background: rgba(0, 196, 140, 0.1);
+  border: 1px solid rgba(0, 196, 140, 0.3);
+  color: var(--color-paper-soft);
+}
+
+.auth-banner--alert {
+  background: var(--color-alert-soft);
+  border: 1px solid rgba(217, 96, 90, 0.35);
+  color: var(--color-paper-soft);
+}
+
+/* ---- Skeleton (/compte pendant la vérification de session) ---- */
+
+.skeleton-line {
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.06);
+  animation: skeleton-pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes skeleton-pulse {
+  0%, 100% { opacity: 0.4; }
+  50% { opacity: 0.6; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .skeleton-line { animation: none; opacity: 0.5; }
+}
+
+.account-shell {
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 20px;
+  padding: 24px;
+  text-align: center;
+  max-width: 480px;
+  margin: 0 auto;
+}
+
+.account-shell[hidden],
+.account-skeleton[hidden] {
+  display: none;
+}
+
+.account-skeleton {
+  width: 100%;
+  max-width: 480px;
+  margin: 0 auto;
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  padding: 24px;
+}
+`;
+}
+
+function supabaseClientJs() {
+  return `// Généré par scripts/build.mjs à partir des variables d'env — l'anon key
+// est publique par conception (protégée par RLS, pas par une clé secrète),
+// voir supabase/schema.sql et migrations/. Cette clé anon est la SEULE
+// autorisée dans ce fichier : voir assertNoSecretsInOutput() dans build.mjs.
+(function () {
+  function init() {
+    if (!window.supabase || !window.supabase.createClient) {
+      console.warn("[ColdTrend] supabase-js (CDN) non chargé.");
+      return;
+    }
+    window.ColdTrendSupabase = window.supabase.createClient(
+      ${JSON.stringify(SUPABASE_URL)},
+      ${JSON.stringify(SUPABASE_ANON_KEY)}
+    );
+    document.dispatchEvent(new CustomEvent("coldtrend:supabase-ready"));
+  }
+  init();
+})();
+`;
+}
+
+function ensureIdentityJs() {
+  return `// Point de convergence unique de l'identité — appelé par le quiz (voir
+// scripts/build.mjs, saveProfileForCurrentIdentity) ET par /inscription.
+// Vérifie une session existante (anonyme ou non) avant d'en créer une
+// nouvelle : une personne qui a commencé le quiz sans le finir puis visite
+// /inscription directement ne doit jamais obtenir un second compte parallèle.
+window.ColdTrendEnsureIdentity = async function ensureIdentity() {
+  var supabase = window.ColdTrendSupabase;
+  if (!supabase) {
+    console.warn("[ColdTrend] ensureIdentity: client Supabase indisponible.");
+    return null;
+  }
+  var sessionRes = await supabase.auth.getSession();
+  if (sessionRes.data && sessionRes.data.session && sessionRes.data.session.user) {
+    return sessionRes.data.session.user;
+  }
+  var signInRes = await supabase.auth.signInAnonymously();
+  if (signInRes.error) {
+    console.warn("[ColdTrend] ensureIdentity: échec signInAnonymously :", signInRes.error.message);
+    return null;
+  }
+  return signInRes.data.user;
+};
+`;
+}
+
+function authStateJs() {
+  return `// Chargé sur TOUTES les pages (pas seulement les 5 pages d'auth) : maintient
+// le petit lien "Se connecter" / prénom du brand-bar cohérent partout, à
+// partir du même état de session Supabase.
+(function () {
+  function apply(user) {
+    var slots = document.querySelectorAll("[data-auth-slot]");
+    if (!slots.length) return;
+    var isRealUser = user && !user.is_anonymous;
+    var html = isRealUser
+      ? '<a href="/compte">' + (user.email ? user.email.split("@")[0] : "Mon compte") + "</a>"
+      : '<a href="/connexion">Se connecter</a>';
+    slots.forEach(function (el) {
+      el.innerHTML = html;
+    });
+  }
+
+  function boot() {
+    if (!window.ColdTrendSupabase) {
+      document.addEventListener("coldtrend:supabase-ready", boot, { once: true });
+      return;
+    }
+    window.ColdTrendSupabase.auth.getSession().then(function (res) {
+      apply(res.data.session ? res.data.session.user : null);
+    });
+    window.ColdTrendSupabase.auth.onAuthStateChange(function (_event, session) {
+      apply(session ? session.user : null);
+    });
+  }
+
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", boot);
+  } else {
+    boot();
+  }
+})();
+`;
+}
+
+// Comportements de formulaire partagés par les 5 pages — un seul endroit,
+// pour que le floating label / la force du mot de passe / le bouton de
+// soumission / l'erreur inline soient identiques partout (pas de dérive
+// visuelle page par page).
+function authUiJs() {
+  return `// ---- Force du mot de passe (port exact de web/lib/passwordStrength.ts) ----
+var ColdTrendPasswordStrength = (function () {
+  var KEYBOARD_RUNS = [
+    "0123456789", "9876543210", "abcdefghijklmnopqrstuvwxyz",
+    "qwertyuiop", "azertyuiop", "asdfghjkl"
+  ];
+
+  function hasSequentialRun(password, minRun) {
+    minRun = minRun || 4;
+    var lower = password.toLowerCase();
+    return KEYBOARD_RUNS.some(function (run) {
+      for (var i = 0; i <= run.length - minRun; i += 1) {
+        if (lower.indexOf(run.slice(i, i + minRun)) !== -1) return true;
+      }
+      return false;
+    });
+  }
+
+  function hasRepeatedRun(password, minRun) {
+    minRun = minRun || 4;
+    var pattern = new RegExp("(.)\\\\1{" + (minRun - 1) + ",}");
+    return pattern.test(password);
+  }
+
+  function containsContext(password, value) {
+    if (!value || value.trim().length < 3) return false;
+    return password.toLowerCase().indexOf(value.trim().toLowerCase()) !== -1;
+  }
+
+  function evaluate(password, context) {
+    context = context || {};
+    if (password.length === 0) {
+      return { score: 0, label: "", widthPercent: 0 };
+    }
+    if (password.length < 8) {
+      return { score: 0, label: "Trop court (8 caractères minimum)", widthPercent: 15 };
+    }
+
+    var points = 0;
+    if (password.length >= 8) points += 1;
+    if (password.length >= 12) points += 1;
+
+    var classCount = [/[a-z]/, /[A-Z]/, /[0-9]/, /[^a-zA-Z0-9]/].filter(function (re) {
+      return re.test(password);
+    }).length;
+    if (classCount >= 2) points += 1;
+    if (classCount >= 3) points += 1;
+
+    var emailLocalPart = context.email ? context.email.split("@")[0] : null;
+    var isWeakPattern =
+      hasSequentialRun(password) ||
+      hasRepeatedRun(password) ||
+      containsContext(password, context.prenom) ||
+      containsContext(password, emailLocalPart);
+
+    if (isWeakPattern) points = Math.min(points, 1);
+
+    var score = Math.max(0, Math.min(4, points));
+    var labels = ["Très faible", "Faible", "Moyen", "Bon", "Excellent"];
+    var widths = [15, 30, 55, 80, 100];
+
+    return {
+      score: score,
+      label: isWeakPattern ? "Trop prévisible — évite les suites et ton prénom" : labels[score],
+      widthPercent: widths[score]
+    };
+  }
+
+  return { evaluate: evaluate };
+})();
+
+// ---- Floating label ----
+function initFloatingLabel(fieldEl) {
+  var input = fieldEl.querySelector("input");
+  if (!input) return;
+  function sync() {
+    fieldEl.classList.toggle("is-filled", input.value.length > 0);
+  }
+  input.addEventListener("input", sync);
+  input.addEventListener("blur", sync);
+  // Détection autofill (le navigateur remplit sans déclencher 'input' avant
+  // un premier repaint) : on revérifie après un court délai.
+  setTimeout(sync, 300);
+  sync();
+}
+
+// ---- Erreur de champ (slide-down doux, jamais display:none sec) ----
+function initFieldError(fieldEl) {
+  var errorEl = fieldEl.querySelector(".field__error");
+  return {
+    show: function (message) {
+      if (!errorEl) return;
+      errorEl.textContent = message;
+      errorEl.classList.add("is-visible");
+    },
+    clear: function () {
+      if (!errorEl) return;
+      errorEl.classList.remove("is-visible");
+    }
+  };
+}
+
+// ---- Barre de force du mot de passe (4 segments, cascade 60ms) ----
+function initPasswordStrength(passwordInput, meterEl, getContext) {
+  var fills = Array.prototype.slice.call(meterEl.querySelectorAll(".pw-strength__seg-fill"));
+  var labelEl = meterEl.parentElement.querySelector(".pw-strength__label");
+  var colors = ["var(--color-alert)", "var(--color-alert)", "var(--color-amber)", "var(--color-cobalt-soft)", "var(--color-verified-green)"];
+
+  function render() {
+    var context = typeof getContext === "function" ? getContext() : {};
+    var strength = ColdTrendPasswordStrength.evaluate(passwordInput.value, context);
+    fills.forEach(function (fill, i) {
+      window.setTimeout(function () {
+        fill.style.width = i < strength.score ? "100%" : "0%";
+        fill.style.background = colors[strength.score];
+      }, i * 60);
+    });
+    if (labelEl) labelEl.textContent = strength.label;
+    return strength;
+  }
+
+  passwordInput.addEventListener("input", render);
+  return { evaluate: render };
+}
+
+// ---- État de chargement du bouton de soumission ----
+function initButtonLoadingState(button) {
+  var labelEl = button.querySelector(".btn-submit__label");
+  var idleText = labelEl ? labelEl.textContent : "";
+
+  function setLabel(text) {
+    if (!labelEl) return;
+    labelEl.style.opacity = "0";
+    window.setTimeout(function () {
+      labelEl.textContent = text;
+      labelEl.style.opacity = "1";
+    }, 150);
+  }
+
+  return {
+    start: function (loadingText) {
+      button.disabled = true;
+      button.classList.remove("is-success");
+      button.classList.add("is-loading");
+      setLabel(loadingText);
+    },
+    success: function (successText) {
+      button.classList.remove("is-loading");
+      button.classList.add("is-success");
+      if (successText) setLabel(successText);
+    },
+    reset: function () {
+      button.disabled = false;
+      button.classList.remove("is-loading", "is-success");
+      setLabel(idleText);
+    }
+  };
+}
+`;
+}
+
+const CHECK_ICON_SVG =
+  '<svg class="field__check" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path d="M20 6L9 17l-5-5" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+
+const BTN_CHECK_SVG =
+  '<svg class="btn-submit__check" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path d="M20 6L9 17l-5-5" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+
+function authField({ id, label, type, autocomplete, withCheck }) {
+  return `<div class="field" id="field-${id}">
+          <input class="auth-input" id="${id}" name="${id}" type="${type}" autocomplete="${autocomplete}" placeholder=" " required />
+          <label for="${id}">${label}</label>
+          ${withCheck ? CHECK_ICON_SVG : ""}
+          <span class="field__error" aria-live="polite"></span>
+        </div>`;
+}
+
+function authPageShell({ title, description, bodyHtml, extraHead = "" }) {
+  return `<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>${brand.name} — ${title}</title>
+<meta name="description" content="${description}" />
+<meta name="robots" content="noindex" />
+<link rel="stylesheet" href="/css/design-tokens.css" />
+<link rel="stylesheet" href="/css/auth.css" />
+${extraHead}
+</head>
+<body>
+${bodyHtml}
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="/js/supabase-client.js"></script>
+<script src="/js/ensure-identity.js"></script>
+<script src="/js/auth-ui.js"></script>
+<script src="/js/auth-state.js"></script>
+</body>
+</html>
+`;
+}
+
+function connexionPage() {
+  const body = `  <div class="auth-shell">
+    <div class="auth-card">
+      <a class="auth-brand" href="/">${brand.name}</a>
+      <h1 class="auth-title">Se connecter</h1>
+      <p class="auth-subtitle">Retrouve ta sélection de SaaS vérifiés.</p>
+      <div class="auth-banner auth-banner--alert" id="login-error" style="display:none;"></div>
+      <form id="login-form" novalidate>
+        ${authField({ id: "login-email", label: "Email", type: "email", autocomplete: "email" })}
+        ${authField({ id: "login-password", label: "Mot de passe", type: "password", autocomplete: "current-password" })}
+        <button class="btn-submit" type="submit" id="login-submit">
+          <span class="btn-submit__label">Se connecter</span>
+          <span class="btn-submit__spinner" aria-hidden="true"></span>
+          ${BTN_CHECK_SVG}
+        </button>
+      </form>
+      <p class="auth-footer">
+        <a href="/mot-de-passe-oublie">Mot de passe oublié ?</a><br />
+        Pas encore de compte ? <a href="/inscription">S'inscrire</a>
+      </p>
+    </div>
+  </div>
+  <script>
+    (function () {
+      var GENERIC_ERROR = "Email ou mot de passe incorrect.";
+      var form = document.getElementById("login-form");
+      var errorBanner = document.getElementById("login-error");
+      var submitBtn = document.getElementById("login-submit");
+      var loadingState = initButtonLoadingState(submitBtn);
+      initFloatingLabel(document.getElementById("field-login-email"));
+      initFloatingLabel(document.getElementById("field-login-password"));
+
+      function showError(message) {
+        errorBanner.textContent = message;
+        errorBanner.style.display = "block";
+      }
+
+      async function redirectAfterLogin() {
+        var params = new URLSearchParams(window.location.search);
+        var redirect = params.get("redirect");
+        if (redirect) {
+          window.location.href = redirect;
+          return;
+        }
+        try {
+          var supabase = window.ColdTrendSupabase;
+          var userRes = await supabase.auth.getUser();
+          var userId = userRes.data.user ? userRes.data.user.id : null;
+          if (userId) {
+            var profileRes = await supabase.from("profiles").select("converted").eq("id", userId).single();
+            if (profileRes.data && profileRes.data.converted) {
+              window.location.href = "/compte";
+              return;
+            }
+          }
+        } catch (err) {
+          console.warn("[ColdTrend] lecture du profil post-connexion échouée :", err);
+        }
+        window.location.href = "/";
+      }
+
+      form.addEventListener("submit", async function (e) {
+        e.preventDefault();
+        errorBanner.style.display = "none";
+        var email = document.getElementById("login-email").value.trim();
+        var password = document.getElementById("login-password").value;
+        loadingState.start("Connexion…");
+
+        if (!window.ColdTrendSupabase) {
+          showError("Service indisponible pour le moment, réessaie dans un instant.");
+          loadingState.reset();
+          return;
+        }
+
+        var res = await window.ColdTrendSupabase.auth.signInWithPassword({ email: email, password: password });
+        if (res.error || !res.data.user) {
+          showError(GENERIC_ERROR);
+          loadingState.reset();
+          return;
+        }
+        loadingState.success("Connecté");
+        window.setTimeout(redirectAfterLogin, 500);
+      });
+    })();
+  </script>`;
+
+  return authPageShell({
+    title: "Connexion",
+    description: "Connecte-toi à ton compte ColdTrend.",
+    bodyHtml: body
+  });
+}
+
+function inscriptionPage() {
+  const body = `  <div class="auth-shell">
+    <div class="auth-card">
+      <a class="auth-brand" href="/">${brand.name}</a>
+      <div id="signup-view">
+        <h1 class="auth-title">Créer un compte</h1>
+        <p class="auth-subtitle">Sécurise l'accès à ta sélection de SaaS vérifiés.</p>
+        <div class="auth-banner auth-banner--alert" id="signup-error" style="display:none;"></div>
+        <form id="signup-form" novalidate>
+          ${authField({ id: "signup-email", label: "Email", type: "email", autocomplete: "email", withCheck: true })}
+          ${authField({ id: "signup-password", label: "Mot de passe", type: "password", autocomplete: "new-password" })}
+          <div class="pw-strength" id="signup-strength-meter">
+            <span class="pw-strength__seg"><span class="pw-strength__seg-fill"></span></span>
+            <span class="pw-strength__seg"><span class="pw-strength__seg-fill"></span></span>
+            <span class="pw-strength__seg"><span class="pw-strength__seg-fill"></span></span>
+            <span class="pw-strength__seg"><span class="pw-strength__seg-fill"></span></span>
+          </div>
+          <p class="pw-strength__label" id="signup-strength-label"></p>
+          <div class="checkbox-row">
+            <input type="checkbox" id="signup-rgpd" required />
+            <label for="signup-rgpd">J'accepte que mes données soient utilisées pour me fournir l'accès à ColdTrend.</label>
+          </div>
+          <button class="btn-submit" type="submit" id="signup-submit" disabled>
+            <span class="btn-submit__label">Créer mon compte</span>
+            <span class="btn-submit__spinner" aria-hidden="true"></span>
+            ${BTN_CHECK_SVG}
+          </button>
+        </form>
+        <p class="auth-footer">Déjà un compte ? <a href="/connexion">Se connecter</a></p>
+      </div>
+
+      <div id="login-view" style="display:none;">
+        <h1 class="auth-title">Ce compte existe déjà</h1>
+        <p class="auth-subtitle">Connecte-toi avec ce mot de passe pour continuer.</p>
+        <div class="auth-banner auth-banner--alert" id="inline-login-error" style="display:none;"></div>
+        <form id="inline-login-form" novalidate>
+          ${authField({ id: "inline-login-password", label: "Mot de passe", type: "password", autocomplete: "current-password" })}
+          <button class="btn-submit" type="submit" id="inline-login-submit">
+            <span class="btn-submit__label">Se connecter</span>
+            <span class="btn-submit__spinner" aria-hidden="true"></span>
+            ${BTN_CHECK_SVG}
+          </button>
+        </form>
+      </div>
+    </div>
+  </div>
+  <script>
+    (function () {
+      var EMAIL_RE = /^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/;
+      var signupView = document.getElementById("signup-view");
+      var loginView = document.getElementById("login-view");
+      var signupForm = document.getElementById("signup-form");
+      var errorBanner = document.getElementById("signup-error");
+      var emailInput = document.getElementById("signup-email");
+      var passwordInput = document.getElementById("signup-password");
+      var rgpdInput = document.getElementById("signup-rgpd");
+      var submitBtn = document.getElementById("signup-submit");
+      var loadingState = initButtonLoadingState(submitBtn);
+      var capturedEmail = "";
+
+      initFloatingLabel(document.getElementById("field-signup-email"));
+      initFloatingLabel(document.getElementById("field-signup-password"));
+      var strength = initPasswordStrength(
+        passwordInput,
+        document.getElementById("signup-strength-meter"),
+        function () { return { email: emailInput.value }; }
+      );
+
+      function canSubmit() {
+        var emailOk = EMAIL_RE.test(emailInput.value.trim());
+        document.getElementById("field-signup-email").classList.toggle("is-valid", emailOk);
+        return emailOk && passwordInput.value.length >= 8 && rgpdInput.checked;
+      }
+
+      function refreshSubmit() {
+        submitBtn.disabled = !canSubmit();
+      }
+
+      emailInput.addEventListener("input", refreshSubmit);
+      passwordInput.addEventListener("input", refreshSubmit);
+      rgpdInput.addEventListener("change", refreshSubmit);
+
+      function showError(message) {
+        errorBanner.textContent = message;
+        errorBanner.style.display = "block";
+      }
+
+      function isEmailAlreadyTakenError(message) {
+        var normalized = (message || "").toLowerCase();
+        return normalized.indexOf("already") !== -1 || normalized.indexOf("email_exists") !== -1;
+      }
+
+      signupForm.addEventListener("submit", async function (e) {
+        e.preventDefault();
+        if (!canSubmit()) return;
+        errorBanner.style.display = "none";
+        loadingState.start("Création…");
+
+        var supabase = window.ColdTrendSupabase;
+        if (!supabase || !window.ColdTrendEnsureIdentity) {
+          showError("Service indisponible pour le moment, réessaie dans un instant.");
+          loadingState.reset();
+          return;
+        }
+
+        // Convergence d'identité : ne traite jamais ceci comme "forcément un
+        // nouveau compte" sans avoir vérifié une session existante d'abord
+        // (voir /js/ensure-identity.js — même fonction que le quiz).
+        var identity = await window.ColdTrendEnsureIdentity();
+        if (!identity) {
+          showError("Impossible de créer ton compte pour le moment. Réessaie dans un instant.");
+          loadingState.reset();
+          return;
+        }
+
+        var email = emailInput.value.trim();
+        var emailRes = await supabase.auth.updateUser({ email: email });
+        if (emailRes.error) {
+          if (isEmailAlreadyTakenError(emailRes.error.message)) {
+            capturedEmail = email;
+            signupView.style.display = "none";
+            loginView.style.display = "block";
+            loadingState.reset();
+            return;
+          }
+          showError(emailRes.error.message);
+          loadingState.reset();
+          return;
+        }
+
+        var passwordRes = await supabase.auth.updateUser({ password: passwordInput.value });
+        if (passwordRes.error) {
+          showError(passwordRes.error.message);
+          loadingState.reset();
+          return;
+        }
+
+        await supabase.from("profiles").update({ converted: true }).eq("id", identity.id);
+        loadingState.success("Compte créé");
+        window.setTimeout(function () { window.location.href = "/compte"; }, 500);
+      });
+
+      var inlineForm = document.getElementById("inline-login-form");
+      var inlineError = document.getElementById("inline-login-error");
+      var inlineSubmit = document.getElementById("inline-login-submit");
+      var inlineLoadingState = initButtonLoadingState(inlineSubmit);
+
+      inlineForm.addEventListener("submit", async function (e) {
+        e.preventDefault();
+        inlineError.style.display = "none";
+        inlineLoadingState.start("Connexion…");
+        var password = document.getElementById("inline-login-password").value;
+        var res = await window.ColdTrendSupabase.auth.signInWithPassword({ email: capturedEmail, password: password });
+        if (res.error || !res.data.user) {
+          inlineError.textContent = "Email ou mot de passe incorrect.";
+          inlineError.style.display = "block";
+          inlineLoadingState.reset();
+          return;
+        }
+        inlineLoadingState.success("Connecté");
+        window.setTimeout(function () { window.location.href = "/compte"; }, 500);
+      });
+    })();
+  </script>`;
+
+  return authPageShell({
+    title: "Créer un compte",
+    description: "Crée ton compte ColdTrend pour accéder à ta sélection de SaaS vérifiés.",
+    bodyHtml: body
+  });
+}
+
+function motDePasseOublieePage() {
+  const body = `  <div class="auth-shell">
+    <div class="auth-card">
+      <a class="auth-brand" href="/">${brand.name}</a>
+      <div id="request-view">
+        <h1 class="auth-title">Mot de passe oublié</h1>
+        <p class="auth-subtitle">On t'envoie un lien pour en choisir un nouveau.</p>
+        <form id="reset-form" novalidate>
+          ${authField({ id: "reset-email", label: "Email", type: "email", autocomplete: "email" })}
+          <button class="btn-submit" type="submit" id="reset-submit">
+            <span class="btn-submit__label">Envoyer le lien</span>
+            <span class="btn-submit__spinner" aria-hidden="true"></span>
+            ${BTN_CHECK_SVG}
+          </button>
+        </form>
+        <p class="auth-footer"><a href="/connexion">Retour à la connexion</a></p>
+      </div>
+      <div id="sent-view" style="display:none;">
+        <h1 class="auth-title">Vérifie ta boîte mail</h1>
+        <p class="auth-subtitle" id="sent-message"></p>
+        <p class="auth-footer"><a href="/connexion">Retour à la connexion</a></p>
+      </div>
+    </div>
+  </div>
+  <script>
+    (function () {
+      var EMAIL_RE = /^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/;
+      var form = document.getElementById("reset-form");
+      var emailInput = document.getElementById("reset-email");
+      var submitBtn = document.getElementById("reset-submit");
+      var loadingState = initButtonLoadingState(submitBtn);
+      initFloatingLabel(document.getElementById("field-reset-email"));
+
+      form.addEventListener("submit", async function (e) {
+        e.preventDefault();
+        var email = emailInput.value.trim();
+        if (!EMAIL_RE.test(email)) return;
+        loadingState.start("Envoi…");
+
+        // Lien renvoie ici avec ?code=... (flow PKCE) — voir
+        // /reinitialiser-mot-de-passe. Le résultat de l'appel n'est jamais
+        // exposé : même message que l'email existe ou non (anti-énumération).
+        if (window.ColdTrendSupabase) {
+          try {
+            await window.ColdTrendSupabase.auth.resetPasswordForEmail(email, {
+              redirectTo: window.location.origin + "/reinitialiser-mot-de-passe"
+            });
+          } catch (err) {
+            console.warn("[ColdTrend] resetPasswordForEmail a échoué :", err);
+          }
+        }
+
+        document.getElementById("sent-message").textContent =
+          "Si un compte existe pour " + email + ", un email avec un lien de réinitialisation vient d'être envoyé.";
+        document.getElementById("request-view").style.display = "none";
+        document.getElementById("sent-view").style.display = "block";
+      });
+    })();
+  </script>`;
+
+  return authPageShell({
+    title: "Mot de passe oublié",
+    description: "Réinitialise le mot de passe de ton compte ColdTrend.",
+    bodyHtml: body
+  });
+}
+
+function reinitialiserMotDePassePage() {
+  const body = `  <div class="auth-shell">
+    <div class="auth-card">
+      <a class="auth-brand" href="/">${brand.name}</a>
+      <div id="checking-view">
+        <h1 class="auth-title">Vérification du lien…</h1>
+      </div>
+      <div id="invalid-view" style="display:none;">
+        <h1 class="auth-title">Lien invalide ou expiré</h1>
+        <p class="auth-subtitle">Redemande un nouveau lien de réinitialisation.</p>
+        <p class="auth-footer"><a href="/mot-de-passe-oublie">Recommencer</a></p>
+      </div>
+      <div id="ready-view" style="display:none;">
+        <h1 class="auth-title">Choisis un nouveau mot de passe</h1>
+        <div class="auth-banner auth-banner--alert" id="reset-error" style="display:none;"></div>
+        <form id="new-password-form" novalidate>
+          ${authField({ id: "new-password", label: "Nouveau mot de passe", type: "password", autocomplete: "new-password" })}
+          <div class="pw-strength" id="reset-strength-meter">
+            <span class="pw-strength__seg"><span class="pw-strength__seg-fill"></span></span>
+            <span class="pw-strength__seg"><span class="pw-strength__seg-fill"></span></span>
+            <span class="pw-strength__seg"><span class="pw-strength__seg-fill"></span></span>
+            <span class="pw-strength__seg"><span class="pw-strength__seg-fill"></span></span>
+          </div>
+          <p class="pw-strength__label" id="reset-strength-label"></p>
+          <button class="btn-submit" type="submit" id="reset-password-submit" disabled>
+            <span class="btn-submit__label">Mettre à jour le mot de passe</span>
+            <span class="btn-submit__spinner" aria-hidden="true"></span>
+            ${BTN_CHECK_SVG}
+          </button>
+        </form>
+      </div>
+      <div id="done-view" style="display:none;">
+        <h1 class="auth-title">Mot de passe mis à jour</h1>
+        <p class="auth-subtitle">Redirection vers ton compte…</p>
+      </div>
+    </div>
+  </div>
+  <script>
+    (function () {
+      function showView(id) {
+        ["checking-view", "invalid-view", "ready-view", "done-view"].forEach(function (viewId) {
+          document.getElementById(viewId).style.display = viewId === id ? "block" : "none";
+        });
+      }
+
+      async function resolveSession() {
+        var supabase = window.ColdTrendSupabase;
+        if (!supabase) {
+          showView("invalid-view");
+          return;
+        }
+        var params = new URLSearchParams(window.location.search);
+        var code = params.get("code");
+
+        if (code) {
+          var exchangeRes = await supabase.auth.exchangeCodeForSession(code);
+          if (exchangeRes.error) {
+            showView("invalid-view");
+            return;
+          }
+          showView("ready-view");
+          return;
+        }
+
+        // Pas de ?code= : soit le SDK a déjà auto-détecté un token dans le
+        // fragment d'URL (flow implicite), soit le lien est invalide/expiré.
+        var sessionRes = await supabase.auth.getSession();
+        showView(sessionRes.data.session ? "ready-view" : "invalid-view");
+      }
+
+      document.addEventListener("coldtrend:supabase-ready", resolveSession, { once: true });
+      if (window.ColdTrendSupabase) resolveSession();
+
+      var passwordInput = document.getElementById("new-password");
+      var submitBtn = document.getElementById("reset-password-submit");
+      var loadingState = initButtonLoadingState(submitBtn);
+      initFloatingLabel(document.getElementById("field-new-password"));
+      initPasswordStrength(passwordInput, document.getElementById("reset-strength-meter"), function () {
+        return {};
+      });
+
+      passwordInput.addEventListener("input", function () {
+        submitBtn.disabled = passwordInput.value.length < 8;
+      });
+
+      document.getElementById("new-password-form").addEventListener("submit", async function (e) {
+        e.preventDefault();
+        if (passwordInput.value.length < 8) return;
+        var errorBanner = document.getElementById("reset-error");
+        errorBanner.style.display = "none";
+        loadingState.start("Enregistrement…");
+
+        var res = await window.ColdTrendSupabase.auth.updateUser({ password: passwordInput.value });
+        if (res.error) {
+          errorBanner.textContent = res.error.message;
+          errorBanner.style.display = "block";
+          loadingState.reset();
+          return;
+        }
+        loadingState.success("Mis à jour");
+        showView("done-view");
+        window.setTimeout(function () { window.location.href = "/compte"; }, 1500);
+      });
+    })();
+  </script>`;
+
+  return authPageShell({
+    title: "Réinitialiser le mot de passe",
+    description: "Choisis un nouveau mot de passe pour ton compte ColdTrend.",
+    bodyHtml: body
+  });
+}
+
+function comptePage() {
+  // Pas de middleware possible sur du statique : la protection réelle tient
+  // dans l'ordre d'affichage — skeleton fidèle à la mise en page finale
+  // affiché immédiatement, contenu réel révélé seulement après vérification
+  // JS de la session, redirection sinon. Assume-le au lieu de le cacher.
+  const body = `  <div class="account-skeleton" id="account-skeleton" aria-hidden="true">
+    <div class="skeleton-line" style="width:120px;height:14px;"></div>
+    <div class="skeleton-line" style="width:220px;height:26px;"></div>
+    <div class="skeleton-line" style="width:180px;height:16px;"></div>
+    <div class="skeleton-line" style="width:160px;height:40px;border-radius:999px;"></div>
+  </div>
+  <div class="account-shell" id="account-content" hidden>
+    <a class="auth-brand" href="/">${brand.name}</a>
+    <h1 class="auth-title">Ton compte</h1>
+    <p class="auth-subtitle" id="account-email"></p>
+    <p class="auth-subtitle" id="account-match" style="display:none;"></p>
+    <button class="btn-submit" type="button" id="signout-btn" style="max-width:220px;">
+      <span class="btn-submit__label">Se déconnecter</span>
+      <span class="btn-submit__spinner" aria-hidden="true"></span>
+      ${BTN_CHECK_SVG}
+    </button>
+  </div>
+  <script>
+    (function () {
+      async function check() {
+        var supabase = window.ColdTrendSupabase;
+        if (!supabase) {
+          document.addEventListener("coldtrend:supabase-ready", check, { once: true });
+          return;
+        }
+        var userRes = await supabase.auth.getUser();
+        var user = userRes.data ? userRes.data.user : null;
+
+        if (!user || user.is_anonymous) {
+          var redirect = encodeURIComponent(window.location.pathname);
+          window.location.replace("/connexion?redirect=" + redirect);
+          return;
+        }
+
+        document.getElementById("account-email").textContent = user.email || "";
+
+        var profileRes = await supabase.from("profiles").select("match_count").eq("id", user.id).single();
+        if (profileRes.data && profileRes.data.match_count) {
+          var matchEl = document.getElementById("account-match");
+          matchEl.textContent = profileRes.data.match_count + " SaaS correspondent à ton profil.";
+          matchEl.style.display = "block";
+        }
+
+        document.getElementById("account-skeleton").hidden = true;
+        document.getElementById("account-content").hidden = false;
+      }
+
+      check();
+
+      document.getElementById("signout-btn").addEventListener("click", async function () {
+        var loadingState = initButtonLoadingState(this);
+        loadingState.start("Déconnexion…");
+        await window.ColdTrendSupabase.auth.signOut();
+        window.location.href = "/connexion";
+      });
+    })();
+  </script>`;
+
+  return authPageShell({
+    title: "Mon compte",
+    description: "Ton compte ColdTrend.",
+    bodyHtml: body
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Sécurité — grep de la sortie buildée pour toute variable sensible qui
+// n'aurait rien à faire dans du code servi au navigateur. Ne vérifie pas
+// seulement le code source (qui ne contient déjà aucun secret) mais la
+// sortie réellement écrite sur disque, après interpolation.
+// ---------------------------------------------------------------------------
+const FORBIDDEN_OUTPUT_PATTERNS = [/service_role/i, /sb_secret_/i, /SUPABASE_SERVICE/i];
+
+function assertNoSecretsInOutput(filePath, contents) {
+  FORBIDDEN_OUTPUT_PATTERNS.forEach((pattern) => {
+    if (pattern.test(contents)) {
+      throw new Error(
+        `[SECURITY] Motif interdit ${pattern} trouvé dans ${filePath} — build bloqué avant déploiement.`
+      );
+    }
+  });
+}
+
+function writeBuiltFile(filePath, contents) {
+  assertNoSecretsInOutput(filePath, contents);
+  writeFileSync(filePath, contents, "utf8");
+  console.log(`Built ${path.relative(process.cwd(), filePath)}`);
+}
+
 // ---------------------------------------------------------------------------
 // Build
 // ---------------------------------------------------------------------------
 
 mkdirSync(OUT_DIR, { recursive: true });
-writeFileSync(OUT_FILE, page({ brand, hero, socialProof, notificationStack, pricing, comparison, faq, quiz }), "utf8");
-writeFileSync(OUT_FILE_SUCCESS, successPage({ brand, siteUrl: SITE_URL }), "utf8");
-console.log(`Built ${path.relative(process.cwd(), OUT_FILE)}`);
-console.log(`Built ${path.relative(process.cwd(), OUT_FILE_SUCCESS)}`);
+mkdirSync(path.join(OUT_DIR, "css"), { recursive: true });
+mkdirSync(path.join(OUT_DIR, "js"), { recursive: true });
+
+writeBuiltFile(OUT_FILE, page({ brand, hero, socialProof, notificationStack, pricing, comparison, faq, quiz }));
+writeBuiltFile(OUT_FILE_SUCCESS, successPage({ brand, siteUrl: SITE_URL }));
+
+writeBuiltFile(path.join(OUT_DIR, "css", "design-tokens.css"), designTokensCss());
+writeBuiltFile(path.join(OUT_DIR, "css", "auth.css"), authCss());
+writeBuiltFile(path.join(OUT_DIR, "js", "supabase-client.js"), supabaseClientJs());
+writeBuiltFile(path.join(OUT_DIR, "js", "ensure-identity.js"), ensureIdentityJs());
+writeBuiltFile(path.join(OUT_DIR, "js", "auth-state.js"), authStateJs());
+writeBuiltFile(path.join(OUT_DIR, "js", "auth-ui.js"), authUiJs());
+
+writeBuiltFile(path.join(OUT_DIR, "connexion.html"), connexionPage());
+writeBuiltFile(path.join(OUT_DIR, "inscription.html"), inscriptionPage());
+writeBuiltFile(path.join(OUT_DIR, "mot-de-passe-oublie.html"), motDePasseOublieePage());
+writeBuiltFile(path.join(OUT_DIR, "reinitialiser-mot-de-passe.html"), reinitialiserMotDePassePage());
+writeBuiltFile(path.join(OUT_DIR, "compte.html"), comptePage());
+
+console.log("Aucun motif interdit (service_role / sb_secret_ / SUPABASE_SERVICE) trouvé dans la sortie buildée.");
