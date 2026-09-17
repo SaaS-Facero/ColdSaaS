@@ -28,7 +28,7 @@ const SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? "REPLACE_
 // construire l'URL de redirection post-paiement affichée à l'écran de succès
 // (la redirection Stripe elle-même se configure côté dashboard Stripe, pas
 // ici : ce n'est qu'un rappel visuel cohérent).
-const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? "https://coldtrend.com";
+const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? "https://www.coldtrend.com";
 
 // Analytics — un seul point d'entrée générique, branché plus tard sur
 // PostHog/Plausible. Ne jamais envoyer de PII (email en clair, nom) dans les
