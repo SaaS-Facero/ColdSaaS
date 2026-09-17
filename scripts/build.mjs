@@ -2035,12 +2035,56 @@ function page({ brand, hero, socialProof, notificationStack, pricing, comparison
       });
 
       // ---- Analytics --------------------------------------------------------
-      // Point d'entrée unique, à brancher plus tard sur PostHog/Plausible.
+      // Écrit réellement dans la table Supabase funnel_events (voir
+      // supabase/migrations/0003_funnel_events.sql) — ce n'était qu'un stub
+      // console.debug jusqu'ici, aucune donnée n'existait nulle part.
       // Jamais de PII dans les props (voir lead_captured : domaine seulement).
-      function trackEvent(name, props) {
-        // TODO: remplacer par window.posthog.capture(name, props) / window.plausible(name, {props}).
+      var currentUserId = null;
+      if (window.ColdTrendSupabase) {
+        window.ColdTrendSupabase.auth.getUser().then(function (res) {
+          currentUserId = res.data && res.data.user ? res.data.user.id : null;
+        });
+        window.ColdTrendSupabase.auth.onAuthStateChange(function (_event, session) {
+          currentUserId = session && session.user ? session.user.id : null;
+        });
+      }
+
+      // Hash déterministe user -> variante A/B. Pas d'outil tiers : juste
+      // assez pour transformer une conviction esthétique en hypothèse
+      // vérifiable sous 1-2 semaines de trafic réel. Aucun écran n'est
+      // encore gated dessus (aucune expérience active pour l'instant) — la
+      // fonction existe pour que le prochain écran testable n'ait qu'à
+      // l'appeler, pas à réinventer un mécanisme.
+      function getVariant(userId, testName) {
+        var seed = String(userId || "anon") + ":" + testName;
+        var hash = 0;
+        for (var i = 0; i < seed.length; i += 1) {
+          hash = (hash * 31 + seed.charCodeAt(i)) | 0;
+        }
+        return Math.abs(hash) % 2 === 0 ? "A" : "B";
+      }
+
+      function trackEvent(name, props, variant) {
         if (window.console && console.debug) {
           console.debug("[trackEvent]", name, props || {});
+        }
+        var supabase = window.ColdTrendSupabase;
+        if (!supabase) return;
+        try {
+          supabase
+            .from("funnel_events")
+            .insert({
+              user_id: currentUserId,
+              event_name: name,
+              screen_index: props && typeof props.step_number === "number" ? props.step_number : null,
+              variant: variant || null,
+              metadata: props || {}
+            })
+            .then(function (res) {
+              if (res.error) console.warn("[ColdTrend] trackEvent insert échoué :", res.error.message);
+            });
+        } catch (err) {
+          console.warn("[ColdTrend] trackEvent a échoué :", err);
         }
       }
 
@@ -2290,6 +2334,7 @@ function page({ brand, hero, socialProof, notificationStack, pricing, comparison
         var next = findNextQuestionIndex(currentQuestionIndex);
         currentQuestionIndex = next;
         updateBackVisibility();
+        persistProgress(next);
         if (next >= questionScreens.length) {
           setProgress(TOTAL_STEPS);
           goToResult();
@@ -2338,6 +2383,7 @@ function page({ brand, hero, socialProof, notificationStack, pricing, comparison
         transitionTo(screenEl, "forward");
 
         authResolutionPromise = resolveIdentityRequest(email, password);
+        persistProgress(next);
       }
 
       function resolveIdentityRequest(email, password) {
@@ -2456,10 +2502,84 @@ function page({ brand, hero, socialProof, notificationStack, pricing, comparison
           });
       }
 
+      // Persiste la progression après CHAQUE question répondue (pas
+      // seulement au résultat) : c'est ce qui rend la reprise de session
+      // possible — sans ça, funnel_last_step ne reflète jamais l'état réel
+      // tant que le quiz n'est pas fini.
+      function persistProgress(stepIndex) {
+        var supabase = window.ColdTrendSupabase;
+        if (!supabase) return;
+        var pending = authResolutionPromise || Promise.resolve(true);
+        pending
+          .then(function () {
+            return supabase.auth.getUser();
+          })
+          .then(function (userRes) {
+            var user = userRes.data ? userRes.data.user : null;
+            if (!user) return;
+            return supabase
+              .from("profiles")
+              .update({
+                intention: answers.intention || null,
+                budget: answers.budget || null,
+                temps: answers.temps || null,
+                secteur: answers.secteur || [],
+                deja_cherche: answers.dejaCherche === "yes" ? true : answers.dejaCherche === "no" ? false : null,
+                funnel_last_step: stepIndex
+              })
+              .eq("id", user.id);
+          })
+          .catch(function (err) {
+            console.warn("[ColdTrend] persistProgress a échoué :", err);
+          });
+      }
+
+      // Réapplique l'état "sélectionné" des options déjà répondues (question
+      // par question) après une restauration de session — sans ça, revenir
+      // en arrière (bouton Retour) sur un écran déjà répondu l'afficherait
+      // vide alors que answers[id] contient bien la réponse.
+      function restoreAnswersUI() {
+        questionScreens.forEach(function (screenEl) {
+          var id = screenEl.getAttribute("data-id");
+          if (id === "auth" || answers[id] === undefined) return;
+          var optionsWrap = screenEl.querySelector("[data-quiz-options]");
+          if (!optionsWrap) return;
+          var type = optionsWrap.getAttribute("data-type");
+          var selectedValues = type === "multi" ? answers[id] || [] : [answers[id]];
+          Array.prototype.forEach.call(optionsWrap.querySelectorAll(".quiz-option"), function (btn) {
+            btn.classList.toggle("is-selected", selectedValues.indexOf(btn.getAttribute("data-value")) !== -1);
+          });
+          if (id === "dejaCherche" && answers.dejaCherche) {
+            var selectedBtn = optionsWrap.querySelector('.quiz-option[data-value="' + answers.dejaCherche + '"]');
+            var followupEl3 = document.getElementById("quiz-followup");
+            var followupText2 = selectedBtn ? selectedBtn.getAttribute("data-followup") : null;
+            if (followupEl3 && followupText2) {
+              followupEl3.textContent = followupText2;
+              followupEl3.classList.add("is-visible");
+            }
+          }
+          updateNextEnabled(screenEl);
+        });
+      }
+
+      // Reconstruit navHistory jusqu'à startIndex (exclu) en respectant les
+      // skip conditionnels, pour que le bouton Retour fonctionne normalement
+      // juste après une reprise de session.
+      function buildNavHistoryUpTo(startIndex) {
+        var built = [];
+        var idx = findNextQuestionIndex(-1);
+        while (idx < startIndex) {
+          built.push(idx);
+          idx = findNextQuestionIndex(idx);
+        }
+        return built;
+      }
+
       // Si une session non-anonyme existe déjà (retour sur un appareil déjà
       // connecté — la session est persistée nativement en localStorage par
-      // le SDK), l'écran auth est sauté : pas besoin de redemander un
-      // compte à quelqu'un qui en a déjà un.
+      // le SDK), l'écran auth est sauté. Si en plus funnel_last_step indique
+      // un quiz commencé mais pas fini, les réponses déjà données sont
+      // restaurées depuis profiles — pas de redémarrage à zéro.
       function determineStartIndex() {
         var supabase = window.ColdTrendSupabase;
         if (!supabase) return Promise.resolve(0);
@@ -2467,13 +2587,33 @@ function page({ brand, hero, socialProof, notificationStack, pricing, comparison
           .getSession()
           .then(function (res) {
             var user = res.data.session ? res.data.session.user : null;
-            if (user && !user.is_anonymous) {
-              showConnectedBadge();
-              return findNextQuestionIndex(0);
-            }
-            return 0;
+            if (!user || user.is_anonymous) return 0;
+            showConnectedBadge();
+            return supabase
+              .from("profiles")
+              .select("intention, budget, temps, secteur, deja_cherche, funnel_last_step")
+              .eq("id", user.id)
+              .single()
+              .then(function (profileRes) {
+                var profile = profileRes.data;
+                var lastStep = profile ? profile.funnel_last_step || 0 : 0;
+                if (!profile || lastStep <= 0 || lastStep >= questionScreens.length) {
+                  return findNextQuestionIndex(0);
+                }
+                answers.intention = profile.intention || undefined;
+                answers.budget = profile.budget || undefined;
+                answers.temps = profile.temps || undefined;
+                answers.secteur = profile.secteur || undefined;
+                if (profile.deja_cherche === true) answers.dejaCherche = "yes";
+                else if (profile.deja_cherche === false) answers.dejaCherche = "no";
+                navHistory = buildNavHistoryUpTo(lastStep);
+                restoreAnswersUI();
+                updateBackVisibility();
+                return lastStep;
+              });
           })
-          .catch(function () {
+          .catch(function (err) {
+            console.warn("[ColdTrend] determineStartIndex a échoué :", err);
             return 0;
           });
       }
