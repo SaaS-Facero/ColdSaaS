@@ -4540,8 +4540,17 @@ html, body {
 }
 
 .dossier {
+  position: relative;
   width: 100%;
   max-width: 560px;
+  padding: 28px 26px;
+  border-radius: 16px;
+  /* Même grain papier que la carte de preuve du funnel — un seul document,
+     pas deux univers visuels différents. Valeur reprise à l'identique. */
+  background:
+    repeating-linear-gradient(0deg, rgba(255,255,255,0.012) 0px, rgba(255,255,255,0.012) 1px, transparent 1px, transparent 3px),
+    var(--color-ink-soft, #12151f);
+  border: 1px solid rgba(255, 255, 255, 0.08);
   opacity: 0;
   transform: scale(0.98);
 }
@@ -4561,7 +4570,105 @@ html, body {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 24px;
+  margin-bottom: 20px;
+}
+
+.dossier__logo {
+  font-size: 13px;
+  font-weight: 800;
+  color: var(--color-paper-soft);
+  text-decoration: none;
+}
+
+.dossier__user-menu {
+  position: relative;
+}
+
+.dossier__user-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: none;
+  border: none;
+  color: var(--color-steel);
+  font-size: 13px;
+  font-family: inherit;
+  cursor: pointer;
+  padding: 6px 8px;
+  border-radius: 8px;
+}
+
+.dossier__user-btn:hover {
+  color: var(--color-paper-soft);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.dossier__user-chevron {
+  width: 14px;
+  height: 14px;
+  transition: transform 220ms cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.dossier__user-menu.is-open .dossier__user-chevron {
+  transform: rotate(180deg);
+}
+
+.dossier__user-dropdown {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  min-width: 220px;
+  padding: 6px;
+  border-radius: 12px;
+  background: #12151f;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: 0 16px 32px -12px rgba(0, 0, 0, 0.5);
+  transform-origin: top right;
+  transform: scale(0.92) translateY(-4px);
+  opacity: 0;
+  pointer-events: none;
+  z-index: 5;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .dossier__user-dropdown {
+    transition: transform 220ms cubic-bezier(0.34, 1.56, 0.64, 1), opacity 160ms ease;
+  }
+}
+
+.dossier__user-menu.is-open .dossier__user-dropdown {
+  transform: scale(1) translateY(0);
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.dossier__user-dropdown-item {
+  display: block;
+  width: 100%;
+  text-align: left;
+  background: none;
+  border: none;
+  padding: 9px 10px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-family: inherit;
+  color: var(--color-paper-soft);
+  cursor: pointer;
+}
+
+.dossier__user-dropdown-item:hover {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.dossier__user-dropdown-item.is-danger {
+  color: var(--color-alert);
+}
+
+.dossier__header {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 8px;
 }
 
 .dossier__day {
@@ -4569,10 +4676,6 @@ html, body {
   color: var(--color-steel);
   text-transform: uppercase;
   letter-spacing: 0.04em;
-}
-
-.dossier__header {
-  margin-bottom: 8px;
 }
 
 .dossier__title {
@@ -4666,13 +4769,13 @@ html, body {
   border-radius: 50%;
   border: 2px solid var(--color-steel);
   background: var(--color-ink);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: visible;
 }
 
-.timeline__item--done .timeline__dot {
-  border-color: var(--color-cobalt);
-  background: var(--color-cobalt);
-}
-
+.timeline__item--done .timeline__dot,
 .timeline__item--current .timeline__dot {
   border-color: var(--color-cobalt);
   background: var(--color-cobalt);
@@ -4692,6 +4795,51 @@ html, body {
 .timeline__item--upcoming .timeline__dot {
   border-style: dashed;
   background: transparent;
+}
+
+.timeline__dot-check {
+  width: 7px;
+  height: 7px;
+  opacity: 0;
+  transform: scale(0);
+}
+
+.timeline__item--done .timeline__dot-check {
+  opacity: 1;
+  transform: scale(1);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .timeline__dot-check {
+    transition: transform 260ms cubic-bezier(0.34, 1.56, 0.64, 1), opacity 200ms ease;
+  }
+
+  /* Effet de "tampon" — reprend l'idée du sceau de la carte de preuve : le
+     check s'écrase brièvement à 1.4x avant de se stabiliser à sa taille
+     finale, comme un vrai tampon qui rebondit à l'impact. */
+  .timeline__item.is-stamping .timeline__dot {
+    animation: dossier-stamp 500ms cubic-bezier(0.34, 1.56, 0.64, 1);
+  }
+}
+
+@keyframes dossier-stamp {
+  0% { transform: scale(1.4); }
+  60% { transform: scale(0.9); }
+  100% { transform: scale(1); }
+}
+
+/* Mini-sceau en filigrane sur "Dossier ouvert" — écho direct du tampon de
+   la carte de preuve du funnel, même silhouette shield-check. */
+.timeline__dot-seal {
+  position: absolute;
+  left: 22px;
+  top: -6px;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  border: 1px solid var(--color-cobalt-soft);
+  opacity: 0.1;
+  pointer-events: none;
 }
 
 .timeline__label {
@@ -4715,27 +4863,40 @@ html, body {
   color: var(--color-cobalt-soft);
 }
 
-.dossier__actions {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  margin-top: 32px;
+/* Étapes verrouillées tant que l'accès n'est pas débloqué — se déverrouille
+   par une transition d'opacité (JS retire la classe), pas une réapparition
+   brute au reload. */
+.timeline__item--locked {
+  opacity: 0.45;
 }
 
-.dossier__link-btn {
-  background: none;
-  border: none;
-  padding: 0;
+@media (prefers-reduced-motion: no-preference) {
+  .timeline__item--locked,
+  .timeline__item {
+    transition: opacity 500ms ease;
+  }
+}
+
+.dossier-toast {
+  position: fixed;
+  left: 50%;
+  bottom: 24px;
+  transform: translate(-50%, 12px);
+  padding: 10px 18px;
+  border-radius: 999px;
+  background: var(--color-verified-green);
+  color: #052e22;
   font-size: 13px;
-  color: var(--color-steel);
-  text-decoration: underline;
-  cursor: pointer;
-  font-family: inherit;
-  text-align: left;
+  font-weight: 700;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 220ms ease, transform 220ms ease;
+  z-index: 20;
 }
 
-.dossier__link-btn--danger:hover {
-  color: var(--color-alert);
+.dossier-toast.is-visible {
+  opacity: 1;
+  transform: translate(-50%, 0);
 }
 `;
 }
@@ -5476,24 +5637,32 @@ function comptePage() {
   <div class="dossier-shell" id="account-content" hidden>
     <div class="dossier" id="dossier">
       <div class="dossier__top">
-        <a class="auth-brand" href="/">${brand.name}</a>
-        <span class="dossier__day" id="dossier-day"></span>
+        <a class="dossier__logo" href="/">${brand.name}</a>
+        <div class="dossier__user-menu" id="user-menu">
+          <button type="button" class="dossier__user-btn" id="user-menu-btn" aria-haspopup="true" aria-expanded="false">
+            <span id="user-menu-email"></span>
+            <svg class="dossier__user-chevron" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+              <path d="M6 9l6 6 6-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </button>
+          <div class="dossier__user-dropdown" id="user-dropdown">
+            <button type="button" class="dossier__user-dropdown-item" id="resend-access-btn" style="display:none;">Renvoyer mon accès par email</button>
+            <button type="button" class="dossier__user-dropdown-item" id="signout-btn">Se déconnecter</button>
+            <button type="button" class="dossier__user-dropdown-item is-danger" id="delete-account-btn">Supprimer mon compte</button>
+          </div>
+        </div>
       </div>
       <div class="dossier__header">
+        <span class="dossier__day" id="dossier-day"></span>
         <h1 class="dossier__title">Ton dossier</h1>
       </div>
       <p class="dossier__narrative" id="dossier-narrative"></p>
       <p class="dossier__context" id="dossier-context"></p>
 
       <ol class="timeline" id="dossier-timeline"></ol>
-
-      <div class="dossier__actions">
-        <button type="button" class="dossier__link-btn" id="resend-access-btn" style="display:none;">Renvoyer mon accès par email</button>
-        <button type="button" class="dossier__link-btn" id="signout-btn">Se déconnecter</button>
-        <button type="button" class="dossier__link-btn dossier__link-btn--danger" id="delete-account-btn">Supprimer mon compte</button>
-      </div>
     </div>
   </div>
+  <div class="dossier-toast" id="dossier-toast" role="status" aria-live="polite"></div>
   <script>
     (function () {
       var SESSION_SEEN_KEY = "coldtrend_dossier_seen";
@@ -5577,17 +5746,24 @@ function comptePage() {
         })();
       }
 
+      var DOT_CHECK_SVG =
+        '<svg class="timeline__dot-check" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path d="M20 6L9 17l-5-5" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+
       function buildTimeline(user, profile) {
         var items = [];
+        var paid = !!(profile && profile.paid_at);
 
         items.push({
+          key: "opened",
           status: "done",
           label: "Dossier ouvert",
-          meta: "Le " + formatDateFr(user.created_at)
+          meta: "Le " + formatDateFr(user.created_at),
+          watermark: true
         });
 
         var hasAnswers = profile && (profile.intention || profile.temps);
         items.push({
+          key: "qualified",
           status: hasAnswers ? "done" : "current",
           label: "Profil qualifié",
           meta: hasAnswers
@@ -5595,8 +5771,8 @@ function comptePage() {
             : "Termine le quiz pour qualifier ton profil."
         });
 
-        var paid = profile && profile.paid_at;
         items.push({
+          key: "access",
           status: paid ? "done" : "current",
           label: paid ? "Accès débloqué" : "Accès en attente",
           meta: paid
@@ -5605,7 +5781,9 @@ function comptePage() {
         });
 
         items.push({
+          key: "resources",
           status: "upcoming",
+          locked: !paid,
           label: "Ressources consultées",
           // Infrastructure dormante : aucun PDF n'existe encore dans le
           // produit. Le traçage "Consulté le {date}" s'activera dès qu'une
@@ -5614,7 +5792,9 @@ function comptePage() {
         });
 
         items.push({
+          key: "next",
           status: "upcoming",
+          locked: !paid,
           label: "À venir",
           meta: "La suite de ton dossier s'écrit ici."
         });
@@ -5629,10 +5809,16 @@ function comptePage() {
             return (
               '<li class="timeline__item timeline__item--' +
               item.status +
+              (item.locked ? " timeline__item--locked" : "") +
+              '" data-item="' +
+              item.key +
               '" style="animation-delay:' +
               index * 90 +
               'ms">' +
-              '<span class="timeline__dot" aria-hidden="true"></span>' +
+              '<span class="timeline__dot" aria-hidden="true">' +
+              (item.watermark ? '<span class="timeline__dot-seal"></span>' : "") +
+              DOT_CHECK_SVG +
+              "</span>" +
               '<p class="timeline__label">' +
               item.label +
               "</p>" +
@@ -5643,6 +5829,68 @@ function comptePage() {
             );
           })
           .join("");
+      }
+
+      // Séquence de transformation live : déclenchée par l'événement
+      // Realtime quand paid_at passe de null à une valeur PENDANT que
+      // l'onglet /compte est ouvert (typiquement juste après un paiement
+      // dans un autre onglet). Pas un simple swap de texte au reload.
+      function playAccessConfirmedSequence(profile) {
+        var accessItem = document.querySelector('.timeline__item[data-item="access"]');
+        if (!accessItem) return;
+
+        accessItem.classList.remove("timeline__item--current");
+        accessItem.classList.add("timeline__item--done", "is-stamping");
+        window.setTimeout(function () {
+          accessItem.classList.remove("is-stamping");
+        }, 500);
+
+        var labelEl = accessItem.querySelector(".timeline__label");
+        var metaEl = accessItem.querySelector(".timeline__meta");
+        labelEl.textContent = "Accès débloqué";
+        typeText(metaEl, "Le " + formatDateFr(profile.paid_at));
+
+        showToast("Paiement confirmé — accès débloqué");
+
+        ["resources", "next"].forEach(function (key) {
+          var el = document.querySelector('.timeline__item[data-item="' + key + '"]');
+          if (el) el.classList.remove("timeline__item--locked");
+        });
+
+        var resendBtn = document.getElementById("resend-access-btn");
+        if (resendBtn) resendBtn.style.display = "block";
+      }
+
+      function showToast(message) {
+        var toastEl = document.getElementById("dossier-toast");
+        if (!toastEl) return;
+        toastEl.textContent = message;
+        toastEl.classList.add("is-visible");
+        window.setTimeout(function () {
+          toastEl.classList.remove("is-visible");
+        }, 3200);
+      }
+
+      // Souscription Realtime sur la propre ligne profiles de la personne
+      // (RLS s'applique aussi aux messages Realtime, jamais les changements
+      // d'un autre profil). Le dossier se met à jour sous les yeux de
+      // l'utilisateur au moment exact où stripe-webhook confirme le
+      // paiement, sans reload manuel.
+      function subscribeToProfileChanges(supabase, userId, previousPaidAt) {
+        supabase
+          .channel("profile-changes-" + userId)
+          .on(
+            "postgres_changes",
+            { event: "UPDATE", schema: "public", table: "profiles", filter: "id=eq." + userId },
+            function (payload) {
+              var updated = payload.new || {};
+              if (!previousPaidAt && updated.paid_at) {
+                playAccessConfirmedSequence(updated);
+              }
+              previousPaidAt = updated.paid_at;
+            }
+          )
+          .subscribe();
       }
 
       function contextLine(profile) {
@@ -5682,7 +5930,9 @@ function comptePage() {
 
         document.getElementById("dossier-day").textContent = "Jour " + (daysSince(profile.created_at) + 1);
         document.getElementById("dossier-context").textContent = contextLine(profile);
+        document.getElementById("user-menu-email").textContent = (user.email || "").split("@")[0];
         renderTimeline(buildTimeline(user, profile));
+        subscribeToProfileChanges(supabase, user.id, profile.paid_at);
 
         document.getElementById("account-skeleton").hidden = true;
         document.getElementById("account-content").hidden = false;
@@ -5714,11 +5964,30 @@ function comptePage() {
         }
 
         if (profile.paid_at) {
-          document.getElementById("resend-access-btn").style.display = "inline";
+          document.getElementById("resend-access-btn").style.display = "block";
         }
       }
 
       check();
+
+      var userMenuBtn = document.getElementById("user-menu-btn");
+      var userMenuEl = document.getElementById("user-menu");
+      userMenuBtn.addEventListener("click", function (e) {
+        e.stopPropagation();
+        var willOpen = !userMenuEl.classList.contains("is-open");
+        userMenuEl.classList.toggle("is-open", willOpen);
+        userMenuBtn.setAttribute("aria-expanded", String(willOpen));
+      });
+      document.addEventListener("click", function () {
+        userMenuEl.classList.remove("is-open");
+        userMenuBtn.setAttribute("aria-expanded", "false");
+      });
+      document.addEventListener("keydown", function (e) {
+        if (e.key === "Escape") {
+          userMenuEl.classList.remove("is-open");
+          userMenuBtn.setAttribute("aria-expanded", "false");
+        }
+      });
 
       document.getElementById("signout-btn").addEventListener("click", async function () {
         await window.ColdTrendSupabase.auth.signOut();
