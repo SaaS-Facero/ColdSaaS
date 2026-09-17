@@ -1609,6 +1609,7 @@ function page({ brand, hero, socialProof, notificationStack, pricing, comparison
 
   .proof-card {
     position: relative;
+    z-index: 1;
     overflow: hidden;
     margin: 4px 0 24px;
     padding: 20px 22px;
@@ -1732,6 +1733,170 @@ function page({ brand, hero, socialProof, notificationStack, pricing, comparison
     font-size: 12px;
     line-height: 1.5;
     color: var(--steel);
+  }
+
+  /* ---- Carrousel de fond — 3 bandes de profondeur ----
+     La profondeur optique raconte le temps : lointain = ancien, proche =
+     récent. La carte principale (opaque) occulte naturellement tout ce qui
+     passe "derrière" elle, donc pas de confusion de plan à gérer en plus. */
+
+  .proof-stage {
+    position: relative;
+  }
+
+  .proof-bg {
+    position: absolute;
+    inset: -16px -20px auto -20px;
+    height: 300px;
+    overflow: hidden;
+    z-index: 0;
+    pointer-events: none;
+    border-radius: 14px;
+  }
+
+  .proof-bg::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(ellipse 60% 70% at 50% 46%, transparent 25%, var(--ink) 90%);
+  }
+
+  .proof-bg__band {
+    position: absolute;
+    left: 0;
+    right: 0;
+  }
+
+  .proof-bg__track {
+    display: flex;
+    align-items: center;
+    gap: 24px;
+    width: max-content;
+  }
+
+  .proof-bg__band--far {
+    top: 6%;
+    filter: blur(6px);
+    opacity: 0.1;
+  }
+
+  .proof-bg__band--mid {
+    top: 42%;
+    filter: blur(2.5px);
+    opacity: 0.2;
+  }
+
+  .proof-bg__band--near {
+    top: 76%;
+    filter: blur(0.5px);
+    opacity: 0.3;
+  }
+
+  .proof-mini {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 12px;
+    border-radius: 10px;
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    white-space: nowrap;
+  }
+
+  .proof-mini__bar {
+    display: inline-block;
+    width: 32px;
+    height: 8px;
+    border-radius: 2px;
+    background: #0c0c0c;
+  }
+
+  .proof-mini__sector {
+    font-size: 11px;
+    color: var(--paper-soft);
+  }
+
+  .proof-mini__check {
+    display: inline-flex;
+    color: var(--verified-green);
+  }
+
+  .proof-mini__check svg {
+    width: 11px;
+    height: 11px;
+  }
+
+  .proof-mini__recent {
+    position: absolute;
+    left: 50%;
+    bottom: 100%;
+    margin-bottom: 6px;
+    padding: 3px 8px;
+    border-radius: 999px;
+    background: var(--cobalt);
+    color: #fff;
+    font-size: 10px;
+    font-weight: 700;
+    white-space: nowrap;
+    opacity: 0;
+    transform: translateX(-50%) translateY(4px);
+  }
+
+  @media (max-width: 380px) {
+    .proof-bg__band--far,
+    .proof-bg__band--near {
+      display: none;
+    }
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    .proof-bg__band {
+      will-change: transform;
+    }
+
+    .proof-bg__band--far {
+      animation: proof-bg-scroll 46s linear infinite;
+    }
+
+    .proof-bg__band--mid {
+      animation: proof-bg-scroll 30s linear infinite reverse;
+    }
+
+    .proof-bg__band--near {
+      animation: proof-bg-scroll 18s linear infinite;
+    }
+
+    .proof-bg__band.is-paused {
+      animation-play-state: paused;
+    }
+
+    /* Point de trajectoire fixe (pas aléatoire) : approximatif plutôt que
+       pixel-parfait — la position exacte de croisement du centre dépend de
+       la largeur de viewport (responsive), qu'on ne calcule jamais en JS
+       par carte pour rester sur une seule timeline CSS par bande. */
+    .proof-mini__recent {
+      animation: proof-mini-recent 18s linear infinite;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .proof-bg__band--far,
+    .proof-bg__band--mid,
+    .proof-bg__band--near {
+      animation: none;
+    }
+  }
+
+  @keyframes proof-bg-scroll {
+    from { transform: translateX(0); }
+    to { transform: translateX(-50%); }
+  }
+
+  @keyframes proof-mini-recent {
+    0%, 100% { opacity: 0; transform: translateX(-50%) translateY(4px); }
+    38%, 46% { opacity: 1; transform: translateX(-50%) translateY(0); }
+    54% { opacity: 0; transform: translateX(-50%) translateY(-4px); }
   }
 
   @media (prefers-reduced-motion: no-preference) {
@@ -2571,6 +2736,14 @@ function page({ brand, hero, socialProof, notificationStack, pricing, comparison
         });
       })();
 
+      // Pause le carrousel de fond (3 bandes) quand l'onglet est masqué —
+      // pas de raison de faire tourner ces boucles CSS en arrière-plan.
+      document.addEventListener("visibilitychange", function () {
+        document.querySelectorAll(".proof-bg__band").forEach(function (band) {
+          band.classList.toggle("is-paused", document.hidden);
+        });
+      });
+
       function easeOutExpo(t) {
         return t === 1 ? 1 : 1 - Math.pow(2, -10 * t);
       }
@@ -3253,6 +3426,44 @@ function renderQuizOptions(question) {
             </div>`;
 }
 
+// Carrousel de fond de l'écran "proof" — 3 bandes de profondeur, chacune
+// une seule timeline CSS (jamais une animation par mini-carte). Vocabulaire
+// de secteur repris à l'identique de quiz.sectorLabels : aucune catégorie
+// inventée qui divergerait du reste du produit (pas de "Productivité" ou
+// autre vertical qui n'existe nulle part ailleurs dans ColdTrend).
+function renderProofBackground() {
+  const sectorCycle = [quiz.sectorLabels.b2b, quiz.sectorLabels.b2c, quiz.sectorLabels.both];
+
+  function miniCard(i, withRecentLabel) {
+    const sector = sectorCycle[i % sectorCycle.length];
+    return `<span class="proof-mini">
+              <span class="proof-mini__bar"></span>
+              <span class="proof-mini__sector">SaaS · ${sector}</span>
+              <span class="proof-mini__check">${ICON_CHECK_SMALL}</span>
+              ${withRecentLabel ? '<span class="proof-mini__recent">Ajouté récemment</span>' : ""}
+            </span>`;
+  }
+
+  // Dupliqué une fois pour une boucle transform:translateX(-50%) sans
+  // coupure visible — une seule timeline anime tout le groupe.
+  function track(count, recentIndex) {
+    const cards = Array.from({ length: count }, (_, i) => miniCard(i, i === recentIndex)).join("\n              ");
+    return cards + "\n              " + cards;
+  }
+
+  return `<div class="proof-bg" aria-hidden="true">
+            <div class="proof-bg__band proof-bg__band--far"><div class="proof-bg__track">
+              ${track(5, -1)}
+            </div></div>
+            <div class="proof-bg__band proof-bg__band--mid"><div class="proof-bg__track">
+              ${track(5, -1)}
+            </div></div>
+            <div class="proof-bg__band proof-bg__band--near"><div class="proof-bg__track">
+              ${track(5, 2)}
+            </div></div>
+          </div>`;
+}
+
 function renderQuizQuestionScreen(question, index) {
   const skipAttrs = question.skipIf
     ? ` data-skip-field="${question.skipIf.field}" data-skip-equals="${question.skipIf.equals}"`
@@ -3298,6 +3509,8 @@ function renderQuizQuestionScreen(question, index) {
     return `<div class="quiz-screen" data-screen="question" data-index="${index}" data-id="${question.id}" data-step-name="${question.stepName}"${skipAttrs}>
           <h2 class="quiz-question-title">${question.title}</h2>
           <p class="quiz-subtext">${question.subtext}</p>
+          <div class="proof-stage">
+          ${renderProofBackground()}
           <div class="proof-card" id="proof-card">
             <div class="proof-card__watermark" aria-hidden="true">
               <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -3329,6 +3542,7 @@ function renderQuizQuestionScreen(question, index) {
               <span class="proof-card__redaction proof-card__redaction--3" tabindex="0" aria-label="Ancienneté masquée"><span class="proof-card__redaction-fill"></span></span>
             </div>
             <p class="proof-card__note">Nom et montant exact masqués ici — la fiche complète est débloquée avec ton accès, jamais un chiffre inventé.</p>
+          </div>
           </div>
           <svg width="0" height="0" style="position:absolute" aria-hidden="true">
             <filter id="proof-roughen" x="-20%" y="-100%" width="140%" height="300%">
