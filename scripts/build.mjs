@@ -1361,6 +1361,7 @@ function page({ brand, hero, socialProof, notificationStack, pricing, comparison
 
   .quiz-next {
     width: 100%;
+    max-width: none;
   }
 
   .quiz-next[disabled] {
