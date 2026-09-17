@@ -2306,7 +2306,8 @@ function page({ brand, hero, socialProof, notificationStack, pricing, comparison
       //
       // Un seul appel à l'Edge Function resolve-identity (voir
       // supabase/functions/resolve-identity/) gère "nouveau compte ou
-      // existant" côté serveur, avec service_role — jamais côté client.
+      // existant" côté serveur, avec des privilèges admin jamais exposés
+      // côté client.
       // La transition vers la question 2 démarre AVANT sa réponse : l'appel
       // réseau se termine en arrière-plan pendant que la personne lit déjà
       // la question suivante. Si ça échoue (mauvais mot de passe pour un
