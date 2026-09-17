@@ -1359,7 +1359,8 @@ function page({ brand, hero, socialProof, notificationStack, pricing, comparison
     margin-top: 24px;
   }
 
-  .quiz-next {
+  .quiz-next,
+  .btn--full {
     width: 100%;
     max-width: none;
   }
@@ -2097,6 +2098,7 @@ function page({ brand, hero, socialProof, notificationStack, pricing, comparison
 
   .btn--cta-final {
     width: 100%;
+    max-width: none;
     font-size: 17px;
     padding: 17px;
     transition: transform 420ms cubic-bezier(0.22, 1.26, 0.36, 1), box-shadow 0.28s ease, background 0.18s ease;
@@ -3605,7 +3607,7 @@ function renderQuizOverlay({ quiz, pricing, stripeLink }) {
         <div class="quiz-result__match" id="quiz-count-match">0</div>
         <p class="quiz-result__match-label" id="quiz-match-label">correspondent à ton profil</p>
         <p class="quiz-result-meta" id="quiz-result-meta"></p>
-        <button class="btn btn--primary" id="quiz-see-offer-btn" type="button">Voir mon accès</button>
+        <button class="btn btn--primary btn--full" id="quiz-see-offer-btn" type="button">Voir mon accès</button>
       </div>
 
       <div class="quiz-screen" data-screen="payment" data-step-name="paiement">
