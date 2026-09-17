@@ -1487,7 +1487,7 @@ function page({ brand, hero, socialProof, notificationStack, pricing, comparison
     border-radius: 12px;
     font-size: 13px;
     line-height: 1.4;
-    margin-bottom: 16px;
+    margin: 12px 20px 0;
   }
 
   .quiz-banner.is-visible {
@@ -2707,10 +2707,6 @@ function renderQuizQuestionScreen(question, index) {
           <div class="quiz-auth-mesh" aria-hidden="true"></div>
           <h2 class="quiz-question-title">${question.title}</h2>
           <p class="quiz-subtext">${question.subtext}</p>
-          <div class="quiz-banner quiz-banner--alert" id="quiz-auth-banner" role="alert">
-            <span id="quiz-auth-banner-text"></span>
-            <button type="button" class="quiz-banner__action" id="quiz-auth-banner-fix">Corriger</button>
-          </div>
           <div class="quiz-field quiz-auth-field quiz-auth-field--1">
             <label class="quiz-label" for="quiz-auth-email">Email</label>
             <input class="quiz-input" id="quiz-auth-email" name="email" type="email" autocomplete="email" required />
@@ -2756,6 +2752,10 @@ function renderQuizOverlay({ quiz, pricing, stripeLink }) {
       ${Array.from({ length: totalSteps })
         .map(() => `<span class="quiz-progress__seg"><span class="quiz-progress__seg-fill"></span></span>`)
         .join("\n      ")}
+    </div>
+    <div class="quiz-banner quiz-banner--alert" id="quiz-auth-banner" role="alert">
+      <span id="quiz-auth-banner-text"></span>
+      <button type="button" class="quiz-banner__action" id="quiz-auth-banner-fix">Corriger</button>
     </div>
     <div class="quiz-stage" id="quiz-stage">
       ${questionScreens}
