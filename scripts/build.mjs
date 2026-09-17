@@ -277,6 +277,19 @@ const quiz = {
       subtext: "Un compte pour retrouver tes résultats plus tard — pas de confirmation par email, pas d'attente."
     },
     {
+      // Preuve visuelle redactée plutôt qu'une affirmation textuelle ou un
+      // chiffre inventé façon concurrent : le montant et le nom du SaaS sont
+      // partiellement masqués (comme une fiche Stripe qu'on aurait le droit
+      // de montrer sans révéler l'identité du vendeur), mais RIEN n'est
+      // fabriqué — c'est un exemple réel de ce que "vérifié" veut dire chez
+      // ColdTrend, pas une preuve sociale gonflée.
+      id: "proof",
+      stepName: "preuve",
+      type: "proof",
+      title: "Chaque SaaS ici a un revenu vérifié — pas une estimation.",
+      subtext: "Voici le type de preuve qu'on croise (Stripe × TrustMRR) avant qu'un SaaS apparaisse dans ta sélection."
+    },
+    {
       id: "intention",
       stepName: "intention",
       title: "Tu veux racheter un SaaS qui tourne déjà, ou t'inspirer d'un concept pour repartir de zéro ?",
@@ -1585,6 +1598,76 @@ function page({ brand, hero, socialProof, notificationStack, pricing, comparison
     .connected-badge { transition: opacity 200ms ease-out; transform: none; }
   }
 
+  /* ---- Carte "preuve redactée" ---- */
+
+  .proof-card {
+    margin: 4px 0 24px;
+    padding: 18px 20px;
+    border-radius: 16px;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px dashed rgba(255, 255, 255, 0.18);
+  }
+
+  .proof-card__header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 14px;
+    padding-bottom: 14px;
+    border-bottom: 1px dashed rgba(255, 255, 255, 0.12);
+  }
+
+  .proof-card__badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--verified-green);
+  }
+
+  .proof-card__badge svg {
+    width: 13px;
+    height: 13px;
+  }
+
+  .proof-card__source {
+    font-size: 11px;
+    color: var(--steel);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+
+  .proof-card__row {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 6px 0;
+  }
+
+  .proof-card__label {
+    font-size: 13px;
+    color: var(--steel);
+  }
+
+  .proof-card__value {
+    font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+    font-size: 14px;
+    color: var(--paper-soft);
+  }
+
+  .proof-card__value--redacted {
+    letter-spacing: 0.02em;
+  }
+
+  .proof-card__note {
+    margin: 14px 0 0;
+    font-size: 12px;
+    line-height: 1.5;
+    color: var(--steel);
+  }
+
   .quiz-result-meta {
     font-size: 13px;
     color: var(--steel);
@@ -2212,6 +2295,12 @@ function page({ brand, hero, socialProof, notificationStack, pricing, comparison
           var authEmailInput = document.getElementById("quiz-auth-email");
           var authPasswordInput = document.getElementById("quiz-auth-password");
           nextBtn.disabled = !(EMAIL_RE.test(authEmailInput.value.trim()) && authPasswordInput.value.length >= 6);
+          return;
+        }
+
+        if (id === "proof") {
+          // Écran purement informatif, rien à répondre : le bouton reste
+          // activé par défaut (pas d'attribut disabled dans le rendu).
           return;
         }
 
@@ -2964,6 +3053,39 @@ function renderQuizQuestionScreen(question, index) {
           </div>
           <div class="quiz-footer">
             <button class="btn btn--primary quiz-next" id="quiz-auth-submit" type="button" disabled>Continuer</button>
+          </div>
+        </div>`;
+  }
+
+  if (question.type === "proof") {
+    // Preuve redactée plutôt qu'un chiffre inventé ou une affirmation
+    // textuelle : on montre littéralement la NATURE de la preuve (source
+    // croisée, montant, nom) sans révéler l'identité du SaaS — rien n'est
+    // fabriqué, juste partiellement masqué.
+    return `<div class="quiz-screen" data-screen="question" data-index="${index}" data-id="${question.id}" data-step-name="${question.stepName}"${skipAttrs}>
+          <h2 class="quiz-question-title">${question.title}</h2>
+          <p class="quiz-subtext">${question.subtext}</p>
+          <div class="proof-card">
+            <div class="proof-card__header">
+              <span class="proof-card__badge">${ICON_CHECK_SMALL} Vérifié</span>
+              <span class="proof-card__source">Stripe × TrustMRR</span>
+            </div>
+            <div class="proof-card__row">
+              <span class="proof-card__label">SaaS</span>
+              <span class="proof-card__value proof-card__value--redacted">████████████</span>
+            </div>
+            <div class="proof-card__row">
+              <span class="proof-card__label">MRR mensuel</span>
+              <span class="proof-card__value proof-card__value--redacted">•••• 8 2•• €</span>
+            </div>
+            <div class="proof-card__row">
+              <span class="proof-card__label">Historique</span>
+              <span class="proof-card__value proof-card__value--redacted">██ mois consécutifs</span>
+            </div>
+            <p class="proof-card__note">Nom et montant exact masqués ici — la fiche complète est débloquée avec ton accès, jamais un chiffre inventé.</p>
+          </div>
+          <div class="quiz-footer">
+            <button class="btn btn--primary quiz-next" type="button">Continuer</button>
           </div>
         </div>`;
   }
