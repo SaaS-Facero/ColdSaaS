@@ -1802,9 +1802,9 @@ function page({ brand, hero, socialProof, notificationStack, pricing, comparison
 
   ${renderQuizOverlay({ quiz, pricing, stripeLink: STRIPE_PAYMENT_LINK })}
 
-  <!-- Le quiz résout l'identité côté serveur (supabase/functions/resolve-identity),
-       pas via ensure-identity.js (utilisé uniquement par /inscription pour
-       les visites directes hors quiz). -->
+  <!-- Le quiz et /inscription résolvent tous les deux l'identité côté
+       serveur via supabase/functions/resolve-identity — un seul mécanisme
+       d'auth pour toute l'app, quel que soit le point d'entrée. -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="/js/supabase-client.js"></script>
   <script src="/js/auth-state.js"></script>
@@ -3578,32 +3578,6 @@ function supabaseClientJs() {
 `;
 }
 
-function ensureIdentityJs() {
-  return `// Point de convergence unique de l'identité — appelé par le quiz (voir
-// scripts/build.mjs, saveProfileForCurrentIdentity) ET par /inscription.
-// Vérifie une session existante (anonyme ou non) avant d'en créer une
-// nouvelle : une personne qui a commencé le quiz sans le finir puis visite
-// /inscription directement ne doit jamais obtenir un second compte parallèle.
-window.ColdTrendEnsureIdentity = async function ensureIdentity() {
-  var supabase = window.ColdTrendSupabase;
-  if (!supabase) {
-    console.warn("[ColdTrend] ensureIdentity: client Supabase indisponible.");
-    return null;
-  }
-  var sessionRes = await supabase.auth.getSession();
-  if (sessionRes.data && sessionRes.data.session && sessionRes.data.session.user) {
-    return sessionRes.data.session.user;
-  }
-  var signInRes = await supabase.auth.signInAnonymously();
-  if (signInRes.error) {
-    console.warn("[ColdTrend] ensureIdentity: échec signInAnonymously :", signInRes.error.message);
-    return null;
-  }
-  return signInRes.data.user;
-};
-`;
-}
-
 function authStateJs() {
   return `// Chargé sur TOUTES les pages (pas seulement les 5 pages d'auth) : maintient
 // le petit lien "Se connecter" / prénom du brand-bar cohérent partout, à
@@ -3838,12 +3812,11 @@ function authPageShell({ title, description, bodyHtml, extraHead = "" }) {
 ${extraHead}
 </head>
 <body>
-${bodyHtml}
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="/js/supabase-client.js"></script>
-<script src="/js/ensure-identity.js"></script>
 <script src="/js/auth-ui.js"></script>
 <script src="/js/auth-state.js"></script>
+${bodyHtml}
 </body>
 </html>
 `;
@@ -4029,11 +4002,12 @@ function inscriptionPage() {
         errorBanner.style.display = "block";
       }
 
-      function isEmailAlreadyTakenError(message) {
-        var normalized = (message || "").toLowerCase();
-        return normalized.indexOf("already") !== -1 || normalized.indexOf("email_exists") !== -1;
-      }
-
+      // Même Edge Function resolve-identity que l'écran auth du quiz (voir
+      // supabase/functions/resolve-identity/) : un seul mécanisme d'auth
+      // pour toute l'app, plus de dance updateUser(email) + updateUser(password)
+      // côté client — ça évitait un point d'entrée direct sur /inscription
+      // de diverger du parcours quiz et de créer un second compte pour la
+      // même personne.
       signupForm.addEventListener("submit", async function (e) {
         e.preventDefault();
         if (!canSubmit()) return;
@@ -4041,45 +4015,51 @@ function inscriptionPage() {
         loadingState.start("Création…");
 
         var supabase = window.ColdTrendSupabase;
-        if (!supabase || !window.ColdTrendEnsureIdentity) {
+        if (!supabase) {
           showError("Service indisponible pour le moment, réessaie dans un instant.");
           loadingState.reset();
           return;
         }
 
-        // Convergence d'identité : ne traite jamais ceci comme "forcément un
-        // nouveau compte" sans avoir vérifié une session existante d'abord
-        // (voir /js/ensure-identity.js — même fonction que le quiz).
-        var identity = await window.ColdTrendEnsureIdentity();
-        if (!identity) {
-          showError("Impossible de créer ton compte pour le moment. Réessaie dans un instant.");
-          loadingState.reset();
-          return;
-        }
-
         var email = emailInput.value.trim();
-        var emailRes = await supabase.auth.updateUser({ email: email });
-        if (emailRes.error) {
-          if (isEmailAlreadyTakenError(emailRes.error.message)) {
-            capturedEmail = email;
-            signupView.style.display = "none";
-            loginView.style.display = "block";
-            loadingState.reset();
-            return;
-          }
-          showError(emailRes.error.message);
+        var password = passwordInput.value;
+        capturedEmail = email;
+
+        var res, body;
+        try {
+          res = await fetch(supabase.supabaseUrl + "/functions/v1/resolve-identity", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              apikey: supabase.supabaseKey,
+              Authorization: "Bearer " + supabase.supabaseKey
+            },
+            body: JSON.stringify({ email: email, password: password })
+          });
+          body = await res.json();
+        } catch (err) {
+          showError("Service indisponible pour le moment, réessaie dans un instant.");
           loadingState.reset();
           return;
         }
 
-        var passwordRes = await supabase.auth.updateUser({ password: passwordInput.value });
-        if (passwordRes.error) {
-          showError(passwordRes.error.message);
+        if (!res.ok || !body.session) {
+          // Email déjà pris ET mot de passe fourni incorrect (resolve-identity
+          // ne distingue jamais les deux cas dans son message, cf.
+          // anti-énumération) : on bascule vers la connexion inline plutôt
+          // que d'afficher une erreur bloquante à quelqu'un qui a déjà un
+          // compte.
+          signupView.style.display = "none";
+          loginView.style.display = "block";
           loadingState.reset();
           return;
         }
 
-        await supabase.from("profiles").update({ converted: true }).eq("id", identity.id);
+        await supabase.auth.setSession({
+          access_token: body.session.access_token,
+          refresh_token: body.session.refresh_token
+        });
+        await supabase.from("profiles").update({ converted: true }).eq("id", body.user.id);
         loadingState.success("Compte créé");
         window.setTimeout(function () { window.location.href = "/compte"; }, 500);
       });
@@ -4402,7 +4382,6 @@ writeBuiltFile(OUT_FILE_SUCCESS, successPage({ brand, siteUrl: SITE_URL }));
 writeBuiltFile(path.join(OUT_DIR, "css", "design-tokens.css"), designTokensCss());
 writeBuiltFile(path.join(OUT_DIR, "css", "auth.css"), authCss());
 writeBuiltFile(path.join(OUT_DIR, "js", "supabase-client.js"), supabaseClientJs());
-writeBuiltFile(path.join(OUT_DIR, "js", "ensure-identity.js"), ensureIdentityJs());
 writeBuiltFile(path.join(OUT_DIR, "js", "auth-state.js"), authStateJs());
 writeBuiltFile(path.join(OUT_DIR, "js", "auth-ui.js"), authUiJs());
 
