@@ -1466,6 +1466,50 @@ function page({ brand, hero, socialProof, notificationStack, pricing, comparison
   .quiz-auth-field--1 { animation-delay: 80ms; }
   .quiz-auth-field--2 { animation-delay: 180ms; }
 
+  .quiz-google-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    width: 100%;
+    padding: 13px 16px;
+    border-radius: 12px;
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    background: #fff;
+    color: #1F1F1F;
+    font-size: 15px;
+    font-weight: 600;
+    font-family: inherit;
+    cursor: pointer;
+    margin-bottom: 16px;
+    transition: transform 180ms cubic-bezier(0.22, 1.26, 0.36, 1), box-shadow 180ms ease;
+  }
+
+  .quiz-google-btn:hover {
+    box-shadow: 0 6px 18px -6px rgba(255, 255, 255, 0.35);
+  }
+
+  .quiz-google-btn:active {
+    transform: scale(0.98);
+  }
+
+  .quiz-auth-divider {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin: 0 0 18px;
+    color: var(--steel);
+    font-size: 12px;
+  }
+
+  .quiz-auth-divider::before,
+  .quiz-auth-divider::after {
+    content: "";
+    flex: 1;
+    height: 1px;
+    background: rgba(255, 255, 255, 0.1);
+  }
+
   @keyframes quiz-auth-field-in {
     to { opacity: 1; transform: translateY(0); }
   }
@@ -2751,6 +2795,66 @@ function page({ brand, hero, socialProof, notificationStack, pricing, comparison
       openBtn.addEventListener("click", openQuiz);
       var authBannerFixBtn = document.getElementById("quiz-auth-banner-fix");
       if (authBannerFixBtn) authBannerFixBtn.addEventListener("click", fixAuthAndGoBack);
+
+      // ---- Google OAuth (position primaire sur l'écran auth) -----------
+      // signInWithOAuth() redirige la page entière vers Google puis vers
+      // redirectTo — l'overlay du quiz est donc détruit par ce
+      // rechargement. On pose un flag sessionStorage AVANT de partir, pour
+      // rouvrir automatiquement le quiz au retour (voir plus bas, à
+      // l'initialisation de la page) : determineStartIndex() se charge de
+      // reprendre au bon écran, exactement comme pour email/mot de passe.
+      var QUIZ_RESUME_FLAG = "coldtrend_resume_quiz";
+      var googleBtn = document.getElementById("quiz-google-btn");
+      if (googleBtn) {
+        googleBtn.addEventListener("click", function () {
+          var supabase = window.ColdTrendSupabase;
+          if (!supabase) return;
+          try {
+            sessionStorage.setItem(QUIZ_RESUME_FLAG, "1");
+          } catch (err) {
+            console.warn("[ColdTrend] sessionStorage indisponible :", err);
+          }
+          supabase.auth.signInWithOAuth({
+            provider: "google",
+            options: { redirectTo: window.location.origin + "/" }
+          });
+        });
+      }
+
+      // Retour de Google : la page vient de recharger avec une session
+      // fraîche dans l'URL (fragment #access_token=...), auto-détectée par
+      // le SDK. On rouvre le quiz dès que la session est confirmée.
+      (function resumeQuizAfterOAuthRedirect() {
+        var shouldResume;
+        try {
+          shouldResume = sessionStorage.getItem(QUIZ_RESUME_FLAG) === "1";
+        } catch (err) {
+          shouldResume = false;
+        }
+        if (!shouldResume) return;
+
+        function tryResume() {
+          var supabase = window.ColdTrendSupabase;
+          if (!supabase) return;
+          supabase.auth.getSession().then(function (res) {
+            if (res.data.session) {
+              try {
+                sessionStorage.removeItem(QUIZ_RESUME_FLAG);
+              } catch (err) {
+                /* pas grave si on ne peut pas nettoyer le flag */
+              }
+              openQuiz();
+            }
+          });
+        }
+
+        if (window.ColdTrendSupabase) {
+          tryResume();
+        } else {
+          document.addEventListener("coldtrend:supabase-ready", tryResume, { once: true });
+        }
+      })();
+
       document.addEventListener("keydown", function (e) {
         if (e.key === "Escape" && overlay.classList.contains("is-open")) closeQuiz();
       });
@@ -2844,6 +2948,11 @@ function renderQuizQuestionScreen(question, index) {
           <div class="quiz-auth-mesh" aria-hidden="true"></div>
           <h2 class="quiz-question-title">${question.title}</h2>
           <p class="quiz-subtext">${question.subtext}</p>
+          <button type="button" class="quiz-google-btn" id="quiz-google-btn">
+            ${ICON_GOOGLE}
+            Continuer avec Google
+          </button>
+          <div class="quiz-auth-divider"><span>ou</span></div>
           <div class="quiz-field quiz-auth-field quiz-auth-field--1">
             <label class="quiz-label" for="quiz-auth-email">Email</label>
             <input class="quiz-input" id="quiz-auth-email" name="email" type="email" autocomplete="email" required />
@@ -2951,6 +3060,8 @@ const ICON_CHECK_SMALL =
   '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M20 6L9 17l-5-5" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>';
 const ICON_LOCK =
   '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="5" y="11" width="14" height="9" rx="2" stroke="currentColor" stroke-width="2"/><path d="M8 11V7a4 4 0 018 0v4" stroke="currentColor" stroke-width="2"/></svg>';
+const ICON_GOOGLE =
+  '<svg width="18" height="18" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M23.52 12.27c0-.85-.08-1.66-.22-2.44H12v4.62h6.47a5.53 5.53 0 01-2.4 3.63v3h3.88c2.27-2.09 3.57-5.17 3.57-8.81z" fill="#4285F4"/><path d="M12 24c3.24 0 5.96-1.07 7.95-2.92l-3.88-3c-1.08.72-2.45 1.15-4.07 1.15-3.13 0-5.78-2.11-6.73-4.96H1.27v3.1A12 12 0 0012 24z" fill="#34A853"/><path d="M5.27 14.27a7.2 7.2 0 010-4.54v-3.1H1.27a12 12 0 000 10.74l4-3.1z" fill="#FBBC05"/><path d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.44-3.44C17.95 1.19 15.24 0 12 0A12 12 0 001.27 6.63l4 3.1C6.22 6.86 8.87 4.75 12 4.75z" fill="#EA4335"/></svg>';
 
 // ---------------------------------------------------------------------------
 // Page succès — cible de la redirection post-paiement Stripe
