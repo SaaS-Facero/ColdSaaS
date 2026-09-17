@@ -2527,11 +2527,6 @@ function page({ brand, hero, socialProof, notificationStack, pricing, comparison
       }
 
       stage.addEventListener("click", function (e) {
-        if (e.target.closest("#quiz-auth-banner-fix")) {
-          fixAuthAndGoBack();
-          return;
-        }
-
         var optBtn = e.target.closest(".quiz-option, .quiz-chip");
         if (optBtn) {
           var screenEl = optBtn.closest(".quiz-screen");
@@ -2614,6 +2609,8 @@ function page({ brand, hero, socialProof, notificationStack, pricing, comparison
 
       closeBtn.addEventListener("click", closeQuiz);
       openBtn.addEventListener("click", openQuiz);
+      var authBannerFixBtn = document.getElementById("quiz-auth-banner-fix");
+      if (authBannerFixBtn) authBannerFixBtn.addEventListener("click", fixAuthAndGoBack);
       document.addEventListener("keydown", function (e) {
         if (e.key === "Escape" && overlay.classList.contains("is-open")) closeQuiz();
       });
