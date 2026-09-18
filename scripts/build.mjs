@@ -4323,6 +4323,16 @@ function successPage({ brand, siteUrl }) {
   .listing-card__name { font-size: 16px; font-weight: 700; color: #F5F6F8; margin: 0; }
   .listing-card__link { font-size: 12px; color: #0047FF; text-decoration: none; }
   .listing-card__meta { font-size: 13px; color: #8A8F98; margin: 0 0 8px; }
+  .listing-card__range { font-size: 12px; color: #8A8F98; margin: 0 0 10px; font-style: italic; }
+  .listing-card__cta {
+    display: inline-block;
+    margin-bottom: 10px;
+    padding: 6px 14px;
+    border-radius: 8px;
+    background: rgba(0, 71, 255, 0.14);
+    border: 1px solid rgba(0, 71, 255, 0.4);
+    font-weight: 700;
+  }
   .listing-card__reason {
     font-size: 12px;
     color: #8A8F98;
@@ -4446,12 +4456,49 @@ function successPage({ brand, siteUrl }) {
         return "MRR ~" + Math.round(value).toLocaleString("fr-FR") + " $";
       }
 
-      function renderListing(listing, isPartial) {
+      function median(sortedNums) {
+        var n = sortedNums.length;
+        var mid = Math.floor(n / 2);
+        return n % 2 !== 0 ? sortedNums[mid] : (sortedNums[mid - 1] + sortedNums[mid]) / 2;
+      }
+
+      // Fourchette de MRR calculée sur les vraies données déjà chargées
+      // (tous les listings actifs sont en mémoire au moment du matching --
+      // pas besoin d'une requête SQL séparée). Seuil de fiabilité : sous 3
+      // SaaS avec un MRR renseigné dans le même secteur, l'échantillon est
+      // trop faible pour être honnête -- on n'affiche aucune fourchette
+      // plutôt que d'en montrer une non représentative.
+      function sectorMrrRange(listing, allListings) {
+        var peers = allListings.filter(function (other) {
+          return sectorsOverlap(listing.secteur, other.secteur) && typeof other.mrr_usd === "number";
+        });
+        if (peers.length < 3) return null;
+        var values = peers.map(function (p) { return p.mrr_usd; }).sort(function (a, b) { return a - b; });
+        return {
+          min: values[0],
+          max: values[values.length - 1],
+          med: median(values),
+          sampleSize: values.length
+        };
+      }
+
+      function formatUsd(value) {
+        return Math.round(value).toLocaleString("fr-FR") + " $";
+      }
+
+      function renderListing(listing, isPartial, allListings) {
         var badgeClass = listing.source_level === "verified" ? "badge--verified" : "badge--platform";
         var badgeLabel = listing.source_level === "verified" ? "Vérifié · TrustMRR" : "Revue par l'équipe";
         var reasonText = listing._reasons && listing._reasons.length
           ? "Correspond à ton " + listing._reasons.join(" et ton ")
           : "Sélection parmi les SaaS les plus solides du catalogue";
+
+        var range = sectorMrrRange(listing, allListings);
+        var rangeHtml = range
+          ? '<p class="listing-card__range">SaaS ' + escapeHtml(sectorLabel(listing.secteur)) +
+            " similaires : MRR entre " + formatUsd(range.min) + " et " + formatUsd(range.max) +
+            " (médiane " + formatUsd(range.med) + ", sur " + range.sampleSize + " SaaS vérifiés)</p>"
+          : "";
 
         var el = document.createElement("div");
         el.className = "listing-card";
@@ -4461,7 +4508,8 @@ function successPage({ brand, siteUrl }) {
             '<span class="badge ' + badgeClass + '">' + badgeLabel + "</span>" +
           "</div>" +
           '<p class="listing-card__meta">' + escapeHtml(sectorLabel(listing.secteur)) + " · " + formatMrr(listing.mrr_usd) + "</p>" +
-          (listing.website ? '<a class="listing-card__link" href="' + escapeAttr(listing.website) + '" target="_blank" rel="noopener">Voir le site &rarr;</a>' : "") +
+          rangeHtml +
+          (listing.website ? '<a class="listing-card__link listing-card__cta" href="' + escapeAttr(listing.website) + '" target="_blank" rel="noopener">Voir le site &rarr;</a>' : "") +
           '<div><span class="listing-card__reason">' + escapeHtml(reasonText) + (isPartial ? " · correspondance partielle" : "") + "</span></div>";
         return el;
       }
@@ -4511,7 +4559,7 @@ function successPage({ brand, siteUrl }) {
         listEl.innerHTML = "";
         top3.forEach(function (listing) {
           var isPartial = hasProfile && listing._score < MATCH_THRESHOLD;
-          listEl.appendChild(renderListing(listing, isPartial));
+          listEl.appendChild(renderListing(listing, isPartial, listings));
         });
 
         document.getElementById("results-zone").className = "is-visible";
