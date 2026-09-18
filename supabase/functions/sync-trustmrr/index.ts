@@ -47,6 +47,7 @@ Deno.serve(async (req) => {
   let synced = 0;
   let failed = 0;
   let pages = 0;
+  const errors: Array<{ slug: unknown; message: string }> = [];
   let url: string | null = `${TRUSTMRR_BASE_URL}/startups`;
 
   while (url && pages < 50) {
@@ -75,6 +76,7 @@ Deno.serve(async (req) => {
       const slug = item["slug"];
       if (typeof slug !== "string" || !slug) {
         failed += 1;
+        errors.push({ slug: slug ?? null, message: "slug manquant ou invalide" });
         continue;
       }
       const revenue = (item["revenue"] as Record<string, unknown> | undefined) ?? {};
@@ -84,7 +86,9 @@ Deno.serve(async (req) => {
         website: item["website"] ?? null,
         description: item["description"] ?? null,
         secteur: mapSecteur(item["targetAudience"]),
-        mrr_cents: typeof revenue["mrr"] === "number" ? revenue["mrr"] : null,
+        // Montant en dollars avec décimales (ex: 3569654.22), pas des
+        // centimes entiers -- vérifié sur un vrai échec de synchronisation.
+        mrr_usd: typeof revenue["mrr"] === "number" ? revenue["mrr"] : null,
         source_level: "verified",
         source_name: "TrustMRR",
         active: true,
@@ -94,6 +98,7 @@ Deno.serve(async (req) => {
       if (error) {
         console.error(`[sync-trustmrr] upsert échoué pour ${slug} :`, error.message);
         failed += 1;
+        errors.push({ slug, message: error.message });
       } else {
         synced += 1;
       }
@@ -109,5 +114,5 @@ Deno.serve(async (req) => {
     url = typeof next === "string" && next ? next : null;
   }
 
-  return json({ synced, failed, pages });
+  return json({ synced, failed, pages, errors });
 });
