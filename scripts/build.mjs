@@ -4310,8 +4310,61 @@ function successPage({ brand, siteUrl }) {
     background: rgba(255, 255, 255, 0.03);
     border: 1px solid rgba(255, 255, 255, 0.08);
     border-radius: 14px;
-    padding: 18px 20px;
-    margin-bottom: 14px;
+    overflow: hidden;
+    margin-bottom: 18px;
+  }
+  .listing-card__verified { padding: 16px 20px 18px; }
+  .concept-mockup { border-bottom: 1px solid rgba(255, 255, 255, 0.08); }
+  .concept-mockup__chrome {
+    display: flex;
+    gap: 5px;
+    padding: 8px 12px;
+    background: rgba(255, 255, 255, 0.03);
+  }
+  .concept-mockup__chrome span {
+    width: 8px;
+    height: 8px;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.15);
+    display: inline-block;
+  }
+  .concept-mockup__hero {
+    padding: 28px 20px;
+    text-align: center;
+  }
+  .concept-mockup__logo {
+    width: 44px;
+    height: 44px;
+    margin: 0 auto 10px;
+    border-radius: 12px;
+    background: rgba(255, 255, 255, 0.2);
+    backdrop-filter: blur(4px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 800;
+    font-size: 15px;
+    color: #fff;
+  }
+  .concept-mockup__brand { font-size: 16px; font-weight: 800; color: #fff; margin: 0 0 6px; }
+  .concept-mockup__headline { font-size: 13px; color: rgba(255, 255, 255, 0.85); margin: 0 0 14px; line-height: 1.4; }
+  .concept-mockup__cta {
+    display: inline-block;
+    padding: 7px 16px;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.92);
+    color: #0A0E1A;
+    font-size: 12px;
+    font-weight: 800;
+  }
+  .concept-mockup__label {
+    font-size: 10px;
+    color: #8A8F98;
+    text-align: center;
+    margin: 0;
+    padding: 6px 12px;
+    background: rgba(255, 255, 255, 0.02);
+    letter-spacing: 0.02em;
   }
   .listing-card__top {
     display: flex;
@@ -4486,6 +4539,57 @@ function successPage({ brand, siteUrl }) {
         return Math.round(value).toLocaleString("fr-FR") + " $";
       }
 
+      // Palette de dégradés "envie" -- pas de couleur choisie au hasard à
+      // chaque rendu (déterministe sur le nom, comme seededMatchCount), pour
+      // qu'un même SaaS garde toujours la même identité visuelle générée.
+      var MOCKUP_PALETTES = [
+        ["#0047FF", "#7B2FF7"],
+        ["#00C48C", "#0047FF"],
+        ["#FF6B4A", "#D9A23D"],
+        ["#7B2FF7", "#D9605A"],
+        ["#0EA5E9", "#00C48C"],
+        ["#D9A23D", "#FF6B4A"]
+      ];
+
+      function hashString(str) {
+        var hash = 0;
+        for (var i = 0; i < str.length; i += 1) {
+          hash = (hash * 31 + str.charCodeAt(i)) | 0;
+        }
+        return Math.abs(hash);
+      }
+
+      function initials(name) {
+        var words = (name || "SaaS").trim().split(/\s+/).slice(0, 2);
+        return words.map(function (w) { return w.charAt(0).toUpperCase(); }).join("") || "S";
+      }
+
+      // Identité visuelle générée (initiales + dégradé), jamais présentée
+      // comme le vrai logo du SaaS -- juste un concept, clairement labellisé
+      // dans le HTML ("Aperçu concept"), séparé du bloc de données vérifiées
+      // en dessous. Le titre de l'aperçu réutilise le vrai nom/la vraie
+      // description en base (jamais un texte généré ou un chiffre inventé).
+      function renderConceptMockup(listing) {
+        var palette = MOCKUP_PALETTES[hashString(listing.name || "") % MOCKUP_PALETTES.length];
+        var gradient = "linear-gradient(135deg, " + palette[0] + ", " + palette[1] + ")";
+        var headline = listing.description
+          ? escapeHtml(listing.description).slice(0, 90)
+          : "Un SaaS " + escapeHtml(sectorLabel(listing.secteur)) + " prêt à reprendre";
+
+        var el = document.createElement("div");
+        el.className = "concept-mockup";
+        el.innerHTML =
+          '<div class="concept-mockup__chrome"><span></span><span></span><span></span></div>' +
+          '<div class="concept-mockup__hero" style="background:' + gradient + '">' +
+            '<div class="concept-mockup__logo">' + escapeHtml(initials(listing.name)) + "</div>" +
+            '<p class="concept-mockup__brand">' + escapeHtml(listing.name || "SaaS") + "</p>" +
+            '<p class="concept-mockup__headline">' + headline + "</p>" +
+            '<span class="concept-mockup__cta">Rejoindre &rarr;</span>' +
+          "</div>" +
+          '<p class="concept-mockup__label">Aperçu concept — pas le vrai site, généré pour visualiser le potentiel</p>';
+        return el;
+      }
+
       function renderListing(listing, isPartial, allListings) {
         var badgeClass = listing.source_level === "verified" ? "badge--verified" : "badge--platform";
         var badgeLabel = listing.source_level === "verified" ? "Vérifié · TrustMRR" : "Revue par l'équipe";
@@ -4502,7 +4606,11 @@ function successPage({ brand, siteUrl }) {
 
         var el = document.createElement("div");
         el.className = "listing-card";
-        el.innerHTML =
+        el.appendChild(renderConceptMockup(listing));
+
+        var verifiedBlock = document.createElement("div");
+        verifiedBlock.className = "listing-card__verified";
+        verifiedBlock.innerHTML =
           '<div class="listing-card__top">' +
             '<p class="listing-card__name">' + escapeHtml(listing.name || "SaaS vérifié") + "</p>" +
             '<span class="badge ' + badgeClass + '">' + badgeLabel + "</span>" +
@@ -4511,6 +4619,8 @@ function successPage({ brand, siteUrl }) {
           rangeHtml +
           (listing.website ? '<a class="listing-card__link listing-card__cta" href="' + escapeAttr(listing.website) + '" target="_blank" rel="noopener">Voir le site &rarr;</a>' : "") +
           '<div><span class="listing-card__reason">' + escapeHtml(reasonText) + (isPartial ? " · correspondance partielle" : "") + "</span></div>";
+        el.appendChild(verifiedBlock);
+
         return el;
       }
 
@@ -4573,7 +4683,7 @@ function successPage({ brand, siteUrl }) {
 
           var listingsRes = await supabase
             .from("saas_listings")
-            .select("name, website, secteur, mrr_usd, asking_price_usd, source_level")
+            .select("name, website, description, secteur, mrr_usd, asking_price_usd, source_level")
             .eq("active", true);
           if (listingsRes.error) throw listingsRes.error;
 
