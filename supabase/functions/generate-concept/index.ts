@@ -32,11 +32,23 @@ const FORBIDDEN_PATTERNS = [
   /€\s*\/\s*mois/i,
 ];
 
-function json(body: unknown, status = 200) {
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: { "Content-Type": "application/json" },
-  });
+// Appelée directement depuis le navigateur (concept.html) -- contrairement
+// à sync-trustmrr/test-*, jamais en curl serveur-à-serveur -- nécessite donc
+// une vraie gestion CORS, même pattern que resend-access/index.ts.
+const ALLOWED_ORIGINS = new Set([
+  "https://coldtrend.com",
+  "https://www.coldtrend.com",
+  "http://localhost:3000",
+]);
+
+function corsHeaders(origin: string | null) {
+  const allowOrigin = origin && ALLOWED_ORIGINS.has(origin) ? origin : "https://coldtrend.com";
+  return {
+    "Access-Control-Allow-Origin": allowOrigin,
+    "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+    "Access-Control-Allow-Methods": "POST, OPTIONS",
+    Vary: "Origin",
+  };
 }
 
 function median(sortedNums: number[]): number {
@@ -99,6 +111,16 @@ Ne produis AUCUN texte avant ou après ce JSON.`;
 const REQUIRED_FIELDS = ["concept_name", "tagline", "description", "need_angle", "why_now", "cta_primary", "cta_secondary"];
 
 Deno.serve(async (req) => {
+  const headers = corsHeaders(req.headers.get("origin"));
+  if (req.method === "OPTIONS") return new Response(null, { headers });
+
+  function json(body: unknown, status = 200) {
+    return new Response(JSON.stringify(body), {
+      status,
+      headers: { ...headers, "Content-Type": "application/json" },
+    });
+  }
+
   const authHeader = req.headers.get("Authorization");
   if (!authHeader) return json({ error: "Non authentifié." }, 401);
 
