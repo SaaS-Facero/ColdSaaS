@@ -157,8 +157,12 @@ Deno.serve(async (req) => {
   if (listingErr || !listing) return json({ error: "SaaS introuvable." }, 404);
 
   const { data: allListings } = await admin.from("saas_listings").select("secteur, mrr_usd").eq("active", true);
+  // mrr_usd = 0 exclu, meme regle que succes.html/concept.html : un MRR
+  // confirme a zero n'est pas un revenu verifie utile pour une fourchette de
+  // marche -- l'inclure ecrase le minimum et la mediane, injectant une
+  // fourchette non credible dans le prompt LLM (ex: "0$ - 72825$, mediane 0$").
   const peers = (allListings ?? []).filter(
-    (p) => sectorsOverlap(listing.secteur, p.secteur as string[]) && typeof p.mrr_usd === "number"
+    (p) => sectorsOverlap(listing.secteur, p.secteur as string[]) && typeof p.mrr_usd === "number" && (p.mrr_usd as number) > 0
   );
   let range: { min: number; max: number; med: number; sampleSize: number } | null = null;
   if (peers.length >= 3) {

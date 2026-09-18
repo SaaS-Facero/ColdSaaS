@@ -4523,8 +4523,11 @@ function successPage({ brand, siteUrl }) {
       // trop faible pour être honnête -- on n'affiche aucune fourchette
       // plutôt que d'en montrer une non représentative.
       function sectorMrrRange(listing, allListings) {
+        // mrr_usd = 0 exclu : un MRR confirmé à zéro n'est pas un revenu
+        // vérifié utile pour une fourchette de marché -- l'inclure écrase le
+        // minimum et la médiane, rendant la fourchette non crédible.
         var peers = allListings.filter(function (other) {
-          return sectorsOverlap(listing.secteur, other.secteur) && typeof other.mrr_usd === "number";
+          return sectorsOverlap(listing.secteur, other.secteur) && typeof other.mrr_usd === "number" && other.mrr_usd > 0;
         });
         if (peers.length < 3) return null;
         var values = peers.map(function (p) { return p.mrr_usd; }).sort(function (a, b) { return a - b; });
@@ -5175,8 +5178,10 @@ function conceptPage({ brand, siteUrl }) {
           var listing = listingRes.data;
 
           var allRes = await supabase.from("saas_listings").select("secteur, mrr_usd").eq("active", true);
+          // mrr_usd = 0 exclu, meme regle que succes.html : un MRR confirme a
+          // zero n'est pas un revenu verifie utile pour une fourchette.
           var peers = (allRes.data || []).filter(function (p) {
-            return sectorsOverlap(listing.secteur, p.secteur) && typeof p.mrr_usd === "number";
+            return sectorsOverlap(listing.secteur, p.secteur) && typeof p.mrr_usd === "number" && p.mrr_usd > 0;
           });
           var range = null;
           if (peers.length >= 3) {
