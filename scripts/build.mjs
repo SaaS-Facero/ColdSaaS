@@ -2314,7 +2314,7 @@ function page({ brand, hero, socialProof, notificationStack, pricing, comparison
           <p class="hero__subhead">${hero.subhead}</p>
           <div class="hero__actions">
             <a class="btn btn--primary" href="#pricing">${hero.ctaPrimary}</a>
-            <a class="btn btn--secondary" href="#methodology">${hero.ctaSecondary}</a>
+            <a class="btn btn--secondary" href="#faq-title">${hero.ctaSecondary}</a>
           </div>
         </div>
 
