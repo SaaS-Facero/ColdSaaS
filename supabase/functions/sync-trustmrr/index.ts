@@ -69,10 +69,15 @@ Deno.serve(async (req) => {
   // quel que soit le "limit" demandé -> 223 pages pour tout voir, ~22 min
   // minimum, largement au-delà du timeout d'une Edge Function).
   //
-  // Solution : le point de départ tourne chaque jour (basé sur la date),
-  // donc l'exécution quotidienne du Cron Job couvre progressivement tout
-  // le catalogue de SaaS à vendre sur ~22 jours, sans jamais dépasser le
-  // rate limit en une seule exécution.
+  // Testé empiriquement (MAX_PAGES=100 sans pause, puis tentative de paquets
+  // de 10 espacés de 61s) : la limite réelle n'est pas un simple "10/min"
+  // qui repart à zéro après une pause fixe -- une 2e salve a échoué dès la
+  // 9e/10e requête même après 90s d'attente. La fenêtre exacte n'est pas
+  // documentée et continuer à la deviner en tapant l'API en rafale gaspille
+  // du quota réel sans garantie. Un seul burst de MAX_PAGES par exécution
+  // reste la valeur fiable et vérifiée plusieurs fois (10/10 réussies à
+  // froid) -- voir HOURS_PER_ROTATION_STEP plus bas pour couvrir plus de
+  // catalogue par jour sans dépendre d'un comportement non garanti.
   const MAX_PAGES = 10;
   const PAGE_SIZE = 10; // l'API plafonne à 10 quel que soit le "limit" demandé
 
@@ -88,8 +93,16 @@ Deno.serve(async (req) => {
   totalOnSale = typeof firstMeta["total"] === "number" ? firstMeta["total"] : null;
   const totalPages = totalOnSale ? Math.max(1, Math.ceil(totalOnSale / PAGE_SIZE)) : 1;
 
-  const dayIndex = Math.floor(Date.now() / 86400000);
-  const startPage = 1 + (dayIndex % totalPages);
+  // Rotation par créneau de 2h (au lieu d'une rotation quotidienne) : avec le
+  // Cron Job réglé pour tourner toutes les 2h (12x/jour), on couvre 120
+  // pages/jour au lieu de 10 -- le catalogue de ~223 pages est parcouru en
+  // ~2 jours au lieu de ~22, sans jamais dépasser le seul burst fiable
+  // (10 requêtes) vérifié empiriquement par exécution.
+  const HOURS_PER_ROTATION_STEP = 2;
+  const stepIndex = Math.floor(Date.now() / (HOURS_PER_ROTATION_STEP * 3600000));
+  const startPage = 1 + (stepIndex % totalPages);
+
+  let rateLimited = false;
 
   for (let offset = 0; offset < MAX_PAGES; offset += 1) {
     const page = 1 + ((startPage - 1 + offset) % totalPages);
@@ -105,10 +118,13 @@ Deno.serve(async (req) => {
         res = await fetch(url, { headers: { Authorization: `Bearer ${trustmrrKey}` } });
       } catch (err) {
         console.error("[sync-trustmrr] appel réseau échoué :", err);
+        pages -= 1;
         break;
       }
       if (!res.ok) {
         console.error("[sync-trustmrr] appel API échoué :", res.status, await res.text());
+        pages -= 1;
+        if (res.status === 429) rateLimited = true;
         break;
       }
       body = await res.json();
@@ -172,10 +188,11 @@ Deno.serve(async (req) => {
     synced,
     failed,
     pages,
+    rateLimited,
     totalOnSale,
     startPage,
     errors,
     budgetBreakdown,
-    note: "Point de depart quotidien tournant sur le catalogue onSale=true (voir commentaire dans le code) -- pas un crawl complet en une seule execution."
+    note: "Un seul burst de 10 requetes par execution (limite API non documentee, verifiee empiriquement). Point de depart tournant par creneau de 2h -- necessite un Cron Job regle toutes les 2h pour couvrir le catalogue en ~2 jours au lieu de ~22, voir commentaire dans le code."
   });
 });
