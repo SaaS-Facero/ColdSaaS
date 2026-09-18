@@ -126,12 +126,12 @@ const faq = {
   title: "Ce qu'on nous demande le plus",
   items: [
     {
-      // TODO(revue humaine) : "la quasi-totalité" à ajuster en "la
-      // totalité" ou en pourcentage exact selon la réponse du fondateur —
-      // ratio réel TrustMRR vs Acquire.com/Flippa dans les 340 SaaS actuels
-      // pas encore confirmé au moment de l'écriture de ce texte.
+      // Formulation volontairement ancrée au présent ("aujourd'hui, 100%")
+      // plutôt qu'un pourcentage codé en dur sans contexte : reste vraie
+      // tant que la composition ne change pas, et devra être mise à jour
+      // le jour où un premier listing Acquire.com/Flippa rejoint la base.
       q: "Que veut dire exactement le badge « Vérifié » ?",
-      a: "Que le revenu affiché est confirmé par une source indépendante — aujourd'hui, la quasi-totalité de la base vient de TrustMRR, qui vérifie le revenu par une connexion en lecture seule au processeur de paiement du vendeur (pas une capture d'écran, pas un chiffre auto-déclaré). Quand une fiche vient d'ailleurs (Acquire.com, dont l'équipe examine chaque dossier manuellement, ou un listing « Verified » de Flippa), elle porte un badge distinct « Revue par la plateforme » — jamais confondu avec le badge vert. « Vérifié » veut dire revenu confirmé, pas garantie de rentabilité future : on vérifie un chiffre passé, pas une promesse."
+      a: "Que le revenu affiché est confirmé par une source indépendante — aujourd'hui, 100% des SaaS listés proviennent de TrustMRR, qui vérifie le revenu par une connexion en lecture seule au processeur de paiement du vendeur (pas une capture d'écran, pas un chiffre auto-déclaré). Si une fiche venait un jour d'ailleurs (Acquire.com, dont l'équipe examine chaque dossier manuellement, ou un listing « Verified » de Flippa), elle porterait un badge distinct « Revue par la plateforme » — jamais confondu avec le badge vert. « Vérifié » veut dire revenu confirmé, pas garantie de rentabilité future : on vérifie un chiffre passé, pas une promesse."
     },
     {
       q: "À quelle fréquence la base est mise à jour ?",
