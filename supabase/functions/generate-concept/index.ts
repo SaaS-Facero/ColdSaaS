@@ -98,6 +98,7 @@ Génère un concept adapté au marché français. Réponds au format JSON :
   "description": "2-3 phrases : ce que fait le concept, pour qui, en français direct",
   "need_angle": "1-2 phrases : pourquoi ce besoin existe structurellement en France aujourd'hui — factuel, vérifiable, pas spéculatif",
   "why_now": "1 phrase sur le momentum actuel, observable",
+  "target_audience": "1-2 phrases : le public cible probable, dérivé du secteur et de la description réels — pas un persona inventé avec des détails fictifs",
   "cta_primary": "Verbe d'action court orienté exécution, ex: 'Copier ce modèle', 'Lancer cette version'",
   "cta_secondary": "Action secondaire, ex: 'Voir le modèle original'",
   "confidence_note": "Limites de cet angle si l'info est insuffisante, sinon vide"
@@ -108,7 +109,7 @@ Ne produis AUCUN texte avant ou après ce JSON.`;
   return { system, user };
 }
 
-const REQUIRED_FIELDS = ["concept_name", "tagline", "description", "need_angle", "why_now", "cta_primary", "cta_secondary"];
+const REQUIRED_FIELDS = ["concept_name", "tagline", "description", "need_angle", "why_now", "target_audience", "cta_primary", "cta_secondary"];
 
 Deno.serve(async (req) => {
   const headers = corsHeaders(req.headers.get("origin"));
@@ -260,6 +261,7 @@ Deno.serve(async (req) => {
     description: concept.description,
     need_angle: concept.need_angle,
     why_now: concept.why_now,
+    target_audience: concept.target_audience,
     cta_primary: concept.cta_primary,
     cta_secondary: concept.cta_secondary,
     confidence_note: typeof concept.confidence_note === "string" ? concept.confidence_note : null,

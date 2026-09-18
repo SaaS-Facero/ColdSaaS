@@ -18,6 +18,13 @@ const OUT_FILE_CONCEPT = path.join(OUT_DIR, "concept.html");
 // Stripe Payment Link — variabilisé ici, jamais construit/géré côté client.
 const STRIPE_PAYMENT_LINK = process.env.STRIPE_PAYMENT_LINK ?? "https://buy.stripe.com/REPLACE_WITH_REAL_LINK";
 
+// Payment Link séparé pour l'upsell "plan de communication" (3,90€, par
+// listing) -- produit/prix distinct du Payment Link principal, nécessaire
+// pour que stripe-webhook puisse différencier les deux paiements (voir
+// migration 0014 et supabase/functions/stripe-webhook). À définir dans les
+// variables d'environnement Vercel une fois le produit créé dans Stripe.
+const COMM_PLAN_PAYMENT_LINK = process.env.COMM_PLAN_PAYMENT_LINK ?? "https://buy.stripe.com/REPLACE_WITH_COMM_PLAN_LINK";
+
 // Supabase — insertion du lead à l'écran 6, avant le prix. L'anon key est
 // publique par conception (protégée par les policies RLS, pas par le secret)
 // mais reste une variable d'environnement pour permettre la rotation et la
@@ -4782,7 +4789,7 @@ function successPage({ brand, siteUrl }) {
 // IntersectionObserver, séparation visuelle stricte entre le bloc "concept
 // généré" (mouvement, couleur) et le bloc "preuve vérifiée" (fade seul,
 // volontairement statique).
-function conceptPage({ brand, siteUrl }) {
+function conceptPage({ brand, siteUrl, commPlanPaymentLink }) {
   return `<!DOCTYPE html>
 <html lang="fr">
 <head>
@@ -4950,6 +4957,47 @@ function conceptPage({ brand, siteUrl }) {
   .timeline__step p { font-size: 13px; color: var(--steel); line-height: 1.6; margin: 0; }
 
   /* CTA sortie */
+  /* Concurrents (donnee reelle, pas generee -- style stable comme la preuve) */
+  .competitors-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--space-8); }
+  .competitors-list li {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: var(--space-12) var(--space-16);
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 10px;
+    font-size: 13px;
+  }
+  .competitors-list a { color: #F5F6F8; text-decoration: none; font-weight: 600; }
+  .competitors-list span { color: var(--steel); }
+
+  /* Stack technique / temps de lancement -- statique, generique, jamais par listing */
+  .static-grid { display: grid; grid-template-columns: 1fr; gap: var(--space-16); }
+  @media (min-width: 640px) { .static-grid { grid-template-columns: 1fr 1fr; } }
+  .static-card {
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 14px;
+    padding: var(--space-24);
+    background: rgba(255,255,255,0.02);
+  }
+  .static-card__label { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.03em; color: var(--steel); margin: 0 0 var(--space-8); }
+  .static-card p.static-card__text { font-size: 14px; line-height: 1.6; margin: 0; color: #E4E6EB; }
+
+  /* Upsell plan de communication */
+  .upsell-card {
+    border: 1px solid rgba(0,71,255,0.35);
+    border-radius: 16px;
+    padding: var(--space-32);
+    background: rgba(0,71,255,0.05);
+    text-align: center;
+  }
+  .upsell-card__price { font-size: 13px; color: var(--steel); margin: var(--space-8) 0 var(--space-16); }
+  .upsell-plan { text-align: left; }
+  .upsell-plan__block { margin-bottom: var(--space-16); }
+  .upsell-plan__label { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.03em; color: var(--steel); margin: 0 0 4px; }
+  .upsell-plan__text { font-size: 14px; line-height: 1.6; margin: 0; color: #E4E6EB; white-space: pre-line; }
+  .upsell-generated-label { font-size: 10px; color: var(--steel); text-transform: uppercase; letter-spacing: 0.02em; margin: 0 0 var(--space-16); }
+
   .exit-cta { text-align: center; padding: var(--space-64) 0 var(--space-96); background: rgba(255,255,255,0.02); border-top: 1px solid rgba(255,255,255,0.06); }
   .exit-cta h2 { font-size: 24px; font-weight: 800; margin: 0 0 var(--space-16); letter-spacing: -0.02em; }
   .confidence-note { font-size: 12px; color: var(--steel); text-align: center; margin: var(--space-16) 0 0; font-style: italic; }
@@ -4993,6 +5041,11 @@ function conceptPage({ brand, siteUrl }) {
           <p class="need-card__label">Pourquoi maintenant</p>
           <p class="need-card__text" id="concept-why-now"></p>
         </div>
+        <div class="need-card" data-reveal style="transition-delay:200ms">
+          <svg class="need-card__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="9" cy="8" r="3"/><path d="M3 20c0-3 2.5-5 6-5s6 2 6 5" stroke-linecap="round"/></svg>
+          <p class="need-card__label">Public cible probable</p>
+          <p class="need-card__text" id="concept-target-audience"></p>
+        </div>
       </div>
     </section>
 
@@ -5020,6 +5073,11 @@ function conceptPage({ brand, siteUrl }) {
       </div>
     </section>
 
+    <section class="section wrap" id="competitors-section" style="display:none">
+      <h2 class="section__title" data-reveal="fade-only">Autres SaaS du secteur</h2>
+      <ul class="competitors-list" id="competitors-list" data-reveal="fade-only"></ul>
+    </section>
+
     <section class="section wrap" id="comment-lancer">
       <h2 class="section__title">Comment le lancer</h2>
       <div class="timeline">
@@ -5040,6 +5098,50 @@ function conceptPage({ brand, siteUrl }) {
           <p>Construis avec tes propres outils, à ton rythme — ce concept n'est qu'un point de départ, pas une promesse.</p>
         </div>
       </div>
+    </section>
+
+    <section class="section wrap">
+      <h2 class="section__title">Pour aller plus vite</h2>
+      <div class="static-grid">
+        <div class="static-card" data-reveal style="transition-delay:0ms">
+          <p class="static-card__label">Stack technique suggérée</p>
+          <p class="static-card__text">No-code : Bubble, Webflow ou Softr pour un premier prototype sans écrire de code. Code : Next.js + Supabase (auth, base de données) + Stripe pour le paiement — la même base technique que ColdTrend.</p>
+        </div>
+        <div class="static-card" data-reveal style="transition-delay:100ms">
+          <p class="static-card__label">Temps de lancement estimé</p>
+          <p class="static-card__text">MVP simple (une fonctionnalité centrale, sans paiement) : 4 à 8 semaines. Version complète avec paiement intégré : 2 à 4 mois. Ce sont des ordres de grandeur généraux, pas une estimation propre à ce SaaS précis.</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="section wrap" id="upsell-section">
+      <h2 class="section__title">Plan de communication</h2>
+      <div id="upsell-locked" class="upsell-card">
+        <p>Un plan de lancement organique concret pour ce concept — canaux pertinents, angle de contenu, idées, cadence. Généré une fois, jamais de promesse de résultats chiffrés.</p>
+        <p class="upsell-card__price">3,90 €</p>
+        <a class="btn btn--primary" id="upsell-cta" href="#">Débloquer le plan</a>
+      </div>
+      <div id="upsell-unlocked" class="upsell-plan" style="display:none">
+        <p class="upsell-generated-label">Généré pour ce concept</p>
+        <div class="upsell-plan__block">
+          <p class="upsell-plan__label">Canaux</p>
+          <p class="upsell-plan__text" id="plan-channels"></p>
+        </div>
+        <div class="upsell-plan__block">
+          <p class="upsell-plan__label">Angle organique</p>
+          <p class="upsell-plan__text" id="plan-organic-angle"></p>
+        </div>
+        <div class="upsell-plan__block">
+          <p class="upsell-plan__label">Idées de contenu</p>
+          <p class="upsell-plan__text" id="plan-content-ideas"></p>
+        </div>
+        <div class="upsell-plan__block">
+          <p class="upsell-plan__label">Cadence</p>
+          <p class="upsell-plan__text" id="plan-cadence"></p>
+        </div>
+        <p class="confidence-note" id="plan-confidence-note"></p>
+      </div>
+      <div id="upsell-loading" style="display:none; text-align:center; color:var(--steel); font-size:13px;">Génération du plan...</div>
     </section>
 
     <section class="exit-cta">
@@ -5121,11 +5223,46 @@ function conceptPage({ brand, siteUrl }) {
         });
       }
 
+      function escapeAttr(str) {
+        return String(str || "").replace(/"/g, "&quot;");
+      }
+
+      function renderCompetitors(competitors) {
+        var section = document.getElementById("competitors-section");
+        var list = document.getElementById("competitors-list");
+        if (!competitors.length) {
+          section.style.display = "none";
+          return;
+        }
+        list.innerHTML = "";
+        competitors.forEach(function (c) {
+          var li = document.createElement("li");
+          var nameHtml = c.website
+            ? '<a href="' + escapeAttr(c.website) + '" target="_blank" rel="noopener">' + escapeHtmlLocal(c.name || "SaaS") + "</a>"
+            : "<span>" + escapeHtmlLocal(c.name || "SaaS") + "</span>";
+          li.innerHTML = nameHtml + "<span>" + formatMrrShort(c.mrr_usd) + "</span>";
+          list.appendChild(li);
+        });
+        section.style.display = "";
+      }
+
+      function escapeHtmlLocal(str) {
+        var div = document.createElement("div");
+        div.textContent = String(str == null ? "" : str);
+        return div.innerHTML;
+      }
+
+      function formatMrrShort(value) {
+        if (typeof value !== "number" || value <= 0) return "MRR non communiqué";
+        return formatUsd(value) + " MRR";
+      }
+
       function renderConcept(concept, listing, range) {
         document.getElementById("concept-name").textContent = concept.concept_name;
         document.getElementById("concept-tagline").textContent = concept.tagline;
         document.getElementById("concept-need-angle").textContent = concept.need_angle;
         document.getElementById("concept-why-now").textContent = concept.why_now;
+        document.getElementById("concept-target-audience").textContent = concept.target_audience || "";
 
         var ctaPrimary = document.getElementById("cta-primary");
         ctaPrimary.textContent = concept.cta_primary;
@@ -5163,6 +5300,74 @@ function conceptPage({ brand, siteUrl }) {
         setupReveals();
       }
 
+      function setupUpsell(supabase, session, slug) {
+        var cta = document.getElementById("upsell-cta");
+        try {
+          var url = new URL(${JSON.stringify(commPlanPaymentLink)});
+          url.searchParams.set("client_reference_id", session.user.id + "::" + slug);
+          if (session.user.email) url.searchParams.set("prefilled_email", session.user.email);
+          cta.href = url.toString();
+        } catch (err) {
+          console.warn("[concept] lien de paiement plan de comm invalide :", err);
+        }
+        cta.addEventListener("click", function () {
+          // Le Payment Link Stripe redirige vers une URL fixe (pas de slug
+          // dynamique possible) -- on stocke le slug pour le retrouver au
+          // retour, meme pattern que QUIZ_RESUME_FLAG ailleurs sur le site.
+          try {
+            sessionStorage.setItem("coldtrend_pending_comm_plan_slug", slug);
+          } catch (err) {
+            /* pas grave si sessionStorage est indisponible */
+          }
+        });
+
+        supabase
+          .from("comm_plan_purchases")
+          .select("paid_at")
+          .eq("user_id", session.user.id)
+          .eq("slug", slug)
+          .maybeSingle()
+          .then(function (res) {
+            if (res.data && res.data.paid_at) {
+              loadCommPlan(supabase, session, slug);
+            }
+          });
+      }
+
+      async function loadCommPlan(supabase, session, slug) {
+        document.getElementById("upsell-locked").style.display = "none";
+        document.getElementById("upsell-loading").style.display = "";
+        try {
+          var res = await fetch(supabase.supabaseUrl + "/functions/v1/generate-comm-plan", {
+            method: "POST",
+            headers: {
+              Authorization: "Bearer " + session.access_token,
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({ slug: slug }),
+          });
+          var body = await res.json();
+          document.getElementById("upsell-loading").style.display = "none";
+          if (!res.ok || !body.plan) {
+            document.getElementById("upsell-locked").style.display = "";
+            console.error("[concept] échec génération plan de comm :", body.error);
+            return;
+          }
+          document.getElementById("plan-channels").textContent = body.plan.channels;
+          document.getElementById("plan-organic-angle").textContent = body.plan.organic_angle;
+          document.getElementById("plan-content-ideas").textContent = body.plan.content_ideas;
+          document.getElementById("plan-cadence").textContent = body.plan.posting_cadence;
+          if (body.plan.confidence_note) {
+            document.getElementById("plan-confidence-note").textContent = body.plan.confidence_note;
+          }
+          document.getElementById("upsell-unlocked").style.display = "";
+        } catch (err) {
+          console.error("[concept] échec du chargement du plan de comm :", err);
+          document.getElementById("upsell-loading").style.display = "none";
+          document.getElementById("upsell-locked").style.display = "";
+        }
+      }
+
       async function loadConcept(supabase, session, slug) {
         try {
           var listingRes = await supabase
@@ -5177,10 +5382,12 @@ function conceptPage({ brand, siteUrl }) {
           }
           var listing = listingRes.data;
 
-          var allRes = await supabase.from("saas_listings").select("secteur, mrr_usd").eq("active", true);
+          var allRes = await supabase.from("saas_listings").select("slug, name, website, secteur, mrr_usd").eq("active", true);
+          var allListings = allRes.data || [];
+
           // mrr_usd = 0 exclu, meme regle que succes.html : un MRR confirme a
           // zero n'est pas un revenu verifie utile pour une fourchette.
-          var peers = (allRes.data || []).filter(function (p) {
+          var peers = allListings.filter(function (p) {
             return sectorsOverlap(listing.secteur, p.secteur) && typeof p.mrr_usd === "number" && p.mrr_usd > 0;
           });
           var range = null;
@@ -5188,6 +5395,15 @@ function conceptPage({ brand, siteUrl }) {
             var values = peers.map(function (p) { return p.mrr_usd; }).sort(function (a, b) { return a - b; });
             range = { min: values[0], max: values[values.length - 1], med: median(values) };
           }
+
+          // Concurrents : donnee reelle deja chargee, aucun calcul par LLM --
+          // meme secteur, exclut le listing courant, trie par MRR reel
+          // (les MRR 0/non-communiques passent en dernier plutot qu'exclus,
+          // ce sont quand meme de vrais concurrents du meme secteur).
+          var competitors = allListings
+            .filter(function (p) { return p.slug !== slug && sectorsOverlap(listing.secteur, p.secteur); })
+            .sort(function (a, b) { return (b.mrr_usd || -1) - (a.mrr_usd || -1); })
+            .slice(0, 5);
 
           var genRes = await fetch(supabase.supabaseUrl + "/functions/v1/generate-concept", {
             method: "POST",
@@ -5204,6 +5420,8 @@ function conceptPage({ brand, siteUrl }) {
           }
 
           renderConcept(genBody.concept, listing, range);
+          renderCompetitors(competitors);
+          setupUpsell(supabase, session, slug);
         } catch (err) {
           console.error("[concept] échec du chargement :", err);
           showError("Un souci technique est survenu. Réessaie dans quelques minutes.");
@@ -5215,6 +5433,17 @@ function conceptPage({ brand, siteUrl }) {
         if (!supabase) return;
 
         var slug = new URLSearchParams(window.location.search).get("slug") || "";
+        if (!slug) {
+          // Le Payment Link Stripe de l'upsell "plan de communication"
+          // redirige vers une URL fixe sans slug -- on retombe sur celui
+          // stocke juste avant de partir payer (voir setupUpsell).
+          try {
+            slug = sessionStorage.getItem("coldtrend_pending_comm_plan_slug") || "";
+            sessionStorage.removeItem("coldtrend_pending_comm_plan_slug");
+          } catch (err) {
+            /* pas grave si sessionStorage est indisponible */
+          }
+        }
         if (!slug) {
           showError("Lien invalide.");
           return;
@@ -7216,7 +7445,7 @@ mkdirSync(path.join(OUT_DIR, "js"), { recursive: true });
 
 writeBuiltFile(OUT_FILE, page({ brand, hero, socialProof, notificationStack, pricing, comparison, faq, quiz }));
 writeBuiltFile(OUT_FILE_SUCCESS, successPage({ brand, siteUrl: SITE_URL }));
-writeBuiltFile(OUT_FILE_CONCEPT, conceptPage({ brand, siteUrl: SITE_URL }));
+writeBuiltFile(OUT_FILE_CONCEPT, conceptPage({ brand, siteUrl: SITE_URL, commPlanPaymentLink: COMM_PLAN_PAYMENT_LINK }));
 
 writeBuiltFile(path.join(OUT_DIR, "css", "design-tokens.css"), designTokensCss());
 writeBuiltFile(path.join(OUT_DIR, "css", "auth.css"), authCss());

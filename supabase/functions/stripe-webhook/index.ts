@@ -79,12 +79,34 @@ Deno.serve(async (req) => {
         Deno.env.get("SUPABASE_URL")!,
         Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
       );
-      const { error } = await supabaseAdmin
-        .from("profiles")
-        .update({ paid_at: new Date().toISOString() })
-        .eq("id", clientReferenceId);
-      if (error) {
-        console.error("[stripe-webhook] échec de mise à jour profiles :", error.message);
+
+      // Deux Payment Links distincts partagent ce webhook : l'accès principal
+      // (15€) encode juste l'UUID utilisateur dans client_reference_id ;
+      // l'upsell "plan de communication" (3,90€, par listing) encode
+      // "<uuid>::<slug>" -- pas d'appel API Stripe supplémentaire pour
+      // récupérer les line_items (ce projet n'utilise jamais la clé secrète
+      // Stripe), donc ce format est le seul signal disponible pour
+      // distinguer les deux paiements.
+      if (clientReferenceId.includes("::")) {
+        const [userId, slug] = clientReferenceId.split("::");
+        if (!userId || !slug) {
+          console.warn("[stripe-webhook] client_reference_id upsell mal formé — ignoré.", clientReferenceId);
+        } else {
+          const { error } = await supabaseAdmin
+            .from("comm_plan_purchases")
+            .upsert({ user_id: userId, slug, paid_at: new Date().toISOString() }, { onConflict: "user_id,slug" });
+          if (error) {
+            console.error("[stripe-webhook] échec de mise à jour comm_plan_purchases :", error.message);
+          }
+        }
+      } else {
+        const { error } = await supabaseAdmin
+          .from("profiles")
+          .update({ paid_at: new Date().toISOString() })
+          .eq("id", clientReferenceId);
+        if (error) {
+          console.error("[stripe-webhook] échec de mise à jour profiles :", error.message);
+        }
       }
     } else {
       console.warn("[stripe-webhook] checkout.session.completed sans client_reference_id exploitable — ignoré.");
