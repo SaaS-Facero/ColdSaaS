@@ -4576,6 +4576,8 @@ function successPage({ brand, siteUrl }) {
           ? escapeHtml(listing.description).slice(0, 90)
           : "Un SaaS " + escapeHtml(sectorLabel(listing.secteur)) + " prêt à reprendre";
 
+        var conceptHref = listing.slug ? "/concept/" + encodeURIComponent(listing.slug) : "#";
+
         var el = document.createElement("div");
         el.className = "concept-mockup";
         el.innerHTML =
@@ -4584,7 +4586,7 @@ function successPage({ brand, siteUrl }) {
             '<div class="concept-mockup__logo">' + escapeHtml(initials(listing.name)) + "</div>" +
             '<p class="concept-mockup__brand">' + escapeHtml(listing.name || "SaaS") + "</p>" +
             '<p class="concept-mockup__headline">' + headline + "</p>" +
-            '<span class="concept-mockup__cta">Rejoindre &rarr;</span>' +
+            '<a class="concept-mockup__cta" href="' + escapeAttr(conceptHref) + '">Je teste mon idée &rarr;</a>' +
           "</div>" +
           '<p class="concept-mockup__label">Aperçu concept — pas le vrai site, généré pour visualiser le potentiel</p>';
         return el;
@@ -4683,7 +4685,7 @@ function successPage({ brand, siteUrl }) {
 
           var listingsRes = await supabase
             .from("saas_listings")
-            .select("name, website, description, secteur, mrr_usd, asking_price_usd, source_level")
+            .select("slug, name, website, description, secteur, mrr_usd, asking_price_usd, source_level")
             .eq("active", true);
           if (listingsRes.error) throw listingsRes.error;
 
