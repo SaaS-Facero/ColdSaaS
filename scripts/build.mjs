@@ -24,6 +24,38 @@ const STRIPE_PAYMENT_LINK = process.env.STRIPE_PAYMENT_LINK ?? "https://buy.stri
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "https://REPLACE_WITH_PROJECT.supabase.co";
 const SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? "REPLACE_WITH_ANON_KEY";
 
+// Chiffres réels de saas_listings_public, récupérés à chaque build (Vercel
+// rebuild à chaque déploiement -> reste à jour sans job séparé). La table est
+// protégée par RLS : la vue publique n'expose que secteur/mrr_bucket, jamais
+// nom ni site -- même en cas de fuite de cette requête, aucune identité de
+// SaaS n'est exposée avant paiement. En échec (pas de réseau en dev local,
+// projet non configuré), on retombe sur des valeurs de secours pour ne
+// jamais faire planter le build.
+let REAL_SAAS_TOTAL = null;
+let REAL_SAAS_SAMPLE = [];
+try {
+  const restHeaders = { apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${SUPABASE_ANON_KEY}` };
+  const [countRes, sampleRes] = await Promise.all([
+    fetch(`${SUPABASE_URL}/rest/v1/saas_listings_public?select=id&limit=1`, {
+      headers: { ...restHeaders, Prefer: "count=exact" },
+    }),
+    fetch(`${SUPABASE_URL}/rest/v1/saas_listings_public?select=secteur,mrr_bucket&limit=24`, {
+      headers: restHeaders,
+    }),
+  ]);
+  if (countRes.ok) {
+    const contentRange = countRes.headers.get("content-range"); // format "0-0/145"
+    const total = contentRange ? Number(contentRange.split("/")[1]) : NaN;
+    if (Number.isFinite(total)) REAL_SAAS_TOTAL = total;
+  }
+  if (sampleRes.ok) {
+    const rows = await sampleRes.json();
+    if (Array.isArray(rows)) REAL_SAAS_SAMPLE = rows;
+  }
+} catch (err) {
+  console.warn("[build] Impossible de récupérer les stats réelles saas_listings_public :", err.message);
+}
+
 // URL canonique du site déployé — utilisée pour l'Open Graph et pour
 // construire l'URL de redirection post-paiement affichée à l'écran de succès
 // (la redirection Stripe elle-même se configure côté dashboard Stripe, pas
@@ -249,7 +281,11 @@ const faq = {
 //   "Débloquer les Y résultats" (écran 7 → paiement).
 //
 const quiz = {
-  totalSaas: 340, // TODO: remplacer par le vrai décompte (vue Supabase `leads`/`saas` en prod).
+  // Vrai décompte de saas_listings_public, recalculé à chaque build (voir
+  // REAL_SAAS_TOTAL en haut du fichier). 340 n'est plus qu'un filet de
+  // sécurité si la requête de build échoue -- le nombre affiché grandit avec
+  // sync-trustmrr, il ne représente plus un catalogue fixe et figé.
+  totalSaas: REAL_SAAS_TOTAL ?? 340,
   sectorLabels: {
     b2b: "B2B",
     b2c: "B2C",
@@ -3017,6 +3053,63 @@ function page({ brand, hero, socialProof, notificationStack, pricing, comparison
         return 2 + (Math.abs(hash) % 4); // 2..5
       }
 
+      // Vrai comptage filtré (secteur + budget) dans saas_listings_public,
+      // remplace seededMatchCount() une fois la réponse arrivée. Un SaaS taggé
+      // "both" correspond à un profil qui a choisi "b2b" seul ou "b2c" seul,
+      // pas seulement à qui a coché "both" -- d'où le .or() qui ajoute
+      // toujours secteur.cs.{both} en plus des secteurs choisis.
+      //
+      // Choix assumé : si le filtre exact (secteur + budget) tombe à 0
+      // résultat, on retente sans le filtre budget plutôt que d'afficher "0
+      // résultat" (CTA cassée) ou d'inventer un chiffre -- le nombre affiché
+      // reste toujours un vrai comptage, juste moins précis dans ce cas rare.
+      function computeRealMatchCount(ans, cb) {
+        function run() {
+          var supabase = window.ColdTrendSupabase;
+          if (!supabase) {
+            cb(null);
+            return;
+          }
+
+          function countWithFilters(applyBudget) {
+            var query = supabase.from("saas_listings_public").select("id", { count: "exact", head: true });
+            var sectorIds = ans.secteur || [];
+            if (sectorIds.length) {
+              var orParts = sectorIds.map(function (id) {
+                return "secteur.cs.{" + id + "}";
+              });
+              if (orParts.indexOf("secteur.cs.{both}") === -1) orParts.push("secteur.cs.{both}");
+              query = query.or(orParts.join(","));
+            }
+            if (applyBudget && ans.budget && ans.budget !== "undecided") {
+              query = query.eq("budget_bucket", ans.budget);
+            }
+            return query;
+          }
+
+          countWithFilters(true).then(function (res) {
+            if (res.error) {
+              cb(null);
+              return;
+            }
+            if (typeof res.count === "number" && res.count > 0) {
+              cb(res.count);
+              return;
+            }
+            // Filtre exact vide : on relâche le budget plutôt que d'afficher 0.
+            countWithFilters(false).then(function (fallbackRes) {
+              cb(!fallbackRes.error && typeof fallbackRes.count === "number" ? fallbackRes.count : null);
+            });
+          });
+        }
+
+        if (window.ColdTrendSupabase) {
+          run();
+        } else {
+          document.addEventListener("coldtrend:supabase-ready", run, { once: true });
+        }
+      }
+
       function sectorSummary() {
         var sectorIds = answers.secteur || [];
         var names = sectorIds.map(function (id) {
@@ -3029,6 +3122,10 @@ function page({ brand, hero, socialProof, notificationStack, pricing, comparison
         reachedResult = true;
         transitionTo(resultScreen, "forward");
 
+        // Compteur seedé affiché tout de suite (jamais d'écran vide pendant le
+        // temps réseau), remplacé par le vrai comptage filtré dès qu'il arrive
+        // (voir computeRealMatchCount) -- sans ça, l'utilisateur attendrait un
+        // aller-retour réseau avant de voir le premier chiffre.
         var matchCount = answers.matchCount !== undefined ? answers.matchCount : seededMatchCount(answers);
         answers.matchCount = matchCount;
         resultScreen.setAttribute("data-match-count", String(matchCount));
@@ -3053,10 +3150,29 @@ function page({ brand, hero, socialProof, notificationStack, pricing, comparison
         totalEl.textContent = "0";
         matchEl.textContent = String(TOTAL_SAAS);
 
+        // matchAnimationStarted évite deux animations concurrentes sur matchEl :
+        // si computeRealMatchCount répond avant que ce setTimeout ne se
+        // déclenche (cas courant, la requête réseau prend rarement 1.3s), la
+        // valeur affichée est déjà à jour au moment où l'animation démarre --
+        // pas besoin d'une deuxième requestAnimationFrame par-dessus.
+        var matchAnimationStarted = false;
         animateCounter(totalEl, 0, TOTAL_SAAS, 900, function () {
           window.setTimeout(function () {
+            matchAnimationStarted = true;
             animateCounter(matchEl, TOTAL_SAAS, matchCount, 700);
           }, 400);
+        });
+
+        computeRealMatchCount(answers, function (realCount) {
+          if (realCount === null || realCount === matchCount) return;
+          matchCount = realCount;
+          answers.matchCount = matchCount;
+          resultScreen.setAttribute("data-match-count", String(matchCount));
+          persistQuizAnswers();
+          ctaBtn.textContent = "Débloquer les " + matchCount + " résultats";
+          if (matchAnimationStarted) {
+            animateCounter(matchEl, Number(matchEl.textContent) || 0, matchCount, 500);
+          }
         });
       }
 
@@ -3866,18 +3982,33 @@ function renderQuizOptions(question) {
 }
 
 // Carrousel de fond de l'écran "proof" — 3 bandes de profondeur, chacune
-// une seule timeline CSS (jamais une animation par mini-carte). Vocabulaire
-// de secteur repris à l'identique de quiz.sectorLabels : aucune catégorie
-// inventée qui divergerait du reste du produit (pas de "Productivité" ou
-// autre vertical qui n'existe nulle part ailleurs dans ColdTrend).
+// une seule timeline CSS (jamais une animation par mini-carte). Contenu tiré
+// de REAL_SAAS_SAMPLE (vraies lignes de saas_listings_public, secteur +
+// tranche de MRR) au lieu d'exemples inventés -- si la requête de build a
+// échoué (REAL_SAAS_SAMPLE vide), on retombe sur les 3 libellés de secteur
+// sans tranche de MRR plutôt que de crasher ou d'inventer des chiffres.
+const proofSampleCards = REAL_SAAS_SAMPLE.length
+  ? REAL_SAAS_SAMPLE.map((row) => {
+      const secteurId = Array.isArray(row.secteur) && row.secteur.length ? row.secteur[0] : null;
+      const sector = secteurId ? quiz.sectorLabels[secteurId] || secteurId : null;
+      return sector ? { sector, bucket: row.mrr_bucket || null } : null;
+    }).filter(Boolean)
+  : [quiz.sectorLabels.b2b, quiz.sectorLabels.b2c, quiz.sectorLabels.both].map((sector) => ({
+      sector,
+      bucket: null
+    }));
+
 function renderProofBackground() {
-  const sectorCycle = [quiz.sectorLabels.b2b, quiz.sectorLabels.b2c, quiz.sectorLabels.both];
+  const cards = proofSampleCards.length
+    ? proofSampleCards
+    : [{ sector: quiz.sectorLabels.both, bucket: null }];
 
   function miniCard(i, withRecentLabel) {
-    const sector = sectorCycle[i % sectorCycle.length];
+    const card = cards[i % cards.length];
+    const label = card.bucket ? `SaaS · ${card.sector} · MRR ${card.bucket}` : `SaaS · ${card.sector}`;
     return `<span class="proof-mini">
               <span class="proof-mini__bar"></span>
-              <span class="proof-mini__sector">SaaS · ${sector}</span>
+              <span class="proof-mini__sector">${label}</span>
               <span class="proof-mini__check">${ICON_CHECK_SMALL}</span>
               ${withRecentLabel ? '<span class="proof-mini__recent">Ajouté récemment</span>' : ""}
             </span>`;
