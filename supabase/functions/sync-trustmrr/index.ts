@@ -51,6 +51,7 @@ Deno.serve(async (req) => {
 
   let synced = 0;
   let failed = 0;
+  let skippedNotOnSale = 0;
   let pages = 0;
   let totalAvailable: number | null = null;
   const errors: Array<{ slug: unknown; message: string }> = [];
@@ -103,6 +104,16 @@ Deno.serve(async (req) => {
         errors.push({ slug: slug ?? null, message: "slug manquant ou invalide" });
         continue;
       }
+      // Filtre produit minimal mais réel : ColdTrend vend des SaaS "à
+      // racheter", pas un classement de toutes les entreprises suivies par
+      // TrustMRR (Gumroad, Stan... ne sont pas à vendre). onSale est un
+      // booléen explicite de la donnée elle-même, pas un seuil de MRR
+      // arbitraire inventé ici.
+      if (item["onSale"] !== true) {
+        skippedNotOnSale += 1;
+        continue;
+      }
+
       const revenue = (item["revenue"] as Record<string, unknown> | undefined) ?? {};
       const row = {
         slug,
@@ -132,5 +143,12 @@ Deno.serve(async (req) => {
     page += 1;
   }
 
-  return json({ synced, failed, pages, totalAvailable, note: "Synchronise seulement le haut du classement (page 1 a MAX_PAGES) -- pas un crawl complet du catalogue, voir commentaire dans le code." });
+  return json({
+    synced,
+    failed,
+    skippedNotOnSale,
+    pages,
+    totalAvailable,
+    note: "Synchronise seulement le haut du classement (page 1 a MAX_PAGES), filtre sur onSale=true -- pas un crawl complet du catalogue, voir commentaire dans le code."
+  });
 });
