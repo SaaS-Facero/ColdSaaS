@@ -175,11 +175,11 @@ const faq = {
     },
     {
       q: "Sous quel format je reçois l'accès ?",
-      a: "Un email automatique avec un lien vers un Google Sheet en lecture seule, envoyé juste après le paiement."
+      a: "Directement à l'écran juste après le paiement : les SaaS qui correspondent le plus à ton profil, puis un accès permanent à la base complète depuis ton compte."
     },
     {
       q: "En quoi c'est différent d'un site qui génère des idées avec l'IA ?",
-      a: "On ne génère rien : chaque ligne du sheet correspond à un SaaS réel, avec un revenu vérifié ou revu par une plateforme sérieuse — pas une suggestion plausible."
+      a: "On ne génère rien : chaque fiche correspond à un SaaS réel, avec un revenu vérifié ou revu par une plateforme sérieuse — pas une suggestion plausible."
     },
     {
       q: "Et si je ne trouve rien qui me convient ?",
@@ -4185,8 +4185,8 @@ function renderQuizOverlay({ quiz, pricing, stripeLink }) {
           <div class="price-block__total">${pricing.totalPrice} — ${pricing.totalNote}</div>
         </div>
         <ul class="included-list">
-          <li>${ICON_CHECK_SMALL} Accès à toute la base de SaaS vérifiés (Stripe × TrustMRR)</li>
-          <li>${ICON_CHECK_SMALL} Livré sous forme de Google Sheet en lecture seule</li>
+          <li>${ICON_CHECK_SMALL} Accès à toute la base de SaaS vérifiés via TrustMRR</li>
+          <li>${ICON_CHECK_SMALL} Résultats affichés à l'écran juste après le paiement</li>
           <li>${ICON_CHECK_SMALL} Mises à jour continues, sans frais supplémentaire</li>
         </ul>
         <p class="stripe-reassurance">${ICON_LOCK} Paiement sécurisé via <strong>&nbsp;Stripe</strong></p>
@@ -4262,7 +4262,7 @@ function successPage({ brand, siteUrl }) {
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>${brand.name} — Accès confirmé</title>
-<meta name="description" content="Ton paiement est confirmé, ton accès arrive par email." />
+<meta name="description" content="Ton paiement est confirmé, voici les SaaS qui correspondent le plus à ton profil." />
 <meta name="robots" content="noindex" />
 <style>
   :root { color-scheme: dark; }
@@ -4273,15 +4273,10 @@ function successPage({ brand, siteUrl }) {
     background: #0A0E1A;
     color: #F5F6F8;
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Inter, Arial, sans-serif;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    padding: 24px;
+    padding: 40px 20px 60px;
   }
-  .card {
-    max-width: 440px;
-    text-align: center;
-  }
+  .wrap { max-width: 640px; margin: 0 auto; }
+  .card { max-width: 440px; margin: 0 auto; text-align: center; }
   .check {
     width: 56px;
     height: 56px;
@@ -4294,8 +4289,9 @@ function successPage({ brand, siteUrl }) {
     justify-content: center;
     color: #00C48C;
   }
-  h1 { font-size: 24px; font-weight: 800; margin: 0 0 12px; }
+  h1 { font-size: 24px; font-weight: 800; margin: 0 0 12px; text-align: center; }
   p { font-size: 15px; line-height: 1.6; color: #8A8F98; margin: 0 0 8px; }
+  .card p { text-align: center; }
   a.btn {
     display: inline-block;
     margin-top: 20px;
@@ -4306,20 +4302,302 @@ function successPage({ brand, siteUrl }) {
     font-weight: 700;
     text-decoration: none;
   }
+  #results-zone { margin-top: 40px; display: none; }
+  #results-zone.is-visible { display: block; }
+  .result-intro { text-align: center; margin-bottom: 24px; }
+  .result-intro h2 { font-size: 18px; font-weight: 800; margin: 0 0 6px; }
+  .listing-card {
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 14px;
+    padding: 18px 20px;
+    margin-bottom: 14px;
+  }
+  .listing-card__top {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 8px;
+  }
+  .listing-card__name { font-size: 16px; font-weight: 700; color: #F5F6F8; margin: 0; }
+  .listing-card__link { font-size: 12px; color: #0047FF; text-decoration: none; }
+  .listing-card__meta { font-size: 13px; color: #8A8F98; margin: 0 0 8px; }
+  .listing-card__reason {
+    font-size: 12px;
+    color: #8A8F98;
+    background: rgba(255, 255, 255, 0.04);
+    border-radius: 8px;
+    padding: 6px 10px;
+    display: inline-block;
+    margin-top: 4px;
+  }
+  .badge {
+    display: inline-flex;
+    align-items: center;
+    font-size: 11px;
+    font-weight: 700;
+    border-radius: 999px;
+    padding: 3px 9px;
+    white-space: nowrap;
+  }
+  .badge--verified { color: #00C48C; background: rgba(0, 196, 140, 0.12); border: 1px solid rgba(0, 196, 140, 0.3); }
+  .badge--platform { color: #8A8F98; background: rgba(138, 143, 152, 0.12); border: 1px solid rgba(138, 143, 152, 0.3); }
+  .badge--partial { color: #D9A23D; background: rgba(217, 162, 61, 0.12); border: 1px solid rgba(217, 162, 61, 0.3); }
+  #empty-state, #error-state { text-align: center; color: #8A8F98; font-size: 14px; margin-top: 24px; display: none; }
+  #empty-state.is-visible, #error-state.is-visible { display: block; }
 </style>
 </head>
 <body>
-  <div class="card">
-    <div class="check" aria-hidden="true">
-      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-        <path d="M20 6L9 17l-5-5" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
-      </svg>
+  <div class="wrap">
+    <div class="card">
+      <div class="check" aria-hidden="true">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M20 6L9 17l-5-5" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </div>
+      <h1>Paiement confirmé.</h1>
+      <p id="status-line">Confirmation en cours...</p>
     </div>
-    <h1>Paiement confirmé.</h1>
-    <p>Ton accès arrive par email dans les prochaines minutes — un lien vers le Google Sheet en lecture seule, envoyé à l'adresse utilisée pendant le quiz.</p>
-    <p>Rien reçu sous 10 minutes ? Vérifie tes spams avant de nous écrire.</p>
-    <a class="btn" href="${siteUrl}">Retour à l'accueil</a>
+
+    <div id="results-zone">
+      <div class="result-intro">
+        <h2 id="results-title">Voici ce qu'on a trouvé pour toi.</h2>
+        <p id="results-subtitle"></p>
+      </div>
+      <div id="results-list"></div>
+    </div>
+
+    <div id="empty-state">Aucune correspondance à afficher pour l'instant — reviens bientôt, la base s'enrichit régulièrement.</div>
+    <div id="error-state">Un souci technique empêche d'afficher tes résultats. Écris-nous via le chat, on corrige ça vite.</div>
+
+    <div class="card">
+      <a class="btn" href="${siteUrl}">Retour à l'accueil</a>
+    </div>
   </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="/js/supabase-client.js"></script>
+  <script>
+    (function () {
+      // Seuils de tranche de budget identiques à la vue SQL
+      // saas_listings_public (migration 0011) -- on interroge saas_listings
+      // directement ici (accès complet réservé authenticated+paid par RLS,
+      // voir migration 0008), donc budget_bucket n'est pas déjà calculé et
+      // doit être reproduit à l'identique côté client.
+      function budgetBucket(askingPriceUsd) {
+        if (typeof askingPriceUsd !== "number") return null;
+        if (askingPriceUsd < 5000) return "low";
+        if (askingPriceUsd < 20000) return "mid";
+        if (askingPriceUsd < 50000) return "high";
+        return "over_high";
+      }
+
+      function sectorsOverlap(profileSecteur, listingSecteur) {
+        if (!profileSecteur || !profileSecteur.length) return false;
+        if (!listingSecteur || !listingSecteur.length) return false;
+        if (listingSecteur.indexOf("both") !== -1) return true;
+        return profileSecteur.some(function (id) {
+          return id === "both" || listingSecteur.indexOf(id) !== -1;
+        });
+      }
+
+      // Scoring déterministe, sans IA : uniquement sur secteur et budget,
+      // les deux seuls critères réellement présents en base (pas de colonne
+      // "complexité"/"temps de build" dans saas_listings -- on ne l'invente
+      // pas). Seuil minimum = 2 pour compter comme "vraie" correspondance.
+      function matchScore(profile, listing) {
+        var score = 0;
+        var reasons = [];
+
+        if (sectorsOverlap(profile.secteur, listing.secteur)) {
+          score += 2;
+          reasons.push("secteur " + sectorLabel(profile.secteur));
+        }
+
+        var bucket = budgetBucket(listing.asking_price_usd);
+        if (profile.budget && profile.budget !== "undecided") {
+          if (bucket === profile.budget) {
+            score += 2;
+            reasons.push("budget " + BUDGET_LABELS[profile.budget]);
+          }
+        } else if (profile.budget === "undecided") {
+          score += 1;
+        }
+
+        return { score: score, reasons: reasons };
+      }
+
+      function sectorLabel(secteurArr) {
+        var ids = secteurArr || [];
+        return ids.map(function (id) { return SECTOR_LABELS[id] || id; }).join(", ");
+      }
+
+      var SECTOR_LABELS = { b2b: "B2B", b2c: "B2C", both: "B2B et B2C" };
+      var BUDGET_LABELS = {
+        low: "moins de 5 000 €",
+        mid: "5 000 € – 20 000 €",
+        high: "20 000 € – 50 000 €"
+      };
+      var MATCH_THRESHOLD = 2;
+
+      function formatMrr(value) {
+        if (typeof value !== "number") return "MRR non communiqué";
+        return "MRR ~" + Math.round(value).toLocaleString("fr-FR") + " $";
+      }
+
+      function renderListing(listing, isPartial) {
+        var badgeClass = listing.source_level === "verified" ? "badge--verified" : "badge--platform";
+        var badgeLabel = listing.source_level === "verified" ? "Vérifié · TrustMRR" : "Revue par l'équipe";
+        var reasonText = listing._reasons && listing._reasons.length
+          ? "Correspond à ton " + listing._reasons.join(" et ton ")
+          : "Sélection parmi les SaaS les plus solides du catalogue";
+
+        var el = document.createElement("div");
+        el.className = "listing-card";
+        el.innerHTML =
+          '<div class="listing-card__top">' +
+            '<p class="listing-card__name">' + escapeHtml(listing.name || "SaaS vérifié") + "</p>" +
+            '<span class="badge ' + badgeClass + '">' + badgeLabel + "</span>" +
+          "</div>" +
+          '<p class="listing-card__meta">' + escapeHtml(sectorLabel(listing.secteur)) + " · " + formatMrr(listing.mrr_usd) + "</p>" +
+          (listing.website ? '<a class="listing-card__link" href="' + escapeAttr(listing.website) + '" target="_blank" rel="noopener">Voir le site &rarr;</a>' : "") +
+          '<div><span class="listing-card__reason">' + escapeHtml(reasonText) + (isPartial ? " · correspondance partielle" : "") + "</span></div>";
+        return el;
+      }
+
+      function escapeHtml(str) {
+        var div = document.createElement("div");
+        div.textContent = String(str == null ? "" : str);
+        return div.innerHTML;
+      }
+      function escapeAttr(str) {
+        return String(str || "").replace(/"/g, "&quot;");
+      }
+
+      function showResults(profile, listings) {
+        var statusLine = document.getElementById("status-line");
+        statusLine.textContent = "Ton accès est actif.";
+
+        if (!listings.length) {
+          document.getElementById("empty-state").className = "is-visible";
+          return;
+        }
+
+        var hasProfile = (profile.secteur && profile.secteur.length) || profile.budget;
+        var scored = listings.map(function (listing) {
+          var result = hasProfile ? matchScore(profile, listing) : { score: 0, reasons: [] };
+          listing._score = result.score;
+          listing._reasons = result.reasons;
+          return listing;
+        });
+
+        var ranked;
+        var subtitle;
+        if (hasProfile) {
+          ranked = scored.slice().sort(function (a, b) { return b._score - a._score; });
+        } else {
+          // Profil incomplet (quiz jamais terminé) : fallback honnête sur le
+          // MRR réel plutôt que de fabriquer une personnalisation qui
+          // n'existe pas.
+          ranked = scored.slice().sort(function (a, b) { return (b.mrr_usd || 0) - (a.mrr_usd || 0); });
+          subtitle = "Ton profil n'a pas assez de détails pour un tri personnalisé -- voici les SaaS les plus solides du catalogue.";
+        }
+
+        var top3 = ranked.slice(0, 3);
+        document.getElementById("results-subtitle").textContent = subtitle || "";
+
+        var listEl = document.getElementById("results-list");
+        listEl.innerHTML = "";
+        top3.forEach(function (listing) {
+          var isPartial = hasProfile && listing._score < MATCH_THRESHOLD;
+          listEl.appendChild(renderListing(listing, isPartial));
+        });
+
+        document.getElementById("results-zone").className = "is-visible";
+      }
+
+      async function loadResults(supabase, userId) {
+        var statusLine = document.getElementById("status-line");
+        try {
+          var profileRes = await supabase.from("profiles").select("secteur, budget, temps").eq("id", userId).single();
+          if (profileRes.error) throw profileRes.error;
+
+          var listingsRes = await supabase
+            .from("saas_listings")
+            .select("name, website, secteur, mrr_usd, asking_price_usd, source_level")
+            .eq("active", true);
+          if (listingsRes.error) throw listingsRes.error;
+
+          showResults(profileRes.data || {}, listingsRes.data || []);
+        } catch (err) {
+          console.error("[succes] échec du chargement des résultats :", err);
+          statusLine.textContent = "Ton accès est actif.";
+          document.getElementById("error-state").className = "is-visible";
+        }
+      }
+
+      function waitForPayment(supabase, userId) {
+        var statusLine = document.getElementById("status-line");
+
+        function tryOnce() {
+          return supabase.from("profiles").select("paid_at").eq("id", userId).single().then(function (res) {
+            if (!res.error && res.data && res.data.paid_at) {
+              loadResults(supabase, userId);
+              return true;
+            }
+            return false;
+          });
+        }
+
+        tryOnce().then(function (done) {
+          if (done) return;
+          statusLine.textContent = "Confirmation du paiement en cours (quelques secondes)...";
+          // Le webhook Stripe peut avoir un léger décalage par rapport à la
+          // redirection du client -- même pattern de secours que /compte
+          // (Realtime + poll de secours, jamais une seule tentative sèche).
+          supabase
+            .channel("succes-paid-" + userId)
+            .on(
+              "postgres_changes",
+              { event: "UPDATE", schema: "public", table: "profiles", filter: "id=eq." + userId },
+              function (payload) {
+                if (payload.new && payload.new.paid_at) loadResults(supabase, userId);
+              }
+            )
+            .subscribe();
+
+          var attempts = 0;
+          var interval = setInterval(function () {
+            attempts += 1;
+            tryOnce().then(function (done2) {
+              if (done2 || attempts >= 10) clearInterval(interval);
+            });
+          }, 3000);
+        });
+      }
+
+      function boot() {
+        var supabase = window.ColdTrendSupabase;
+        if (!supabase) return;
+        supabase.auth.getUser().then(function (res) {
+          var user = res.data ? res.data.user : null;
+          if (!user) {
+            document.getElementById("status-line").textContent =
+              "Session introuvable -- reconnecte-toi pour voir ton accès.";
+            return;
+          }
+          waitForPayment(supabase, user.id);
+        });
+      }
+
+      if (window.ColdTrendSupabase) {
+        boot();
+      } else {
+        document.addEventListener("coldtrend:supabase-ready", boot, { once: true });
+      }
+    })();
+  </script>
   ${crispWidgetScript()}
 </body>
 </html>
