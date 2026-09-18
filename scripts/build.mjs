@@ -6,6 +6,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const OUT_DIR = path.join(__dirname, "..", "public");
 const OUT_FILE = path.join(OUT_DIR, "index.html");
 const OUT_FILE_SUCCESS = path.join(OUT_DIR, "succes.html");
+const OUT_FILE_CONCEPT = path.join(OUT_DIR, "concept.html");
 
 // Toute config sensible/par-environnement se lit depuis process.env — jamais
 // en dur. Le second membre de chaque `??` n'est qu'un filet de sécurité pour
@@ -4764,6 +4765,491 @@ function successPage({ brand, siteUrl }) {
 `;
 }
 
+// ---------------------------------------------------------------------------
+// Page concept — /concept/{slug} (rewrite vercel.json -> concept.html)
+// ---------------------------------------------------------------------------
+// Génération LLM déclenchée UNIQUEMENT au clic sur "Je teste mon idée" côté
+// succes.html -- jamais en pré-chargement. Cette page affiche donc un écran
+// de chargement pendant l'appel à generate-concept (qui sert le cache si le
+// listing a déjà été généré pour un autre utilisateur), puis révèle la LP.
+//
+// Système d'espacement/typo/easing appliqué systématiquement (voir wireframe
+// validé) : une seule échelle d'espacement (4/8/12/16/24/32/48/64/96/128),
+// easing cubic-bezier custom (jamais ease/linear), stagger réel via
+// IntersectionObserver, séparation visuelle stricte entre le bloc "concept
+// généré" (mouvement, couleur) et le bloc "preuve vérifiée" (fade seul,
+// volontairement statique).
+function conceptPage({ brand, siteUrl }) {
+  return `<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>${brand.name} — Concept</title>
+<meta name="description" content="Un concept adapté au marché français, à partir d'un SaaS réel à revenus vérifiés." />
+<meta name="robots" content="noindex" />
+<style>
+  :root {
+    color-scheme: dark;
+    --space-4: 4px; --space-8: 8px; --space-12: 12px; --space-16: 16px;
+    --space-24: 24px; --space-32: 32px; --space-48: 48px; --space-64: 64px;
+    --space-96: 96px; --space-128: 128px;
+    --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+    --ease-standard: cubic-bezier(0.4, 0, 0.2, 1);
+    --cobalt: #0047FF;
+    --steel: #8A8F98;
+    --ink: #0A0E1A;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: var(--ink); color: #F5F6F8; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Inter, Arial, sans-serif; }
+  body { position: relative; overflow-x: hidden; }
+  body::before {
+    content: "";
+    position: fixed;
+    top: -20%;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 900px;
+    height: 900px;
+    background: radial-gradient(circle, rgba(0,71,255,0.10), transparent 70%);
+    pointer-events: none;
+    z-index: 0;
+  }
+  a { color: inherit; }
+
+  /* ---- Écran de chargement ---- */
+  #loading {
+    min-height: 100dvh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: var(--space-16);
+    text-align: center;
+    padding: var(--space-24);
+  }
+  .loading-spinner {
+    width: 32px;
+    height: 32px;
+    border-radius: 999px;
+    border: 2px solid rgba(255,255,255,0.12);
+    border-top-color: var(--cobalt);
+    animation: spin 900ms linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  #loading p { color: var(--steel); font-size: 15px; margin: 0; }
+  #loading.is-hidden { display: none; }
+
+  #error-state {
+    min-height: 100dvh;
+    display: none;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: var(--space-16);
+    text-align: center;
+    padding: var(--space-24);
+    color: var(--steel);
+  }
+  #error-state.is-visible { display: flex; }
+
+  /* ---- Contenu principal ---- */
+  #content { display: none; position: relative; z-index: 1; }
+  #content.is-visible { display: block; }
+
+  .wrap { max-width: 720px; margin: 0 auto; padding: 0 var(--space-24); }
+
+  [data-reveal] { opacity: 0; transform: translateY(16px); transition: opacity 600ms var(--ease-out-expo), transform 600ms var(--ease-out-expo); }
+  [data-reveal].is-visible { opacity: 1; transform: translateY(0); }
+  [data-reveal="fade-only"] { transform: none; transition: opacity 400ms var(--ease-standard); }
+
+  @media (prefers-reduced-motion: reduce) {
+    [data-reveal] { transition: none !important; transform: none !important; opacity: 1 !important; }
+    .loading-spinner { animation: none; border-top-color: rgba(255,255,255,0.12); }
+  }
+
+  /* Hero */
+  .hero { padding: var(--space-96) 0 var(--space-64); text-align: center; }
+  .hero__badge { display: inline-block; font-size: 11px; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; color: var(--steel); margin-bottom: var(--space-16); }
+  .hero h1 { font-size: 40px; line-height: 1.08; letter-spacing: -0.03em; font-weight: 800; margin: 0 0 var(--space-16); }
+  .hero__tagline { font-size: 17px; line-height: 1.5; color: var(--steel); font-weight: 400; margin: 0 0 var(--space-32); max-width: 520px; margin-left: auto; margin-right: auto; }
+  .hero__ctas { display: flex; gap: var(--space-12); justify-content: center; flex-wrap: wrap; }
+
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 12px 22px;
+    border-radius: 10px;
+    font-weight: 700;
+    font-size: 14px;
+    text-decoration: none;
+    cursor: pointer;
+    transition: transform 200ms var(--ease-standard), box-shadow 200ms var(--ease-standard), background 200ms var(--ease-standard);
+  }
+  .btn:active { transform: scale(0.97); }
+  .btn:focus-visible { outline: 2px solid var(--cobalt); outline-offset: 2px; }
+  .btn--primary { background: var(--cobalt); color: #fff; border: none; }
+  .btn--primary:hover { box-shadow: 0 0 0 6px rgba(0,71,255,0.16); transform: scale(1.02); }
+  .btn--ghost { background: transparent; color: #F5F6F8; border: 1px solid rgba(255,255,255,0.16); }
+  .btn--ghost:hover { border-color: rgba(255,255,255,0.32); }
+
+  /* Besoin */
+  .section { padding: var(--space-64) 0; }
+  .section__title { font-size: 22px; font-weight: 800; letter-spacing: -0.01em; margin: 0 0 var(--space-32); text-align: center; }
+  .need-grid { display: grid; grid-template-columns: 1fr; gap: var(--space-16); }
+  @media (min-width: 640px) { .need-grid { grid-template-columns: 1fr 1fr; } }
+  .need-card {
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 14px;
+    padding: var(--space-24);
+    background: rgba(255,255,255,0.02);
+  }
+  .need-card__icon { width: 22px; height: 22px; margin-bottom: var(--space-12); color: var(--cobalt); }
+  .need-card__label { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.03em; color: var(--steel); margin: 0 0 var(--space-8); }
+  .need-card p.need-card__text { font-size: 14px; line-height: 1.6; margin: 0; color: #E4E6EB; }
+
+  /* Preuve */
+  .proof-section {
+    border-top: 1px solid rgba(0,71,255,0.3);
+    border-bottom: 1px solid rgba(0,71,255,0.3);
+    background: rgba(0,71,255,0.04);
+  }
+  .proof-grid { display: flex; flex-wrap: wrap; gap: var(--space-24); align-items: center; justify-content: space-between; }
+  .proof-item__label { font-size: 11px; color: var(--steel); text-transform: uppercase; letter-spacing: 0.03em; margin: 0 0 4px; }
+  .proof-item__value { font-size: 18px; font-weight: 800; margin: 0; }
+  .proof-badge { display: inline-flex; align-items: center; font-size: 11px; font-weight: 700; border-radius: 999px; padding: 4px 10px; color: #00C48C; background: rgba(0,196,140,0.12); border: 1px solid rgba(0,196,140,0.3); }
+  .proof-link { font-size: 13px; color: var(--cobalt); text-decoration: none; }
+
+  /* Comment le lancer */
+  .timeline { position: relative; padding-left: var(--space-32); }
+  .timeline__line { position: absolute; left: 11px; top: 8px; bottom: 8px; width: 1px; background: rgba(255,255,255,0.12); transform-origin: top; transform: scaleY(0); transition: transform 700ms var(--ease-out-expo); }
+  .timeline__line.is-visible { transform: scaleY(1); }
+  .timeline__step { position: relative; padding-bottom: var(--space-32); }
+  .timeline__step:last-child { padding-bottom: 0; }
+  .timeline__dot {
+    position: absolute;
+    left: -32px;
+    top: 2px;
+    width: 24px;
+    height: 24px;
+    border-radius: 999px;
+    background: var(--ink);
+    border: 1px solid rgba(0,71,255,0.5);
+    color: var(--cobalt);
+    font-size: 12px;
+    font-weight: 800;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .timeline__step h3 { font-size: 15px; font-weight: 700; margin: 0 0 4px; }
+  .timeline__step p { font-size: 13px; color: var(--steel); line-height: 1.6; margin: 0; }
+
+  /* CTA sortie */
+  .exit-cta { text-align: center; padding: var(--space-64) 0 var(--space-96); background: rgba(255,255,255,0.02); border-top: 1px solid rgba(255,255,255,0.06); }
+  .exit-cta h2 { font-size: 24px; font-weight: 800; margin: 0 0 var(--space-16); letter-spacing: -0.02em; }
+  .confidence-note { font-size: 12px; color: var(--steel); text-align: center; margin: var(--space-16) 0 0; font-style: italic; }
+
+  footer.page-footer { text-align: center; padding: var(--space-24); }
+  footer.page-footer a { font-size: 13px; color: var(--steel); text-decoration: none; }
+</style>
+</head>
+<body>
+  <div id="loading">
+    <div class="loading-spinner" aria-hidden="true"></div>
+    <p>Nous préparons ton site...</p>
+  </div>
+
+  <div id="error-state">
+    <p id="error-message">Génération momentanément indisponible. Réessaie dans quelques minutes.</p>
+    <a class="btn btn--ghost" href="/succes">Retour</a>
+  </div>
+
+  <div id="content">
+    <section class="hero wrap">
+      <p class="hero__badge" data-reveal style="transition-delay:0ms">Concept généré</p>
+      <h1 id="concept-name" data-reveal style="transition-delay:100ms"></h1>
+      <p class="hero__tagline" id="concept-tagline" data-reveal style="transition-delay:200ms"></p>
+      <div class="hero__ctas" data-reveal style="transition-delay:300ms">
+        <a class="btn btn--primary" id="cta-primary" href="#comment-lancer"></a>
+        <a class="btn btn--ghost" id="cta-secondary" href="#" target="_blank" rel="noopener"></a>
+      </div>
+    </section>
+
+    <section class="section wrap">
+      <h2 class="section__title">Le besoin</h2>
+      <div class="need-grid">
+        <div class="need-card" data-reveal style="transition-delay:0ms">
+          <svg class="need-card__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M12 3v18M3 12h18" stroke-linecap="round"/></svg>
+          <p class="need-card__label">Pourquoi ce besoin existe</p>
+          <p class="need-card__text" id="concept-need-angle"></p>
+        </div>
+        <div class="need-card" data-reveal style="transition-delay:100ms">
+          <svg class="need-card__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3" stroke-linecap="round"/></svg>
+          <p class="need-card__label">Pourquoi maintenant</p>
+          <p class="need-card__text" id="concept-why-now"></p>
+        </div>
+      </div>
+    </section>
+
+    <section class="section proof-section">
+      <div class="wrap">
+        <h2 class="section__title" data-reveal="fade-only">Données vérifiées</h2>
+        <div class="proof-grid" data-reveal="fade-only">
+          <div>
+            <p class="proof-item__label">SaaS source</p>
+            <p class="proof-item__value" id="proof-name"></p>
+          </div>
+          <div>
+            <p class="proof-item__label">MRR vérifié</p>
+            <p class="proof-item__value" id="proof-mrr"></p>
+          </div>
+          <div>
+            <p class="proof-item__label">Fourchette secteur</p>
+            <p class="proof-item__value" id="proof-range">—</p>
+          </div>
+          <div>
+            <span class="proof-badge" id="proof-badge">Vérifié · TrustMRR</span><br/>
+            <a class="proof-link" id="proof-link" href="#" target="_blank" rel="noopener">Voir la source &rarr;</a>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section wrap" id="comment-lancer">
+      <h2 class="section__title">Comment le lancer</h2>
+      <div class="timeline">
+        <div class="timeline__line" id="timeline-line"></div>
+        <div class="timeline__step" data-reveal style="transition-delay:0ms">
+          <div class="timeline__dot">1</div>
+          <h3>Étudie le modèle vérifié</h3>
+          <p>Va voir le vrai site et le vrai MRR affichés ci-dessus — c'est la base réelle du concept.</p>
+        </div>
+        <div class="timeline__step" data-reveal style="transition-delay:100ms">
+          <div class="timeline__dot">2</div>
+          <h3>Récupère l'angle</h3>
+          <p>Le besoin identifié et pourquoi il existe en France sont détaillés plus haut — c'est ton point de départ.</p>
+        </div>
+        <div class="timeline__step" data-reveal style="transition-delay:200ms">
+          <div class="timeline__dot">3</div>
+          <h3>Lance ta version</h3>
+          <p>Construis avec tes propres outils, à ton rythme — ce concept n'est qu'un point de départ, pas une promesse.</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="exit-cta">
+      <div class="wrap">
+        <h2 data-reveal>Prêt à commencer ?</h2>
+        <a class="btn btn--primary" id="cta-exit" href="#comment-lancer" data-reveal style="transition-delay:100ms"></a>
+        <p class="confidence-note" id="confidence-note"></p>
+      </div>
+    </section>
+
+    <footer class="page-footer"><a href="${siteUrl}">Retour à l'accueil</a></footer>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="/js/supabase-client.js"></script>
+  <script>
+    (function () {
+      function escapeHtml(str) {
+        var div = document.createElement("div");
+        div.textContent = String(str == null ? "" : str);
+        return div.innerHTML;
+      }
+
+      function median(sortedNums) {
+        var n = sortedNums.length;
+        var mid = Math.floor(n / 2);
+        return n % 2 !== 0 ? sortedNums[mid] : (sortedNums[mid - 1] + sortedNums[mid]) / 2;
+      }
+
+      function sectorsOverlap(a, b) {
+        if (!a || !a.length || !b || !b.length) return false;
+        if (b.indexOf("both") !== -1) return true;
+        return a.some(function (id) { return id === "both" || b.indexOf(id) !== -1; });
+      }
+
+      function formatUsd(value) {
+        if (typeof value !== "number") return "non communiqué";
+        return Math.round(value).toLocaleString("fr-FR") + " $";
+      }
+
+      function showError(message) {
+        document.getElementById("loading").className = "is-hidden";
+        document.getElementById("error-message").textContent = message;
+        document.getElementById("error-state").className = "is-visible";
+      }
+
+      function setupReveals() {
+        var items = document.querySelectorAll("[data-reveal]");
+        var observer = new IntersectionObserver(
+          function (entries) {
+            entries.forEach(function (entry) {
+              if (entry.isIntersecting) {
+                entry.target.classList.add("is-visible");
+                observer.unobserve(entry.target);
+              }
+            });
+          },
+          { threshold: 0.2 }
+        );
+        items.forEach(function (el) { observer.observe(el); });
+
+        var line = document.getElementById("timeline-line");
+        var lineObserver = new IntersectionObserver(
+          function (entries) {
+            entries.forEach(function (entry) {
+              if (entry.isIntersecting) {
+                line.classList.add("is-visible");
+                lineObserver.disconnect();
+              }
+            });
+          },
+          { threshold: 0.1 }
+        );
+        lineObserver.observe(line);
+
+        // Hero : révélé immédiatement (pas besoin de scroll pour le voir).
+        document.querySelectorAll(".hero [data-reveal]").forEach(function (el) {
+          requestAnimationFrame(function () { el.classList.add("is-visible"); });
+        });
+      }
+
+      function renderConcept(concept, listing, range) {
+        document.getElementById("concept-name").textContent = concept.concept_name;
+        document.getElementById("concept-tagline").textContent = concept.tagline;
+        document.getElementById("concept-need-angle").textContent = concept.need_angle;
+        document.getElementById("concept-why-now").textContent = concept.why_now;
+
+        var ctaPrimary = document.getElementById("cta-primary");
+        ctaPrimary.textContent = concept.cta_primary;
+        var ctaExit = document.getElementById("cta-exit");
+        ctaExit.textContent = concept.cta_primary;
+
+        var ctaSecondary = document.getElementById("cta-secondary");
+        ctaSecondary.textContent = concept.cta_secondary;
+        if (listing.website) {
+          ctaSecondary.href = listing.website;
+        } else {
+          ctaSecondary.style.display = "none";
+        }
+
+        document.getElementById("proof-name").textContent = listing.name || "Non communiqué";
+        document.getElementById("proof-mrr").textContent = formatUsd(listing.mrr_usd);
+        document.getElementById("proof-range").textContent = range
+          ? formatUsd(range.min) + " – " + formatUsd(range.max)
+          : "Échantillon insuffisant";
+        document.getElementById("proof-badge").textContent =
+          listing.source_level === "verified" ? "Vérifié · TrustMRR" : "Revue par l'équipe";
+        var proofLink = document.getElementById("proof-link");
+        if (listing.website) {
+          proofLink.href = listing.website;
+        } else {
+          proofLink.style.display = "none";
+        }
+
+        if (concept.confidence_note) {
+          document.getElementById("confidence-note").textContent = concept.confidence_note;
+        }
+
+        document.getElementById("loading").className = "is-hidden";
+        document.getElementById("content").className = "is-visible";
+        setupReveals();
+      }
+
+      async function loadConcept(supabase, session, slug) {
+        try {
+          var listingRes = await supabase
+            .from("saas_listings")
+            .select("slug, name, website, description, secteur, mrr_usd, source_level")
+            .eq("slug", slug)
+            .eq("active", true)
+            .single();
+          if (listingRes.error || !listingRes.data) {
+            showError("Ce SaaS n'est plus disponible.");
+            return;
+          }
+          var listing = listingRes.data;
+
+          var allRes = await supabase.from("saas_listings").select("secteur, mrr_usd").eq("active", true);
+          var peers = (allRes.data || []).filter(function (p) {
+            return sectorsOverlap(listing.secteur, p.secteur) && typeof p.mrr_usd === "number";
+          });
+          var range = null;
+          if (peers.length >= 3) {
+            var values = peers.map(function (p) { return p.mrr_usd; }).sort(function (a, b) { return a - b; });
+            range = { min: values[0], max: values[values.length - 1], med: median(values) };
+          }
+
+          var genRes = await fetch(supabase.supabaseUrl + "/functions/v1/generate-concept", {
+            method: "POST",
+            headers: {
+              Authorization: "Bearer " + session.access_token,
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({ slug: slug }),
+          });
+          var genBody = await genRes.json();
+          if (!genRes.ok || !genBody.concept) {
+            showError(genBody.error || "Génération momentanément indisponible.");
+            return;
+          }
+
+          renderConcept(genBody.concept, listing, range);
+        } catch (err) {
+          console.error("[concept] échec du chargement :", err);
+          showError("Un souci technique est survenu. Réessaie dans quelques minutes.");
+        }
+      }
+
+      function boot() {
+        var supabase = window.ColdTrendSupabase;
+        if (!supabase) return;
+
+        var slug = decodeURIComponent(window.location.pathname.split("/").filter(Boolean).pop() || "");
+        if (!slug) {
+          showError("Lien invalide.");
+          return;
+        }
+
+        supabase.auth.getUser().then(function (res) {
+          var user = res.data ? res.data.user : null;
+          if (!user) {
+            showError("Session introuvable — reconnecte-toi pour accéder à ce concept.");
+            return;
+          }
+          supabase.from("profiles").select("paid_at").eq("id", user.id).single().then(function (profileRes) {
+            if (profileRes.error || !profileRes.data || !profileRes.data.paid_at) {
+              showError("Accès non payé.");
+              return;
+            }
+            supabase.auth.getSession().then(function (sessionRes) {
+              var session = sessionRes.data ? sessionRes.data.session : null;
+              if (!session) {
+                showError("Session invalide — reconnecte-toi.");
+                return;
+              }
+              loadConcept(supabase, session, slug);
+            });
+          });
+        });
+      }
+
+      if (window.ColdTrendSupabase) {
+        boot();
+      } else {
+        document.addEventListener("coldtrend:supabase-ready", boot, { once: true });
+      }
+    })();
+  </script>
+</body>
+</html>
+`;
+}
+
 // =============================================================================
 // Système de compte — HTML/JS vanilla + supabase-js (CDN), sans framework
 // =============================================================================
@@ -6725,6 +7211,7 @@ mkdirSync(path.join(OUT_DIR, "js"), { recursive: true });
 
 writeBuiltFile(OUT_FILE, page({ brand, hero, socialProof, notificationStack, pricing, comparison, faq, quiz }));
 writeBuiltFile(OUT_FILE_SUCCESS, successPage({ brand, siteUrl: SITE_URL }));
+writeBuiltFile(OUT_FILE_CONCEPT, conceptPage({ brand, siteUrl: SITE_URL }));
 
 writeBuiltFile(path.join(OUT_DIR, "css", "design-tokens.css"), designTokensCss());
 writeBuiltFile(path.join(OUT_DIR, "css", "auth.css"), authCss());
