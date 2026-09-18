@@ -51,66 +51,80 @@ Deno.serve(async (req) => {
 
   let synced = 0;
   let failed = 0;
-  let skippedNotOnSale = 0;
   let pages = 0;
-  let totalAvailable: number | null = null;
+  let totalOnSale: number | null = null;
   const errors: Array<{ slug: unknown; message: string }> = [];
 
-  // La vraie pagination TrustMRR est page/limit/hasMore (confirmée sur une
-  // vraie réponse : meta.total = 10653 startups au total), pas un
-  // next_page_url comme d'abord supposé sans preuve. MAX_PAGES reste
-  // volontairement bas : à 10 req/min (palier standard), parcourir tout le
-  // catalogue prendrait ~18h et timeoutera bien avant dans un seul appel
-  // de fonction — et surtout, synchroniser TOUT le catalogue sans filtre
-  // (Gumroad, Stan...) n'a pas de sens produit pour une base de "SaaS à
-  // racheter". Cette fonction ne resynchronise aujourd'hui que le haut du
-  // classement (page 1 à MAX_PAGES) à chaque exécution, pas un crawl
-  // complet et progressif — à revoir avec un vrai critère de filtre
-  // (onSale, plage de MRR ?) avant d'aller plus loin.
+  // onSale=true est un vrai paramètre serveur (vérifié empiriquement : les
+  // autres essais comme sort/maxAskingPrice sont silencieusement ignorés
+  // par l'API, celui-ci change réellement les résultats) -- fini le
+  // gaspillage de requêtes à filtrer côté client après coup.
+  //
+  // Les petits SaaS abordables (budget du quiz : 5-50k$) ne sont PAS en
+  // tête de classement (trié par MRR/rang, donc par taille) -- vérifié :
+  // les 2226 SaaS à vendre mélangent des prix de 3000$ à plus d'1M$ sans
+  // ordre par prix. La seule vraie option (aucun tri par prix disponible
+  // côté API) est de parcourir en profondeur. Un seul appel de fonction ne
+  // peut pas tout couvrir (10 req/min, page fixée à 10 items par l'API
+  // quel que soit le "limit" demandé -> 223 pages pour tout voir, ~22 min
+  // minimum, largement au-delà du timeout d'une Edge Function).
+  //
+  // Solution : le point de départ tourne chaque jour (basé sur la date),
+  // donc l'exécution quotidienne du Cron Job couvre progressivement tout
+  // le catalogue de SaaS à vendre sur ~22 jours, sans jamais dépasser le
+  // rate limit en une seule exécution.
   const MAX_PAGES = 10;
-  const PAGE_LIMIT = 25;
-  let page = 1;
+  const PAGE_SIZE = 10; // l'API plafonne à 10 quel que soit le "limit" demandé
 
-  while (page <= MAX_PAGES) {
+  const firstRes = await fetch(`${TRUSTMRR_BASE_URL}/startups?onSale=true&page=1&limit=${PAGE_SIZE}`, {
+    headers: { Authorization: `Bearer ${trustmrrKey}` },
+  });
+  if (!firstRes.ok) {
+    console.error("[sync-trustmrr] appel initial échoué :", firstRes.status, await firstRes.text());
+    return json({ error: "Appel TrustMRR initial échoué." }, 502);
+  }
+  const firstBody = await firstRes.json();
+  const firstMeta = (firstBody.meta as Record<string, unknown> | undefined) ?? {};
+  totalOnSale = typeof firstMeta["total"] === "number" ? firstMeta["total"] : null;
+  const totalPages = totalOnSale ? Math.max(1, Math.ceil(totalOnSale / PAGE_SIZE)) : 1;
+
+  const dayIndex = Math.floor(Date.now() / 86400000);
+  const startPage = 1 + (dayIndex % totalPages);
+
+  for (let offset = 0; offset < MAX_PAGES; offset += 1) {
+    const page = 1 + ((startPage - 1 + offset) % totalPages);
     pages += 1;
-    const url = `${TRUSTMRR_BASE_URL}/startups?page=${page}&limit=${PAGE_LIMIT}`;
-    let res: Response;
-    try {
-      res = await fetch(url, { headers: { Authorization: `Bearer ${trustmrrKey}` } });
-    } catch (err) {
-      console.error("[sync-trustmrr] appel réseau échoué :", err);
-      break;
+
+    let body: Record<string, unknown>;
+    if (page === 1 && offset === 0 && startPage === 1) {
+      body = firstBody;
+    } else {
+      const url = `${TRUSTMRR_BASE_URL}/startups?onSale=true&page=${page}&limit=${PAGE_SIZE}`;
+      let res: Response;
+      try {
+        res = await fetch(url, { headers: { Authorization: `Bearer ${trustmrrKey}` } });
+      } catch (err) {
+        console.error("[sync-trustmrr] appel réseau échoué :", err);
+        break;
+      }
+      if (!res.ok) {
+        console.error("[sync-trustmrr] appel API échoué :", res.status, await res.text());
+        break;
+      }
+      body = await res.json();
     }
 
-    if (!res.ok) {
-      console.error("[sync-trustmrr] appel API échoué :", res.status, await res.text());
-      break;
-    }
-
-    const body = await res.json();
     const items: Record<string, unknown>[] = Array.isArray(body.data)
       ? body.data
       : body.data
       ? [body.data]
       : [];
 
-    const meta = (body.meta as Record<string, unknown> | undefined) ?? {};
-    if (typeof meta["total"] === "number") totalAvailable = meta["total"];
-
     for (const item of items) {
       const slug = item["slug"];
       if (typeof slug !== "string" || !slug) {
         failed += 1;
         errors.push({ slug: slug ?? null, message: "slug manquant ou invalide" });
-        continue;
-      }
-      // Filtre produit minimal mais réel : ColdTrend vend des SaaS "à
-      // racheter", pas un classement de toutes les entreprises suivies par
-      // TrustMRR (Gumroad, Stan... ne sont pas à vendre). onSale est un
-      // booléen explicite de la donnée elle-même, pas un seuil de MRR
-      // arbitraire inventé ici.
-      if (item["onSale"] !== true) {
-        skippedNotOnSale += 1;
         continue;
       }
 
@@ -124,6 +138,10 @@ Deno.serve(async (req) => {
         // Montant en dollars avec décimales (ex: 3569654.22), pas des
         // centimes entiers -- vérifié sur un vrai échec de synchronisation.
         mrr_usd: typeof revenue["mrr"] === "number" ? revenue["mrr"] : null,
+        // Même convention que mrr (dollars, pas centimes) -- cohérent avec
+        // askingPrice=7500000 observé sur "online-edtech" (~4,5x son ARR
+        // réel, plausible en dollars bruts, absurde en centimes).
+        asking_price_usd: typeof item["askingPrice"] === "number" ? item["askingPrice"] : null,
         source_level: "verified",
         source_name: "TrustMRR",
         active: true,
@@ -139,16 +157,25 @@ Deno.serve(async (req) => {
       }
     }
 
-    if (meta["hasMore"] !== true) break;
-    page += 1;
+  }
+
+  const { data: bucketRows } = await supabaseAdmin
+    .from("saas_listings_public")
+    .select("budget_bucket");
+  const budgetBreakdown: Record<string, number> = {};
+  for (const row of bucketRows ?? []) {
+    const key = (row as Record<string, unknown>)["budget_bucket"] as string | null ?? "null";
+    budgetBreakdown[key] = (budgetBreakdown[key] ?? 0) + 1;
   }
 
   return json({
     synced,
     failed,
-    skippedNotOnSale,
     pages,
-    totalAvailable,
-    note: "Synchronise seulement le haut du classement (page 1 a MAX_PAGES), filtre sur onSale=true -- pas un crawl complet du catalogue, voir commentaire dans le code."
+    totalOnSale,
+    startPage,
+    errors,
+    budgetBreakdown,
+    note: "Point de depart quotidien tournant sur le catalogue onSale=true (voir commentaire dans le code) -- pas un crawl complet en une seule execution."
   });
 });
