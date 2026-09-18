@@ -69,10 +69,10 @@ const hero = {
   eyebrow: "Preuve de revenus vérifiés",
   prefix: "Découvrez des SaaS avec",
   rotatingPhrases: [
-    "revenus Stripe vérifiés",
+    "Stripe vérifié",
     "MRR réel",
-    "zéro opinion générée",
-    "données auditées par des tiers"
+    "Zéro invention",
+    "Audité, pas généré"
   ],
   subhead:
     "ColdTrend indexe des SaaS à vendre ou à copier sur la base de revenus vérifiés — pas d'idées générées par IA, pas de promesses en l'air.",
@@ -126,8 +126,16 @@ const faq = {
   title: "Ce qu'on nous demande le plus",
   items: [
     {
-      q: "À quelle fréquence les données sont mises à jour ?",
-      a: "Le croisement Stripe / TrustMRR tourne en continu, et chaque fiche SaaS est revérifiée chaque semaine."
+      // TODO(revue humaine) : "la quasi-totalité" à ajuster en "la
+      // totalité" ou en pourcentage exact selon la réponse du fondateur —
+      // ratio réel TrustMRR vs Acquire.com/Flippa dans les 340 SaaS actuels
+      // pas encore confirmé au moment de l'écriture de ce texte.
+      q: "Que veut dire exactement le badge « Vérifié » ?",
+      a: "Que le revenu affiché est confirmé par une source indépendante — aujourd'hui, la quasi-totalité de la base vient de TrustMRR, qui vérifie le revenu par une connexion en lecture seule au processeur de paiement du vendeur (pas une capture d'écran, pas un chiffre auto-déclaré). Quand une fiche vient d'ailleurs (Acquire.com, dont l'équipe examine chaque dossier manuellement, ou un listing « Verified » de Flippa), elle porte un badge distinct « Revue par la plateforme » — jamais confondu avec le badge vert. « Vérifié » veut dire revenu confirmé, pas garantie de rentabilité future : on vérifie un chiffre passé, pas une promesse."
+    },
+    {
+      q: "À quelle fréquence la base est mise à jour ?",
+      a: "Chaque SaaS est vérifié au moment de son ajout — il n'y a pas de recalcul automatique en continu aujourd'hui, la base s'enrichit et se retire au fil de l'eau plutôt que par un système entièrement automatisé."
     },
     {
       q: "Un remboursement est possible ?",
@@ -139,7 +147,7 @@ const faq = {
     },
     {
       q: "En quoi c'est différent d'un site qui génère des idées avec l'IA ?",
-      a: "On ne génère rien : chaque ligne du sheet correspond à un SaaS réel, avec un revenu vérifié — pas une suggestion plausible."
+      a: "On ne génère rien : chaque ligne du sheet correspond à un SaaS réel, avec un revenu vérifié ou revu par une plateforme sérieuse — pas une suggestion plausible."
     },
     {
       q: "Et si je ne trouve rien qui me convient ?",
@@ -447,8 +455,16 @@ function page({ brand, hero, socialProof, notificationStack, pricing, comparison
     }
   }
 
+
   .hero__copy {
     text-align: center;
+    /* Grid items default to min-width:auto, which lets their intrinsic
+       (min-content) width push the track wider than its fr share. The
+       typewriter text below is nowrap, so without this reset every
+       keystroke would nudge the whole grid — badge, buttons, phone
+       visual included. min-width:0 keeps the fr tracks fixed regardless
+       of what the copy column currently contains. */
+    min-width: 0;
   }
 
   @media (min-width: 960px) {
@@ -527,6 +543,16 @@ function page({ brand, hero, socialProof, notificationStack, pricing, comparison
     min-height: 1.2em;
     color: var(--cobalt);
     white-space: nowrap;
+    overflow: hidden;
+    text-align: left;
+    vertical-align: bottom;
+    /* Fallback for no-JS / before the width-lock script runs: reserve
+       space for the longest phrase in ch units so the box is never
+       narrower than it needs to be. The script below replaces this with
+       an exact pixel width measured from the actual rendered font, which
+       is what keeps the box byte-for-byte stable across every phrase —
+       ch is only an approximation (average glyph width), not exact. */
+    min-width: 20ch;
   }
 
   .hero__rotator-text {
@@ -1723,6 +1749,38 @@ function page({ brand, hero, socialProof, notificationStack, pricing, comparison
     .connected-badge { transition: opacity 200ms ease-out; transform: none; }
   }
 
+  /* ---- Badges de niveau de source — deux niveaux de confiance distincts,
+     jamais mélangés sous un même badge "Vérifié" (voir saas_listings,
+     migration 0007). Même forme de pill que .connected-badge, jamais vert
+     pour le niveau 2 : le vert reste exclusivement réservé à "Vérifié". ---- */
+
+  .source-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+    font-weight: 600;
+    border-radius: 999px;
+    padding: 4px 10px;
+  }
+
+  .source-badge--verified {
+    color: var(--verified-green);
+    background: rgba(0, 196, 140, 0.12);
+    border: 1px solid rgba(0, 196, 140, 0.3);
+  }
+
+  .source-badge--platform {
+    color: var(--steel);
+    background: rgba(138, 143, 152, 0.12);
+    border: 1px solid rgba(138, 143, 152, 0.3);
+  }
+
+  .source-badge__icon {
+    width: 12px;
+    height: 12px;
+  }
+
   /* ---- Carte "preuve redactée" — relevé de vérification caviardé ---- */
 
   .proof-card {
@@ -2332,10 +2390,30 @@ function page({ brand, hero, socialProof, notificationStack, pricing, comparison
     (function () {
       var phrases = ${JSON.stringify(hero.rotatingPhrases)};
       var el = document.getElementById("rotator-text");
+      var box = document.getElementById("rotator");
       if (!el) return;
 
       var reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
       if (reduceMotion) return;
+
+      // Lock the box to the widest phrase's actual rendered width so the
+      // typewriter never reflows the hero (badge/buttons/visual stay put)
+      // as it types through phrases of very different lengths.
+      if (box) {
+        var probe = document.createElement("span");
+        probe.style.visibility = "hidden";
+        probe.style.position = "absolute";
+        probe.style.whiteSpace = "nowrap";
+        probe.style.font = window.getComputedStyle(el).font;
+        document.body.appendChild(probe);
+        var widest = 0;
+        phrases.forEach(function (p) {
+          probe.textContent = p;
+          widest = Math.max(widest, probe.getBoundingClientRect().width);
+        });
+        document.body.removeChild(probe);
+        box.style.minWidth = Math.ceil(widest) + "px";
+      }
 
       var TYPE_SPEED = 45;
       var DELETE_SPEED = 30;
