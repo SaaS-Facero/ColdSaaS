@@ -209,12 +209,30 @@ Deno.serve(async (req) => {
     return json({ error: "Réponse de génération invalide." }, 502);
   }
 
+  // Le prompt interdit tout texte hors JSON, mais certains modèles ajoutent
+  // quand même des balises markdown (```json ... ```) -- on les retire avant
+  // de parser plutôt que d'échouer sur une sortie par ailleurs correcte.
+  let cleanedText = rawText.trim();
+  const fencedMatch = cleanedText.match(/^```(?:json)?\s*([\s\S]*?)\s*```$/i);
+  if (fencedMatch) cleanedText = fencedMatch[1].trim();
+
   let concept: Record<string, unknown>;
   try {
-    concept = JSON.parse(rawText.trim());
+    concept = JSON.parse(cleanedText);
   } catch {
-    console.error("[generate-concept] JSON invalide renvoyé par le LLM :", rawText.slice(0, 500));
-    return json({ error: "Réponse de génération mal formée." }, 502);
+    // Dernier recours : extraire le premier bloc {...} plutôt que d'échouer
+    // sur du texte parasite autour d'un JSON par ailleurs valide.
+    const braceMatch = cleanedText.match(/\{[\s\S]*\}/);
+    if (!braceMatch) {
+      console.error("[generate-concept] JSON invalide renvoyé par le LLM :", rawText.slice(0, 500));
+      return json({ error: "Réponse de génération mal formée." }, 502);
+    }
+    try {
+      concept = JSON.parse(braceMatch[0]);
+    } catch {
+      console.error("[generate-concept] JSON invalide renvoyé par le LLM (après extraction) :", rawText.slice(0, 500));
+      return json({ error: "Réponse de génération mal formée." }, 502);
+    }
   }
 
   for (const field of REQUIRED_FIELDS) {
