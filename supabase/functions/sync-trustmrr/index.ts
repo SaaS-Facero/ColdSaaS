@@ -13,9 +13,14 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 const TRUSTMRR_BASE_URL = "https://trustmrr.com/api/v1";
 
 function mapSecteur(targetAudience: unknown): string[] {
-  if (targetAudience === "b2b") return ["b2b"];
-  if (targetAudience === "b2c") return ["b2c"];
-  if (typeof targetAudience === "string" && targetAudience.length > 0) return ["both"];
+  // L'API renvoie "B2B" / "B2C" / "Both" (casse capitalisée) -- vérifié sur
+  // les vraies données, pas en minuscules comme l'exemple de documentation
+  // le laissait supposer.
+  if (typeof targetAudience !== "string") return [];
+  const normalized = targetAudience.toLowerCase();
+  if (normalized === "b2b") return ["b2b"];
+  if (normalized === "b2c") return ["b2c"];
+  if (normalized.length > 0) return ["both"];
   return [];
 }
 
@@ -47,11 +52,27 @@ Deno.serve(async (req) => {
   let synced = 0;
   let failed = 0;
   let pages = 0;
+  let totalAvailable: number | null = null;
   const errors: Array<{ slug: unknown; message: string }> = [];
-  let url: string | null = `${TRUSTMRR_BASE_URL}/startups`;
 
-  while (url && pages < 50) {
+  // La vraie pagination TrustMRR est page/limit/hasMore (confirmée sur une
+  // vraie réponse : meta.total = 10653 startups au total), pas un
+  // next_page_url comme d'abord supposé sans preuve. MAX_PAGES reste
+  // volontairement bas : à 10 req/min (palier standard), parcourir tout le
+  // catalogue prendrait ~18h et timeoutera bien avant dans un seul appel
+  // de fonction — et surtout, synchroniser TOUT le catalogue sans filtre
+  // (Gumroad, Stan...) n'a pas de sens produit pour une base de "SaaS à
+  // racheter". Cette fonction ne resynchronise aujourd'hui que le haut du
+  // classement (page 1 à MAX_PAGES) à chaque exécution, pas un crawl
+  // complet et progressif — à revoir avec un vrai critère de filtre
+  // (onSale, plage de MRR ?) avant d'aller plus loin.
+  const MAX_PAGES = 10;
+  const PAGE_LIMIT = 25;
+  let page = 1;
+
+  while (page <= MAX_PAGES) {
     pages += 1;
+    const url = `${TRUSTMRR_BASE_URL}/startups?page=${page}&limit=${PAGE_LIMIT}`;
     let res: Response;
     try {
       res = await fetch(url, { headers: { Authorization: `Bearer ${trustmrrKey}` } });
@@ -71,6 +92,9 @@ Deno.serve(async (req) => {
       : body.data
       ? [body.data]
       : [];
+
+    const meta = (body.meta as Record<string, unknown> | undefined) ?? {};
+    if (typeof meta["total"] === "number") totalAvailable = meta["total"];
 
     for (const item of items) {
       const slug = item["slug"];
@@ -104,15 +128,9 @@ Deno.serve(async (req) => {
       }
     }
 
-    // Pagination défensive : le schéma exact de pagination de TrustMRR
-    // n'a pas été confirmé au moment d'écrire cette fonction (seule la
-    // réponse d'un item unique a été observée). On s'arrête proprement si
-    // aucun indice de page suivante n'est trouvé plutôt que de deviner un
-    // mauvais nom de champ et boucler dans le vide.
-    const meta = (body.meta as Record<string, unknown> | undefined) ?? {};
-    const next = meta["next_page_url"] ?? body["next_page_url"] ?? null;
-    url = typeof next === "string" && next ? next : null;
+    if (meta["hasMore"] !== true) break;
+    page += 1;
   }
 
-  return json({ synced, failed, pages, errors });
+  return json({ synced, failed, pages, totalAvailable, note: "Synchronise seulement le haut du classement (page 1 a MAX_PAGES) -- pas un crawl complet du catalogue, voir commentaire dans le code." });
 });
