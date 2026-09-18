@@ -4577,7 +4577,7 @@ function successPage({ brand, siteUrl }) {
           ? escapeHtml(listing.description).slice(0, 90)
           : "Un SaaS " + escapeHtml(sectorLabel(listing.secteur)) + " prêt à reprendre";
 
-        var conceptHref = listing.slug ? "/concept/" + encodeURIComponent(listing.slug) : "#";
+        var conceptHref = listing.slug ? "/concept?slug=" + encodeURIComponent(listing.slug) : "#";
 
         var el = document.createElement("div");
         el.className = "concept-mockup";
@@ -5209,7 +5209,7 @@ function conceptPage({ brand, siteUrl }) {
         var supabase = window.ColdTrendSupabase;
         if (!supabase) return;
 
-        var slug = decodeURIComponent(window.location.pathname.split("/").filter(Boolean).pop() || "");
+        var slug = new URLSearchParams(window.location.search).get("slug") || "";
         if (!slug) {
           showError("Lien invalide.");
           return;

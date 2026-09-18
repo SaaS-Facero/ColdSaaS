@@ -2,9 +2,5 @@
   "buildCommand": "npm run build",
   "outputDirectory": "public",
   "cleanUrls": true,
-  "trailingSlash": false,
-  "rewrites": [
-    { "source": "/rewrite-test-fixed", "destination": "/concept.html" },
-    { "source": "/concept/:slug*", "destination": "/concept.html" }
-  ]
+  "trailingSlash": false
 }
