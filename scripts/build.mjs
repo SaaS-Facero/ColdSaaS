@@ -7,6 +7,7 @@ const OUT_DIR = path.join(__dirname, "..", "public");
 const OUT_FILE = path.join(OUT_DIR, "index.html");
 const OUT_FILE_SUCCESS = path.join(OUT_DIR, "succes.html");
 const OUT_FILE_CONCEPT = path.join(OUT_DIR, "concept.html");
+const OUT_FILE_ENTREPRENEUR_PROFILE = path.join(OUT_DIR, "profil-entrepreneur.html");
 
 // Toute config sensible/par-environnement se lit depuis process.env — jamais
 // en dur. Le second membre de chaque `??` n'est qu'un filet de sécurité pour
@@ -2285,6 +2286,19 @@ function page({ brand, hero, socialProof, notificationStack, pricing, comparison
     margin: 4px 0 32px;
   }
 
+  .quiz-result__entrepreneur-link {
+    display: block;
+    text-align: center;
+    margin-top: 16px;
+    font-size: 13px;
+    color: var(--steel);
+    text-decoration: none;
+  }
+
+  .quiz-result__entrepreneur-link:hover {
+    color: var(--paper-soft);
+  }
+
   .quiz-payment__teaser {
     background: rgba(255, 255, 255, 0.03);
     border: 1px solid rgba(255, 255, 255, 0.08);
@@ -4238,6 +4252,7 @@ function renderQuizOverlay({ quiz, pricing, stripeLink }) {
         <p class="quiz-result__match-label" id="quiz-match-label">correspondent à ton profil</p>
         <p class="quiz-result-meta" id="quiz-result-meta"></p>
         <button class="btn btn--primary btn--full" id="quiz-see-offer-btn" type="button">Voir mon accès</button>
+        <a class="quiz-result__entrepreneur-link" href="/profil-entrepreneur">Va plus loin : découvre ton profil entrepreneur &rarr;</a>
       </div>
 
       <div class="quiz-screen" data-screen="payment" data-step-name="paiement">
@@ -5522,6 +5537,571 @@ function conceptPage({ brand, siteUrl, commPlanPaymentLink }) {
               }
               loadConcept(supabase, session, slug);
             });
+          });
+        });
+      }
+
+      if (window.ColdTrendSupabase) {
+        boot();
+      } else {
+        document.addEventListener("coldtrend:supabase-ready", boot, { once: true });
+      }
+    })();
+  </script>
+</body>
+</html>
+`;
+}
+
+// ---------------------------------------------------------------------------
+// Page profil entrepreneur — /profil-entrepreneur, module optionnel proposé
+// APRÈS l'écran de résultat gratuit du quiz existant (jamais avant, jamais
+// une fusion) -- decision produit explicite. Reutilise
+// profiles.secteur/budget/temps deja collectes par le quiz, ne les
+// redemande jamais : seulement 9 questions introspectives ici.
+// ---------------------------------------------------------------------------
+// Meme systeme d'easing/reveal que /concept (cubic-bezier custom, jamais
+// ease/linear) pour coherence visuelle entre les deux parcours "generes".
+function entrepreneurProfilePage({ brand, siteUrl, stripePaymentLink }) {
+  return `<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>${brand.name} — Ton profil entrepreneur</title>
+<meta name="description" content="9 questions pour un profil entrepreneur personnalisé, gratuit." />
+<meta name="robots" content="noindex" />
+<style>
+  :root {
+    color-scheme: dark;
+    --space-4: 4px; --space-8: 8px; --space-12: 12px; --space-16: 16px;
+    --space-24: 24px; --space-32: 32px; --space-48: 48px; --space-64: 64px;
+    --space-96: 96px;
+    --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+    --ease-standard: cubic-bezier(0.4, 0, 0.2, 1);
+    --cobalt: #0047FF;
+    --steel: #8A8F98;
+    --ink: #0A0E1A;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: var(--ink); color: #F5F6F8; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Inter, Arial, sans-serif; }
+  body { position: relative; overflow-x: hidden; min-height: 100dvh; }
+  a { color: inherit; }
+
+  #loading, #error-state {
+    min-height: 100dvh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: var(--space-16);
+    text-align: center;
+    padding: var(--space-24);
+  }
+  #error-state { display: none; color: var(--steel); }
+  #error-state.is-visible { display: flex; }
+  #loading.is-hidden { display: none; }
+  .loading-spinner {
+    width: 32px; height: 32px; border-radius: 999px;
+    border: 2px solid rgba(255,255,255,0.12);
+    border-top-color: var(--cobalt);
+    animation: spin 900ms linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  #loading p { color: var(--steel); font-size: 15px; margin: 0; }
+
+  #app { display: none; }
+  #app.is-visible { display: block; }
+
+  .wrap { max-width: 560px; margin: 0 auto; padding: var(--space-24); }
+
+  .progress-track { height: 4px; background: rgba(255,255,255,0.08); border-radius: 999px; overflow: hidden; margin-bottom: var(--space-32); }
+  .progress-fill { height: 100%; background: var(--cobalt); border-radius: 999px; transition: width 500ms var(--ease-out-expo); width: 0%; }
+  .progress-label { font-size: 12px; color: var(--steel); margin: 0 0 var(--space-16); }
+
+  .question-screen { display: none; }
+  .question-screen.is-active { display: block; animation: fadeSlideIn 500ms var(--ease-out-expo); }
+  @keyframes fadeSlideIn { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
+  @media (prefers-reduced-motion: reduce) {
+    .question-screen.is-active { animation: none; }
+    .progress-fill { transition: none; }
+  }
+
+  .question-title { font-size: 22px; font-weight: 800; letter-spacing: -0.01em; line-height: 1.3; margin: 0 0 var(--space-24); }
+
+  textarea, input[type="text"] {
+    width: 100%;
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(255,255,255,0.12);
+    border-radius: 10px;
+    color: #F5F6F8;
+    font-size: 15px;
+    font-family: inherit;
+    padding: var(--space-12) var(--space-16);
+    resize: none;
+    transition: border-color 200ms var(--ease-standard);
+  }
+  textarea:focus, input[type="text"]:focus {
+    outline: none;
+    border-color: var(--cobalt);
+  }
+  textarea.size-short { min-height: 70px; }
+  textarea.size-medium { min-height: 120px; }
+  textarea.size-large { min-height: 180px; }
+  .char-counter { font-size: 12px; color: var(--steel); text-align: right; margin-top: 6px; }
+
+  .choice-grid { display: flex; flex-direction: column; gap: var(--space-8); }
+  .choice-card {
+    display: block;
+    width: 100%;
+    text-align: left;
+    background: rgba(255,255,255,0.03);
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 10px;
+    padding: var(--space-12) var(--space-16);
+    color: #F5F6F8;
+    font-size: 15px;
+    cursor: pointer;
+    transition: border-color 200ms var(--ease-standard), background 200ms var(--ease-standard);
+  }
+  .choice-card:hover { border-color: rgba(255,255,255,0.28); }
+  .choice-card.is-selected { border-color: var(--cobalt); background: rgba(0,71,255,0.1); }
+  .choice-other-field { margin-top: var(--space-12); display: none; }
+  .choice-other-field.is-visible { display: block; }
+
+  .slider-block { text-align: center; }
+  .slider-value { font-size: 40px; font-weight: 800; letter-spacing: -0.02em; margin: 0 0 var(--space-8); }
+  .slider-emoji { font-size: 40px; margin: 0 0 var(--space-8); }
+  input[type="range"] {
+    width: 100%;
+    accent-color: var(--cobalt);
+    margin: var(--space-16) 0;
+  }
+  .slider-scale-labels { display: flex; justify-content: space-between; font-size: 12px; color: var(--steel); }
+
+  .nav-row { display: flex; justify-content: space-between; align-items: center; margin-top: var(--space-32); gap: var(--space-12); }
+  .btn {
+    display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+    padding: 12px 22px; border-radius: 10px; font-weight: 700; font-size: 14px;
+    text-decoration: none; cursor: pointer; border: none;
+    transition: transform 200ms var(--ease-standard), box-shadow 200ms var(--ease-standard), background 200ms var(--ease-standard), opacity 200ms var(--ease-standard);
+  }
+  .btn:active { transform: scale(0.97); }
+  .btn:focus-visible { outline: 2px solid var(--cobalt); outline-offset: 2px; }
+  .btn--primary { background: var(--cobalt); color: #fff; }
+  .btn--primary:hover { box-shadow: 0 0 0 6px rgba(0,71,255,0.16); }
+  .btn--primary:disabled { opacity: 0.4; cursor: not-allowed; box-shadow: none; }
+  .btn--ghost { background: transparent; color: var(--steel); border: 1px solid rgba(255,255,255,0.14); }
+  .btn--ghost:hover { border-color: rgba(255,255,255,0.32); }
+  .btn--ghost:disabled { opacity: 0.3; cursor: not-allowed; }
+
+  /* Écran de résultat -- tout est "généré" ici (parcours gratuit, avant
+     paiement) : pas de bloc "données vérifiées" comme sur /concept, ce
+     serait faux -- aucune vérification n'a eu lieu à ce stade. */
+  #result-screen { display: none; text-align: center; padding: var(--space-64) 0; }
+  #result-screen.is-visible { display: block; }
+  .result-badge { font-size: 11px; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; color: var(--steel); margin-bottom: var(--space-16); }
+  #result-name { font-size: 32px; font-weight: 800; letter-spacing: -0.02em; margin: 0 0 var(--space-24); }
+  .result-block { text-align: left; margin-bottom: var(--space-24); }
+  .result-block p { font-size: 15px; line-height: 1.6; color: #E4E6EB; margin: 0; }
+  .result-transition { font-size: 14px; color: var(--steel); margin: var(--space-32) 0 var(--space-24); }
+
+  footer.page-footer { text-align: center; padding: var(--space-24); }
+  footer.page-footer a { font-size: 13px; color: var(--steel); text-decoration: none; }
+</style>
+</head>
+<body>
+  <div id="loading">
+    <div class="loading-spinner" aria-hidden="true"></div>
+    <p>Chargement...</p>
+  </div>
+
+  <div id="error-state">
+    <p id="error-message">Un souci technique est survenu.</p>
+    <a class="btn btn--ghost" href="${siteUrl}">Retour à l'accueil</a>
+  </div>
+
+  <div id="app">
+    <div class="wrap">
+      <div id="questionnaire">
+        <p class="progress-label" id="progress-label">Question 1 / 9</p>
+        <div class="progress-track"><div class="progress-fill" id="progress-fill"></div></div>
+        <div id="questions-container"></div>
+        <div class="nav-row">
+          <button type="button" class="btn btn--ghost" id="btn-prev">Précédent</button>
+          <button type="button" class="btn btn--primary" id="btn-next" disabled>Suivant</button>
+        </div>
+      </div>
+
+      <div id="result-screen">
+        <p class="result-badge">Ton profil entrepreneur</p>
+        <h1 id="result-name"></h1>
+        <div class="result-block"><p id="result-opening"></p></div>
+        <div class="result-block"><p id="result-strength"></p></div>
+        <div class="result-block"><p id="result-direction"></p></div>
+        <p class="result-transition" id="result-transition"></p>
+        <a class="btn btn--primary" id="result-cta" href="#">Lancer mon business</a>
+      </div>
+    </div>
+    <footer class="page-footer"><a href="${siteUrl}">Retour à l'accueil</a></footer>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="/js/supabase-client.js"></script>
+  <script>
+    (function () {
+      var QUESTIONS = [
+        {
+          id: "revenu_vise",
+          type: "slider",
+          title: "Quel revenu mensuel vises-tu ?",
+          min: 500,
+          max: 20000,
+          step: 100,
+          format: function (v) { return v >= 20000 ? "20 000 € et plus" : Number(v).toLocaleString("fr-FR") + " € / mois"; }
+        },
+        {
+          id: "reponse_nuit",
+          type: "textarea",
+          size: "short",
+          maxlength: 280,
+          title: "Qu'est-ce qui te réveille la nuit quand tu penses à ton projet ?"
+        },
+        {
+          id: "confiance",
+          type: "slider-emoji",
+          title: "Ton niveau de confiance actuel, sur 10 ?",
+          min: 1,
+          max: 10,
+          step: 1,
+          emojiFor: function (v) {
+            if (v <= 3) return "😟";
+            if (v <= 6) return "😐";
+            if (v <= 8) return "🙂";
+            return "😄";
+          }
+        },
+        {
+          id: "frein",
+          type: "single-choice-other",
+          title: "Qu'est-ce qui te freine le plus aujourd'hui ?",
+          options: [
+            { value: "temps", label: "Manque de temps" },
+            { value: "argent", label: "Manque d'argent" },
+            { value: "peur_echec", label: "Peur de l'échec" },
+            { value: "ne_sait_pas", label: "Ne sait pas par où commencer" },
+            { value: "autre", label: "Autre" }
+          ]
+        },
+        {
+          id: "fierte",
+          type: "single-choice",
+          title: "Si tu réussissais, qui serait le plus fier de toi ?",
+          options: [
+            { value: "parents", label: "Mes parents" },
+            { value: "partenaire", label: "Mon/ma partenaire" },
+            { value: "amis", label: "Mes amis" },
+            { value: "moi_meme", label: "Moi-même" },
+            { value: "personne", label: "Personne en particulier" }
+          ]
+        },
+        {
+          id: "frequence",
+          type: "single-choice",
+          title: "À quelle fréquence tu penses à ton projet ?",
+          options: [
+            { value: "constamment", label: "Constamment" },
+            { value: "plusieurs_fois_jour", label: "Plusieurs fois par jour" },
+            { value: "une_fois_jour", label: "Une fois par jour" },
+            { value: "rarement", label: "Rarement" }
+          ]
+        },
+        {
+          id: "habitude_regrettee",
+          type: "textarea",
+          size: "short",
+          maxlength: 280,
+          title: "Quelle habitude aimerais-tu avoir prise il y a un an ?"
+        },
+        {
+          id: "incompris",
+          type: "textarea",
+          size: "medium",
+          maxlength: 500,
+          title: "Qu'est-ce que ton entourage ne comprend pas sur ton ambition ?"
+        },
+        {
+          id: "projection_10ans",
+          type: "textarea",
+          size: "large",
+          maxlength: 800,
+          title: "Où te vois-tu dans 10 ans si rien ne change ?"
+        }
+      ];
+
+      var answers = {};
+      var currentIndex = 0;
+      var container = document.getElementById("questions-container");
+      var btnPrev = document.getElementById("btn-prev");
+      var btnNext = document.getElementById("btn-next");
+
+      function escapeHtml(str) {
+        var div = document.createElement("div");
+        div.textContent = String(str == null ? "" : str);
+        return div.innerHTML;
+      }
+
+      function isAnswered(q) {
+        var val = answers[q.id];
+        if (q.type === "slider" || q.type === "slider-emoji") return typeof val === "number";
+        if (q.type === "single-choice") return typeof val === "string" && val.length > 0;
+        if (q.type === "single-choice-other") {
+          if (typeof val !== "string" || !val) return false;
+          if (val === "autre") return typeof answers.frein_autre === "string" && answers.frein_autre.trim().length > 0;
+          return true;
+        }
+        if (q.type === "textarea") return typeof val === "string" && val.trim().length > 0;
+        return false;
+      }
+
+      function renderQuestion(index) {
+        var q = QUESTIONS[index];
+        var el = document.createElement("div");
+        el.className = "question-screen is-active";
+        el.setAttribute("data-question-id", q.id);
+
+        var html = '<h2 class="question-title">' + escapeHtml(q.title) + "</h2>";
+
+        if (q.type === "slider" || q.type === "slider-emoji") {
+          var current = typeof answers[q.id] === "number" ? answers[q.id] : Math.round((q.min + q.max) / 2);
+          html +=
+            '<div class="slider-block">' +
+            (q.type === "slider-emoji" ? '<div class="slider-emoji" id="field-emoji">' + q.emojiFor(current) + "</div>" : "") +
+            '<p class="slider-value" id="field-value">' + (q.format ? q.format(current) : current) + "</p>" +
+            '<input type="range" id="field-input" min="' + q.min + '" max="' + q.max + '" step="' + q.step + '" value="' + current + '" />' +
+            '<div class="slider-scale-labels"><span>' + (q.format ? q.format(q.min) : q.min) + "</span><span>" + (q.format ? q.format(q.max) : q.max) + "</span></div>" +
+            "</div>";
+        } else if (q.type === "single-choice" || q.type === "single-choice-other") {
+          html += '<div class="choice-grid" id="field-choices">';
+          q.options.forEach(function (opt) {
+            var selected = answers[q.id] === opt.value;
+            html +=
+              '<button type="button" class="choice-card' + (selected ? " is-selected" : "") + '" data-value="' + escapeHtml(opt.value) + '">' +
+              escapeHtml(opt.label) +
+              "</button>";
+          });
+          html += "</div>";
+          if (q.type === "single-choice-other") {
+            var otherVisible = answers[q.id] === "autre";
+            html +=
+              '<div class="choice-other-field' + (otherVisible ? " is-visible" : "") + '" id="field-other">' +
+              '<input type="text" id="field-other-input" placeholder="Précise..." value="' + escapeHtml(answers.frein_autre || "") + '" maxlength="140" />' +
+              "</div>";
+          }
+        } else if (q.type === "textarea") {
+          var text = answers[q.id] || "";
+          html +=
+            '<textarea id="field-input" class="size-' + q.size + '" maxlength="' + q.maxlength + '" placeholder="Ta réponse...">' + escapeHtml(text) + "</textarea>" +
+            '<p class="char-counter" id="field-counter">' + text.length + " / " + q.maxlength + "</p>";
+        }
+
+        el.innerHTML = html;
+        return el;
+      }
+
+      function attachHandlers(index) {
+        var q = QUESTIONS[index];
+
+        if (q.type === "slider" || q.type === "slider-emoji") {
+          var input = document.getElementById("field-input");
+          var valueEl = document.getElementById("field-value");
+          var emojiEl = document.getElementById("field-emoji");
+          answers[q.id] = Number(input.value);
+          input.addEventListener("input", function () {
+            var v = Number(input.value);
+            answers[q.id] = v;
+            valueEl.textContent = q.format ? q.format(v) : String(v);
+            if (emojiEl) emojiEl.textContent = q.emojiFor(v);
+            updateNextEnabled();
+          });
+        } else if (q.type === "single-choice" || q.type === "single-choice-other") {
+          var cards = document.querySelectorAll("#field-choices .choice-card");
+          cards.forEach(function (card) {
+            card.addEventListener("click", function () {
+              cards.forEach(function (c) { c.classList.remove("is-selected"); });
+              card.classList.add("is-selected");
+              answers[q.id] = card.getAttribute("data-value");
+              if (q.type === "single-choice-other") {
+                var otherField = document.getElementById("field-other");
+                if (answers[q.id] === "autre") {
+                  otherField.className = "choice-other-field is-visible";
+                } else {
+                  otherField.className = "choice-other-field";
+                  answers.frein_autre = "";
+                }
+              }
+              updateNextEnabled();
+            });
+          });
+          var otherInput = document.getElementById("field-other-input");
+          if (otherInput) {
+            otherInput.addEventListener("input", function () {
+              answers.frein_autre = otherInput.value;
+              updateNextEnabled();
+            });
+          }
+        } else if (q.type === "textarea") {
+          var textarea = document.getElementById("field-input");
+          var counter = document.getElementById("field-counter");
+          answers[q.id] = textarea.value;
+          textarea.addEventListener("input", function () {
+            answers[q.id] = textarea.value;
+            counter.textContent = textarea.value.length + " / " + q.maxlength;
+            updateNextEnabled();
+          });
+        }
+      }
+
+      function updateNextEnabled() {
+        btnNext.disabled = !isAnswered(QUESTIONS[currentIndex]);
+      }
+
+      function renderStep() {
+        container.innerHTML = "";
+        container.appendChild(renderQuestion(currentIndex));
+        attachHandlers(currentIndex);
+        updateNextEnabled();
+
+        document.getElementById("progress-label").textContent = "Question " + (currentIndex + 1) + " / " + QUESTIONS.length;
+        document.getElementById("progress-fill").style.width = Math.round(((currentIndex + 1) / QUESTIONS.length) * 100) + "%";
+        btnPrev.disabled = currentIndex === 0;
+        btnNext.textContent = currentIndex === QUESTIONS.length - 1 ? "Voir mon profil" : "Suivant";
+      }
+
+      btnPrev.addEventListener("click", function () {
+        if (currentIndex === 0) return;
+        currentIndex -= 1;
+        renderStep();
+      });
+
+      btnNext.addEventListener("click", function () {
+        if (!isAnswered(QUESTIONS[currentIndex])) return;
+        if (currentIndex < QUESTIONS.length - 1) {
+          currentIndex += 1;
+          renderStep();
+        } else {
+          submitQuestionnaire();
+        }
+      });
+
+      var supabaseRef = null;
+      var sessionRef = null;
+
+      async function submitQuestionnaire() {
+        btnNext.disabled = true;
+        btnNext.textContent = "Enregistrement...";
+        try {
+          var row = {
+            user_id: sessionRef.user.id,
+            revenu_vise: answers.revenu_vise,
+            reponse_nuit: answers.reponse_nuit,
+            confiance: answers.confiance,
+            frein: answers.frein,
+            frein_autre: answers.frein === "autre" ? answers.frein_autre : null,
+            fierte: answers.fierte,
+            frequence: answers.frequence,
+            habitude_regrettee: answers.habitude_regrettee,
+            incompris: answers.incompris,
+            projection_10ans: answers.projection_10ans,
+            completed_at: new Date().toISOString()
+          };
+          var saveRes = await supabaseRef.from("entrepreneur_profile_answers").upsert(row, { onConflict: "user_id" });
+          if (saveRes.error) throw saveRes.error;
+
+          document.getElementById("questionnaire").style.display = "none";
+          document.getElementById("loading").className = "";
+          document.getElementById("loading").querySelector("p").textContent = "On prépare ton profil...";
+
+          var genRes = await fetch(supabaseRef.supabaseUrl + "/functions/v1/generate-entrepreneur-profile", {
+            method: "POST",
+            headers: { Authorization: "Bearer " + sessionRef.access_token, "Content-Type": "application/json" }
+          });
+          var genBody = await genRes.json();
+          document.getElementById("loading").className = "is-hidden";
+          if (!genRes.ok || !genBody.profile) {
+            showError(genBody.error || "Génération momentanément indisponible.");
+            return;
+          }
+
+          renderResult(genBody.profile);
+        } catch (err) {
+          console.error("[profil-entrepreneur] échec de soumission :", err);
+          document.getElementById("loading").className = "is-hidden";
+          showError("Un souci technique est survenu. Réessaie dans quelques minutes.");
+        }
+      }
+
+      function renderResult(profile) {
+        document.getElementById("result-name").textContent = profile.profile_name;
+        document.getElementById("result-opening").textContent = profile.opening_line;
+        document.getElementById("result-strength").textContent = profile.strength_recognition;
+        document.getElementById("result-direction").textContent = profile.direction_hint;
+        document.getElementById("result-transition").textContent = profile.transition_line;
+
+        var cta = document.getElementById("result-cta");
+        try {
+          var url = new URL(${JSON.stringify(stripePaymentLink)});
+          url.searchParams.set("client_reference_id", sessionRef.user.id);
+          if (sessionRef.user.email) url.searchParams.set("prefilled_email", sessionRef.user.email);
+          cta.href = url.toString();
+        } catch (err) {
+          console.warn("[profil-entrepreneur] lien de paiement invalide :", err);
+        }
+
+        document.getElementById("result-screen").className = "is-visible";
+      }
+
+      function showError(message) {
+        document.getElementById("error-message").textContent = message;
+        document.getElementById("error-state").className = "is-visible";
+      }
+
+      function boot() {
+        var supabase = window.ColdTrendSupabase;
+        if (!supabase) return;
+        supabaseRef = supabase;
+
+        supabase.auth.getUser().then(function (res) {
+          var user = res.data ? res.data.user : null;
+          if (!user) {
+            showError("Session introuvable — reconnecte-toi pour continuer.");
+            return;
+          }
+          supabase.auth.getSession().then(function (sessionRes) {
+            var session = sessionRes.data ? sessionRes.data.session : null;
+            if (!session) {
+              showError("Session invalide — reconnecte-toi.");
+              return;
+            }
+            sessionRef = session;
+
+            // Si un profil existe deja (un seul par utilisateur), on saute
+            // directement au resultat plutot que de refaire les 9 questions.
+            supabase
+              .from("entrepreneur_profiles")
+              .select("*")
+              .eq("user_id", user.id)
+              .maybeSingle()
+              .then(function (existingRes) {
+                document.getElementById("loading").className = "is-hidden";
+                document.getElementById("app").className = "is-visible";
+                if (existingRes.data) {
+                  document.getElementById("questionnaire").style.display = "none";
+                  renderResult(existingRes.data);
+                } else {
+                  renderStep();
+                }
+              });
           });
         });
       }
@@ -7500,6 +8080,7 @@ mkdirSync(path.join(OUT_DIR, "js"), { recursive: true });
 writeBuiltFile(OUT_FILE, page({ brand, hero, socialProof, notificationStack, pricing, comparison, faq, quiz }));
 writeBuiltFile(OUT_FILE_SUCCESS, successPage({ brand, siteUrl: SITE_URL }));
 writeBuiltFile(OUT_FILE_CONCEPT, conceptPage({ brand, siteUrl: SITE_URL, commPlanPaymentLink: COMM_PLAN_PAYMENT_LINK }));
+writeBuiltFile(OUT_FILE_ENTREPRENEUR_PROFILE, entrepreneurProfilePage({ brand, siteUrl: SITE_URL, stripePaymentLink: STRIPE_PAYMENT_LINK }));
 
 writeBuiltFile(path.join(OUT_DIR, "css", "design-tokens.css"), designTokensCss());
 writeBuiltFile(path.join(OUT_DIR, "css", "auth.css"), authCss());
