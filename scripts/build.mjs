@@ -116,7 +116,7 @@ const hero = {
   ],
   subhead:
     "ColdTrend indexe des SaaS à vendre ou à copier sur la base de revenus vérifiés — pas d'idées générées par IA, pas de promesses en l'air.",
-  ctaPrimary: "Voir les SaaS vérifiés",
+  ctaPrimary: "Lancer mon business",
   ctaSecondary: "Comment on vérifie"
 };
 
@@ -644,6 +644,48 @@ function page({ brand, hero, socialProof, notificationStack, pricing, comparison
 
   @media (min-width: 960px) {
     .hero__actions { justify-content: flex-start; }
+  }
+
+  /* Preuve sociale : chiffre indicatif, volontairement distinct visuellement
+     du badge Cobalt Blue/Vérifié TrustMRR -- pas de bordure, pas de couleur
+     de marque, pour ne jamais le confondre avec les preuves auditées. */
+  .hero__social-proof {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    margin-top: 16px;
+  }
+
+  @media (min-width: 960px) {
+    .hero__social-proof { justify-content: flex-start; }
+  }
+
+  .hero__social-proof-avatars {
+    display: flex;
+  }
+
+  .hero__avatar {
+    width: 28px;
+    height: 28px;
+    border-radius: 999px;
+    border: 2px solid var(--ink, #0A0E1A);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 11px;
+    font-weight: 700;
+    color: rgba(255, 255, 255, 0.85);
+    margin-left: -8px;
+  }
+
+  .hero__avatar:first-child {
+    margin-left: 0;
+  }
+
+  .hero__social-proof-text {
+    font-size: 13px;
+    color: var(--steel);
   }
 
   .btn {
@@ -2357,8 +2399,18 @@ function page({ brand, hero, socialProof, notificationStack, pricing, comparison
           </h1>
           <p class="hero__subhead">${hero.subhead}</p>
           <div class="hero__actions">
-            <a class="btn btn--primary" href="#pricing">${hero.ctaPrimary}</a>
+            <button type="button" class="btn btn--primary" id="hero-quiz-btn">${hero.ctaPrimary}</button>
             <a class="btn btn--secondary" href="#faq-title">${hero.ctaSecondary}</a>
+          </div>
+          <div class="hero__social-proof">
+            <div class="hero__social-proof-avatars" aria-hidden="true">
+              <span class="hero__avatar" style="background:#7B8794">A</span>
+              <span class="hero__avatar" style="background:#8A6FD9">M</span>
+              <span class="hero__avatar" style="background:#4A9B8E">S</span>
+              <span class="hero__avatar" style="background:#C97B4A">L</span>
+              <span class="hero__avatar" style="background:#5A7FB8">R</span>
+            </div>
+            <span class="hero__social-proof-text">+2 300 entrepreneurs nous font confiance</span>
           </div>
         </div>
 
@@ -3809,6 +3861,8 @@ function page({ brand, hero, socialProof, notificationStack, pricing, comparison
 
       closeBtn.addEventListener("click", closeQuiz);
       openBtn.addEventListener("click", openQuiz);
+      var heroQuizBtn = document.getElementById("hero-quiz-btn");
+      if (heroQuizBtn) heroQuizBtn.addEventListener("click", openQuiz);
       var authBannerFixBtn = document.getElementById("quiz-auth-banner-fix");
       if (authBannerFixBtn) authBannerFixBtn.addEventListener("click", fixAuthAndGoBack);
 
