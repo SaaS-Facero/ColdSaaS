@@ -528,7 +528,9 @@ function page({ brand, hero, socialProof, notificationStack, pricing, comparison
   }
 
   @media (min-width: 960px) {
-    .hero__copy { text-align: left; }
+    /* Decale vers le centre (loin du bord gauche du conteneur) pour plus
+       de presence visuelle, maintenant que le telephone est colle a droite. */
+    .hero__copy { text-align: left; padding-left: 40px; }
   }
 
   .brand-bar {
@@ -772,8 +774,19 @@ function page({ brand, hero, socialProof, notificationStack, pricing, comparison
     transform: translateY(-24px);
   }
 
+  @keyframes phone-float {
+    0%, 100% { transform: translateY(-24px) translateX(48px); }
+    50% { transform: translateY(-36px) translateX(48px); }
+  }
+
   @media (min-width: 960px) {
-    .ns-root { transform: translateY(-24px) translateX(24px); }
+    /* Colle a droite (translateX plus marque qu'avant) + leger flottement
+       vertical continu -- casse encore plus l'alignement statique. */
+    .ns-root { transform: translateY(-24px) translateX(48px); }
+  }
+
+  @media (min-width: 960px) and (prefers-reduced-motion: no-preference) {
+    .ns-root { animation: phone-float 5s ease-in-out infinite; }
   }
 
   @media (min-width: 960px) {
