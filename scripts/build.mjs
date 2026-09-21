@@ -484,6 +484,188 @@ function page({ brand, hero, socialProof, notificationStack, pricing, comparison
     padding-inline: 20px;
   }
 
+  /* ---------------- Nav sticky ---------------- */
+
+  .site-nav {
+    position: sticky;
+    top: 0;
+    z-index: 40;
+    background: transparent;
+    border-bottom: 1px solid transparent;
+    /* Meme famille de transition que le reste de la page (ease, pas de
+       cubic-bezier custom -- cette page n'utilise pas ce systeme, contrairement
+       a /concept ou /profil-entrepreneur). */
+    transition: background 0.25s ease, border-color 0.25s ease, backdrop-filter 0.25s ease;
+  }
+
+  .site-nav.is-scrolled {
+    background: rgba(10, 14, 26, 0.82);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    border-bottom-color: #232936;
+  }
+
+  .site-nav__inner {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    padding-block: 14px;
+  }
+
+  .site-nav__brand {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    text-decoration: none;
+    color: inherit;
+    min-width: 0;
+  }
+
+  .site-nav__logo {
+    width: 30px;
+    height: 30px;
+    flex-shrink: 0;
+  }
+
+  .site-nav__wordmark {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+  }
+
+  .site-nav__name {
+    font-size: 15px;
+    font-weight: 800;
+    color: var(--paper-soft);
+  }
+
+  .site-nav__tagline {
+    font-size: 11px;
+    font-style: italic;
+    color: var(--steel);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  @media (max-width: 639px) {
+    .site-nav__tagline { display: none; }
+  }
+
+  .site-nav__links {
+    display: none;
+    align-items: center;
+    gap: 20px;
+  }
+
+  @media (min-width: 860px) {
+    .site-nav__links { display: flex; }
+  }
+
+  .site-nav__faq-link {
+    font-size: 14px;
+    color: var(--paper-soft);
+    text-decoration: none;
+  }
+
+  .site-nav__faq-link:hover {
+    color: #fff;
+  }
+
+  .site-nav__auth-btn a {
+    display: inline-block;
+    padding: 8px 16px;
+    border-radius: 8px;
+    border: 1px solid #2A3140;
+    color: var(--paper-soft);
+    font-size: 14px;
+    font-weight: 600;
+    text-decoration: none;
+    transition: border-color 0.18s ease, color 0.18s ease;
+  }
+
+  .site-nav__auth-btn a:hover {
+    border-color: var(--cobalt);
+    color: var(--cobalt);
+  }
+
+  .btn--sm {
+    width: auto;
+    max-width: none;
+    padding: 9px 18px;
+    font-size: 14px;
+  }
+
+  .site-nav__burger {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    gap: 5px;
+    width: 40px;
+    height: 40px;
+    background: transparent;
+    border: 1px solid #2A3140;
+    border-radius: 8px;
+    cursor: pointer;
+    flex-shrink: 0;
+  }
+
+  @media (min-width: 860px) {
+    .site-nav__burger { display: none; }
+  }
+
+  .site-nav__burger span {
+    display: block;
+    width: 16px;
+    height: 2px;
+    background: var(--paper-soft);
+    transition: transform 0.2s ease, opacity 0.2s ease;
+  }
+
+  .site-nav__burger[aria-expanded="true"] span:nth-child(1) {
+    transform: translateY(7px) rotate(45deg);
+  }
+
+  .site-nav__burger[aria-expanded="true"] span:nth-child(2) {
+    opacity: 0;
+  }
+
+  .site-nav__burger[aria-expanded="true"] span:nth-child(3) {
+    transform: translateY(-7px) rotate(-45deg);
+  }
+
+  .site-nav__mobile-panel {
+    display: none;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 14px;
+    padding: 16px 20px 20px;
+    border-top: 1px solid #232936;
+    background: rgba(10, 14, 26, 0.98);
+  }
+
+  .site-nav__mobile-panel.is-open {
+    display: flex;
+  }
+
+  @media (min-width: 860px) {
+    .site-nav__mobile-panel { display: none !important; }
+  }
+
+  .site-nav__mobile-panel a#nav-mobile-faq-link {
+    font-size: 15px;
+    color: var(--paper-soft);
+    text-decoration: none;
+    padding: 6px 0;
+  }
+
+  .site-nav__mobile-panel .site-nav__auth-btn a {
+    display: block;
+    text-align: center;
+  }
+
   /* ---------------- Hero ---------------- */
 
   .hero {
@@ -536,45 +718,6 @@ function page({ brand, hero, socialProof, notificationStack, pricing, comparison
     /* Decale vers le centre (loin du bord gauche du conteneur) pour plus
        de presence visuelle, maintenant que le telephone est colle a droite. */
     .hero__copy { text-align: left; padding-left: 40px; }
-  }
-
-  .brand-bar {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 2px;
-    margin-bottom: 18px;
-  }
-
-  @media (min-width: 960px) {
-    .brand-bar { align-items: flex-start; }
-  }
-
-  .brand-bar__name {
-    font-size: 14px;
-    font-weight: 800;
-    letter-spacing: 0.01em;
-    color: var(--paper-soft);
-  }
-
-  .brand-bar__tagline {
-    font-size: 12px;
-    color: var(--steel);
-    font-style: italic;
-  }
-
-  .brand-bar__auth {
-    margin-top: 6px;
-    font-size: 12px;
-  }
-
-  .brand-bar__auth a {
-    color: var(--steel);
-    text-decoration: underline;
-  }
-
-  .brand-bar__auth a:hover {
-    color: var(--cobalt-soft);
   }
 
   .hero__eyebrow {
@@ -2480,6 +2623,64 @@ function page({ brand, hero, socialProof, notificationStack, pricing, comparison
 </style>
 </head>
 <body>
+  <header class="site-nav" id="site-nav">
+    <div class="site-nav__inner wrap">
+      <a class="site-nav__brand" href="/">
+        <svg class="site-nav__logo" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+          <rect x="1" y="1" width="30" height="30" rx="9" fill="none" stroke="#0047FF" stroke-width="1.6"/>
+          <path d="M9 20l5-8 4 5 5-9" stroke="#0047FF" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        <span class="site-nav__wordmark">
+          <span class="site-nav__name">${brand.name}</span>
+          <span class="site-nav__tagline">${brand.tagline}</span>
+        </span>
+      </a>
+      <nav class="site-nav__links">
+        <a class="site-nav__faq-link" href="#faq-title">FAQ</a>
+        <span class="site-nav__auth-btn" data-auth-slot></span>
+        <button type="button" class="btn btn--primary btn--sm" id="nav-cta-btn">${hero.ctaPrimary}</button>
+      </nav>
+      <button type="button" class="site-nav__burger" id="nav-burger-btn" aria-label="Menu" aria-expanded="false" aria-controls="nav-mobile-panel">
+        <span></span><span></span><span></span>
+      </button>
+    </div>
+    <div class="site-nav__mobile-panel" id="nav-mobile-panel">
+      <a href="#faq-title" id="nav-mobile-faq-link">FAQ</a>
+      <span class="site-nav__auth-btn" data-auth-slot></span>
+      <button type="button" class="btn btn--primary" id="nav-cta-btn-mobile">${hero.ctaPrimary}</button>
+    </div>
+  </header>
+  <script>
+    (function () {
+      var nav = document.getElementById("site-nav");
+      var burgerBtn = document.getElementById("nav-burger-btn");
+      var mobilePanel = document.getElementById("nav-mobile-panel");
+      if (!nav) return;
+
+      var SCROLL_THRESHOLD = 64;
+      function onScroll() {
+        nav.classList.toggle("is-scrolled", window.scrollY > SCROLL_THRESHOLD);
+      }
+      onScroll();
+      window.addEventListener("scroll", onScroll, { passive: true });
+
+      if (burgerBtn && mobilePanel) {
+        burgerBtn.addEventListener("click", function () {
+          var willOpen = !mobilePanel.classList.contains("is-open");
+          mobilePanel.classList.toggle("is-open", willOpen);
+          burgerBtn.setAttribute("aria-expanded", String(willOpen));
+        });
+        // Ferme le panneau mobile apres un clic sur un de ses liens/boutons,
+        // au lieu de le laisser ouvert par-dessus le contenu vise.
+        mobilePanel.addEventListener("click", function (e) {
+          if (e.target.closest("a, button")) {
+            mobilePanel.classList.remove("is-open");
+            burgerBtn.setAttribute("aria-expanded", "false");
+          }
+        });
+      }
+    })();
+  </script>
   <main class="wrap">
     <section class="hero">
       <svg class="hero__pattern" aria-hidden="true" viewBox="0 0 800 600" preserveAspectRatio="xMidYMid slice">
@@ -2498,11 +2699,6 @@ function page({ brand, hero, socialProof, notificationStack, pricing, comparison
       </svg>
       <div class="hero__grid">
         <div class="hero__copy">
-          <div class="brand-bar">
-            <span class="brand-bar__name">${brand.name}</span>
-            <span class="brand-bar__tagline">${brand.tagline}</span>
-            <span class="brand-bar__auth" data-auth-slot></span>
-          </div>
           <span class="hero__eyebrow">
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
               <path d="M20 6L9 17l-5-5" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
@@ -4009,6 +4205,10 @@ function page({ brand, hero, socialProof, notificationStack, pricing, comparison
       openBtn.addEventListener("click", openQuiz);
       var heroQuizBtn = document.getElementById("hero-quiz-btn");
       if (heroQuizBtn) heroQuizBtn.addEventListener("click", openQuiz);
+      var navCtaBtn = document.getElementById("nav-cta-btn");
+      if (navCtaBtn) navCtaBtn.addEventListener("click", openQuiz);
+      var navCtaBtnMobile = document.getElementById("nav-cta-btn-mobile");
+      if (navCtaBtnMobile) navCtaBtnMobile.addEventListener("click", openQuiz);
       var authBannerFixBtn = document.getElementById("quiz-auth-banner-fix");
       if (authBannerFixBtn) authBannerFixBtn.addEventListener("click", fixAuthAndGoBack);
 
