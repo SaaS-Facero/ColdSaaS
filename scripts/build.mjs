@@ -4513,8 +4513,8 @@ function page({ brand, hero, socialProof, notificationStack, pricing, comparison
       // Retour depuis "Mon dossier" quand le quiz est déjà qualifié
       // (match_count renseigné) mais pas encore payé : reconstruit l'écran
       // résultat/paiement directement depuis profiles, sans repasser par les
-      // questions déjà répondues (goToResult() lit `answers`, pas la base --
-      // on le remplit à la main avant de l'appeler).
+      // questions déjà répondues (goToResult() lit la variable "answers",
+      // pas la base -- on la remplit à la main avant de l'appeler).
       (function resumeToResultScreen() {
         var params = new URLSearchParams(window.location.search);
         if (params.get("resume") !== "result") return;
