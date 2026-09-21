@@ -108,11 +108,15 @@ const brand = {
 
 const hero = {
   eyebrow: "Preuve de revenus vérifiés",
-  prefix: "Trouve ton SaaS avec",
+  titleLine1: "Ton prochain business commence par une idée, on trouve celle qui te correspond.",
+  prefix: "Transforme-la en site et commence à générer",
   rotatingPhrases: [
-    "preuves vérifiées",
-    "revenus audités",
-    "données Stripe"
+    "tes premiers revenus.",
+    "tes premiers clients.",
+    "tes premières ventes.",
+    "tes premiers paiements.",
+    "un revenu récurrent.",
+    "ton premier chiffre d'affaires."
   ],
   subhead:
     "ColdTrend indexe des SaaS à vendre ou à copier sur la base de revenus vérifiés — pas d'idées générées par IA, pas de promesses en l'air.",
@@ -589,11 +593,19 @@ function page({ brand, hero, socialProof, notificationStack, pricing, comparison
   }
 
   .hero__title {
-    font-size: clamp(30px, 7.5vw, 60px);
-    line-height: 1.15;
+    /* Deux phrases completes maintenant (pas juste un prefixe court) --
+       taille reduite par rapport a l'ancien titre court pour rester lisible
+       sur plusieurs lignes sans deborder. */
+    font-size: clamp(26px, 5.5vw, 42px);
+    line-height: 1.2;
     font-weight: 800;
     letter-spacing: -0.02em;
     margin: 0 0 18px;
+  }
+
+  .hero__title-line1 {
+    display: block;
+    margin-bottom: 14px;
   }
 
   .hero__title-static {
@@ -617,7 +629,7 @@ function page({ brand, hero, socialProof, notificationStack, pricing, comparison
        an exact pixel width measured from the actual rendered font, which
        is what keeps the box byte-for-byte stable across every phrase —
        ch is only an approximation (average glyph width), not exact. */
-    min-width: 20ch;
+    min-width: 32ch;
   }
 
   .hero__rotator-text {
@@ -2466,6 +2478,7 @@ function page({ brand, hero, socialProof, notificationStack, pricing, comparison
             ${hero.eyebrow}
           </span>
           <h1 class="hero__title">
+            <span class="hero__title-line1">${hero.titleLine1}</span>
             <span class="hero__title-static">${hero.prefix}</span>
             <span class="hero__rotator" id="rotator" aria-live="polite">
               <span class="hero__rotator-text" id="rotator-text">${renderRotatorNoScript(hero.rotatingPhrases)}</span>
