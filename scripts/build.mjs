@@ -7695,6 +7695,180 @@ html, body {
   opacity: 1;
   transform: translate(-50%, 0);
 }
+
+/* ---- /admin -- back-office interne, hors de la charte "produit" -------- */
+.admin-skeleton,
+.admin-denied {
+  max-width: 1100px;
+  margin: 60px auto;
+  padding: 0 24px;
+}
+
+.admin-shell {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 40px 24px 80px;
+}
+
+.admin-header {
+  display: flex;
+  align-items: baseline;
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.admin-title {
+  font-size: 22px;
+  font-weight: 800;
+  margin: 0;
+}
+
+.admin-count {
+  color: var(--color-steel);
+  font-size: 13px;
+  margin-left: auto;
+}
+
+.admin-filters {
+  display: flex;
+  gap: 20px;
+  flex-wrap: wrap;
+  margin-bottom: 20px;
+  font-size: 13px;
+  color: var(--color-steel);
+}
+
+.admin-filters select {
+  display: block;
+  margin-top: 4px;
+  padding: 6px 10px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: var(--color-ink-soft);
+  color: var(--color-paper-soft);
+  font-family: inherit;
+}
+
+.admin-table-wrap {
+  overflow-x: auto;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: var(--radius-md);
+  margin-bottom: 40px;
+}
+
+.admin-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+  white-space: nowrap;
+}
+
+.admin-table th,
+.admin-table td {
+  padding: 10px 14px;
+  text-align: left;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.admin-table th {
+  color: var(--color-steel);
+  font-weight: 600;
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.admin-table__email {
+  color: var(--color-steel);
+  font-size: 11px;
+}
+
+.admin-campaign {
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  padding-top: 32px;
+}
+
+.admin-campaign__title {
+  font-size: 18px;
+  font-weight: 700;
+  margin: 0 0 16px;
+}
+
+.admin-campaign__templates {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 20px;
+}
+
+.admin-campaign__form {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  max-width: 560px;
+}
+
+.admin-campaign__form label {
+  display: block;
+  font-size: 13px;
+  color: var(--color-steel);
+}
+
+.admin-campaign__form input,
+.admin-campaign__form textarea {
+  display: block;
+  width: 100%;
+  margin-top: 6px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--color-paper-soft);
+  font-family: inherit;
+  font-size: 14px;
+}
+
+.admin-campaign__preview {
+  font-size: 12px;
+  color: var(--color-cobalt-soft);
+  margin: 0;
+}
+
+.admin-campaign__result {
+  font-size: 13px;
+  color: var(--color-steel);
+  margin: 0;
+}
+
+.admin-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 10px 18px;
+  border-radius: 999px;
+  border: none;
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.admin-btn--primary {
+  background: var(--color-cobalt);
+  color: #fff;
+}
+
+.admin-btn--primary:hover {
+  background: var(--color-cobalt-dark);
+}
+
+.admin-btn--secondary {
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  color: var(--color-paper-soft);
+}
+
+.admin-btn--secondary:hover {
+  border-color: var(--color-cobalt);
+  color: var(--color-cobalt-soft);
+}
 `;
 }
 
@@ -8978,6 +9152,372 @@ function comptePage() {
   });
 }
 
+// ---- /admin — back-office interne (accès is_admin) ------------------------
+//
+// Statique comme les autres pages : la protection réelle est la double
+// vérification côté serveur dans admin-list-profiles/admin-send-campaign
+// (is_admin relu en base avec le rôle service), jamais un check ici. Ce
+// script se contente d'afficher un skeleton tant que le fetch initial n'a
+// pas répondu, puis affiche soit le tableau, soit une page "Accès refusé"
+// si l'appel renvoie 403 -- pas de fuite de layout avant vérification.
+//
+// Vue par défaut = tous les profils sans filtre. Les filtres (payé, quiz,
+// secteur) ne sont que des options d'affichage appliquées en JS sur le jeu
+// de données déjà chargé -- ils ne refont jamais de requête et n'excluent
+// jamais une ligne côté serveur.
+function adminPage() {
+  const body = `  <div class="admin-skeleton" id="admin-skeleton" aria-hidden="true">
+    <div class="skeleton-line" style="width:160px;height:20px;"></div>
+    <div class="skeleton-line" style="width:100%;height:200px;"></div>
+  </div>
+  <div class="admin-denied" id="admin-denied" hidden>
+    <p>Accès refusé.</p>
+  </div>
+  <div class="admin-shell" id="admin-content" hidden>
+    <header class="admin-header">
+      <a class="auth-brand" href="/">${brand.name}</a>
+      <h1 class="admin-title">Back-office</h1>
+      <span class="admin-count" id="admin-count"></span>
+    </header>
+
+    <section class="admin-filters" aria-label="Filtres d'affichage">
+      <label>Paiement
+        <select id="filter-paid">
+          <option value="all">Tous</option>
+          <option value="paid">Payé</option>
+          <option value="unpaid">Non payé</option>
+        </select>
+      </label>
+      <label>Quiz
+        <select id="filter-quiz">
+          <option value="all">Tous</option>
+          <option value="complete">Complet</option>
+          <option value="incomplete">Abandonné / en cours</option>
+        </select>
+      </label>
+      <label>Secteur
+        <select id="filter-secteur">
+          <option value="all">Tous</option>
+          <option value="b2b">B2B</option>
+          <option value="b2c">B2C</option>
+          <option value="both">Les deux</option>
+        </select>
+      </label>
+    </section>
+
+    <div class="admin-table-wrap">
+      <table class="admin-table">
+        <thead>
+          <tr>
+            <th></th>
+            <th>Prénom / email</th>
+            <th>Secteur</th>
+            <th>Budget</th>
+            <th>Temps</th>
+            <th>Intention</th>
+            <th>Frein</th>
+            <th>Revenu visé</th>
+            <th>Paiement</th>
+            <th>Projet</th>
+            <th>Inscrit le</th>
+            <th>Étape funnel</th>
+          </tr>
+        </thead>
+        <tbody id="admin-table-body"></tbody>
+      </table>
+    </div>
+
+    <section class="admin-campaign" aria-label="Envoi ciblé">
+      <h2 class="admin-campaign__title">Envoi ciblé</h2>
+      <div class="admin-campaign__templates">
+        <button type="button" class="admin-btn admin-btn--secondary" id="template-quiz-abandonne">Relance quiz abandonné</button>
+        <button type="button" class="admin-btn admin-btn--secondary" id="template-resultat-non-paye">Relance résultat non payé</button>
+      </div>
+      <div class="admin-campaign__form">
+        <label>Segment
+          <select id="campaign-segment">
+            <option value="quiz_abandonne">Quiz abandonné</option>
+            <option value="resultat_non_paye">Résultat non payé</option>
+          </select>
+        </label>
+        <label>Inactif depuis (heures)
+          <input type="number" id="campaign-hours" value="48" min="0" />
+        </label>
+        <p class="admin-campaign__preview" id="campaign-preview"></p>
+        <label>Objet
+          <input type="text" id="campaign-subject" placeholder="Objet de l'email" />
+        </label>
+        <label>Corps (variables : {{prenom}}, {{secteur}}, {{frein}})
+          <textarea id="campaign-body" rows="8" placeholder="&lt;p&gt;Salut {{prenom}},&lt;/p&gt;"></textarea>
+        </label>
+        <button type="button" class="admin-btn admin-btn--primary" id="campaign-send-btn">Envoyer la campagne</button>
+        <p class="admin-campaign__result" id="campaign-result"></p>
+      </div>
+    </section>
+  </div>
+  <script>
+    (function () {
+      var SECTOR_LABELS = ${JSON.stringify(quiz.sectorLabels)};
+      var BUDGET_LABELS = ${JSON.stringify(quiz.budgetLabels)};
+      var TIME_LABELS = ${JSON.stringify(quiz.timeLabels)};
+      var FREIN_LABELS = {
+        temps: "Le temps",
+        argent: "Le budget",
+        peur_echec: "La peur de se lancer",
+        ne_sait_pas: "Ne sait pas encore",
+        autre: "Autre"
+      };
+      var TEMPLATES = {
+        quiz_abandonne: {
+          segment: "quiz_abandonne",
+          subject: "Tu avais commencé à chercher un SaaS vérifié",
+          body: "<p>Salut {{prenom}},</p><p>Tu avais commencé à chercher un SaaS vérifié dans le secteur {{secteur}} sans aller jusqu'au bout.</p><p><a href=\\"https://coldtrend.com/?resume=quiz\\">Reprends exactement où tu t'étais arrêté</a> — tes réponses précédentes sont toujours là.</p><p>— ColdTrend</p>"
+        },
+        resultat_non_paye: {
+          segment: "resultat_non_paye",
+          subject: "Tes SaaS vérifiés t'attendent toujours",
+          body: "<p>Salut {{prenom}},</p><p>On avait trouvé des SaaS vérifiés qui correspondent à ton profil ({{secteur}}) — {{frein}} t'a peut-être arrêté avant le dernier pas.</p><p><a href=\\"https://coldtrend.com/?resume=result\\">Voir mes résultats</a></p><p>— ColdTrend</p>"
+        }
+      };
+
+      var rows = [];
+
+      function formatDateFr(iso) {
+        try {
+          return new Date(iso).toLocaleDateString("fr-FR", { day: "numeric", month: "short", year: "numeric" });
+        } catch (err) {
+          return "";
+        }
+      }
+
+      function sectorText(secteur) {
+        if (!secteur || !secteur.length) return "—";
+        return secteur.map(function (s) { return SECTOR_LABELS[s] || s; }).join(", ");
+      }
+
+      function quizStatus(row) {
+        if (row.match_count !== null && row.match_count !== undefined) return "complete";
+        return "incomplete";
+      }
+
+      function renderRow(row) {
+        var tr = document.createElement("tr");
+        tr.innerHTML =
+          "<td><input type=\\"checkbox\\" class=\\"admin-row-check\\" data-id=\\"" + row.id + "\\" /></td>" +
+          "<td>" + (row.prenom || "—") + "<br><span class=\\"admin-table__email\\">" + (row.email || "") + "</span></td>" +
+          "<td>" + sectorText(row.secteur) + "</td>" +
+          "<td>" + (BUDGET_LABELS[row.budget] || row.budget || "—") + "</td>" +
+          "<td>" + (TIME_LABELS[row.temps] || row.temps || "—") + "</td>" +
+          "<td>" + (row.intention || "—") + "</td>" +
+          "<td>" + (FREIN_LABELS[row.frein] || row.frein_autre || "—") + "</td>" +
+          "<td>" + (row.revenu_vise != null ? row.revenu_vise + " €" : "—") + "</td>" +
+          "<td>" + (row.paid_at ? "Payé le " + formatDateFr(row.paid_at) : "Non payé") + "</td>" +
+          "<td>" + (row.projet_selectionne || "—") + "</td>" +
+          "<td>" + formatDateFr(row.created_at) + "</td>" +
+          "<td>" + (row.funnel_last_step != null ? row.funnel_last_step : "—") + "</td>";
+        return tr;
+      }
+
+      function applyFilters() {
+        var paidFilter = document.getElementById("filter-paid").value;
+        var quizFilter = document.getElementById("filter-quiz").value;
+        var secteurFilter = document.getElementById("filter-secteur").value;
+
+        var filtered = rows.filter(function (row) {
+          if (paidFilter === "paid" && !row.paid_at) return false;
+          if (paidFilter === "unpaid" && row.paid_at) return false;
+          if (quizFilter !== "all" && quizStatus(row) !== quizFilter) return false;
+          if (secteurFilter !== "all" && !(row.secteur || []).includes(secteurFilter)) return false;
+          return true;
+        });
+
+        var tbody = document.getElementById("admin-table-body");
+        tbody.innerHTML = "";
+        filtered.forEach(function (row) {
+          tbody.appendChild(renderRow(row));
+        });
+        document.getElementById("admin-count").textContent = filtered.length + " / " + rows.length + " profils";
+      }
+
+      ["filter-paid", "filter-quiz", "filter-secteur"].forEach(function (id) {
+        document.getElementById(id).addEventListener("change", applyFilters);
+      });
+
+      function updateCampaignPreview() {
+        var segment = document.getElementById("campaign-segment").value;
+        var hours = Number(document.getElementById("campaign-hours").value) || 0;
+        var cutoff = Date.now() - hours * 60 * 60 * 1000;
+
+        var matching = rows.filter(function (row) {
+          if (row.unsubscribed_at) return false;
+          var updatedAt = new Date(row.created_at).getTime();
+          if (segment === "quiz_abandonne") {
+            return row.funnel_last_step > 0 && (row.match_count === null || row.match_count === undefined) && updatedAt < cutoff;
+          }
+          if (segment === "resultat_non_paye") {
+            return row.match_count !== null && row.match_count !== undefined && !row.paid_at && updatedAt < cutoff;
+          }
+          return false;
+        });
+
+        document.getElementById("campaign-preview").textContent =
+          matching.length + " destinataire" + (matching.length !== 1 ? "s" : "") + " correspondent à ce segment (aperçu approximatif -- le serveur revérifie au moment de l'envoi).";
+      }
+
+      document.getElementById("campaign-segment").addEventListener("change", updateCampaignPreview);
+      document.getElementById("campaign-hours").addEventListener("input", updateCampaignPreview);
+
+      function applyTemplate(key) {
+        var tpl = TEMPLATES[key];
+        document.getElementById("campaign-segment").value = tpl.segment;
+        document.getElementById("campaign-subject").value = tpl.subject;
+        document.getElementById("campaign-body").value = tpl.body;
+        updateCampaignPreview();
+      }
+
+      document.getElementById("template-quiz-abandonne").addEventListener("click", function () {
+        applyTemplate("quiz_abandonne");
+      });
+      document.getElementById("template-resultat-non-paye").addEventListener("click", function () {
+        applyTemplate("resultat_non_paye");
+      });
+
+      async function callAdminFunction(name, payload) {
+        var supabase = window.ColdTrendSupabase;
+        var sessionRes = await supabase.auth.getSession();
+        var token = sessionRes.data.session ? sessionRes.data.session.access_token : null;
+        if (!token) return { error: "Session invalide." };
+        var res = await fetch(supabase.supabaseUrl + "/functions/v1/" + name, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            apikey: supabase.supabaseKey,
+            Authorization: "Bearer " + token
+          },
+          body: JSON.stringify(payload || {})
+        });
+        return res.json();
+      }
+
+      document.getElementById("campaign-send-btn").addEventListener("click", async function () {
+        var segment = document.getElementById("campaign-segment").value;
+        var hours = Number(document.getElementById("campaign-hours").value) || 0;
+        var subject = document.getElementById("campaign-subject").value.trim();
+        var bodyHtml = document.getElementById("campaign-body").value.trim();
+        if (!subject || !bodyHtml) {
+          document.getElementById("campaign-result").textContent = "Objet et corps requis.";
+          return;
+        }
+        var confirmed = window.confirm("Envoyer cette campagne maintenant ? Cette action ne peut pas être annulée.");
+        if (!confirmed) return;
+
+        var btn = this;
+        btn.disabled = true;
+        var result = await callAdminFunction("admin-send-campaign", {
+          templateId: segment,
+          segment: { type: segment, inactiveSinceHours: hours },
+          subject: subject,
+          bodyHtml: bodyHtml
+        });
+        btn.disabled = false;
+
+        var resultEl = document.getElementById("campaign-result");
+        if (result && result.error) {
+          resultEl.textContent = "Erreur : " + result.error;
+        } else {
+          resultEl.textContent = result.sent + " envoyé(s), " + result.failed + " échec(s), sur " + result.eligible + " éligible(s).";
+        }
+      });
+
+      async function init() {
+        function check() {
+          if (!window.ColdTrendSupabase) {
+            document.addEventListener("coldtrend:supabase-ready", check, { once: true });
+            return;
+          }
+          callAdminFunction("admin-list-profiles").then(function (result) {
+            document.getElementById("admin-skeleton").hidden = true;
+            if (!result || result.error || !result.rows) {
+              document.getElementById("admin-denied").hidden = false;
+              return;
+            }
+            rows = result.rows;
+            document.getElementById("admin-content").hidden = false;
+            applyFilters();
+            updateCampaignPreview();
+          });
+        }
+        check();
+      }
+
+      init();
+    })();
+  </script>`;
+
+  return authPageShell({
+    title: "Back-office",
+    description: "Administration ColdTrend.",
+    bodyHtml: body
+  });
+}
+
+// ---- /desabonnement — RGPD, public, sans session requise -------------------
+function desabonnementPage() {
+  const body = `  <div class="auth-shell">
+    <div class="auth-card">
+      <a class="auth-brand" href="/">${brand.name}</a>
+      <h1 class="auth-title" id="unsub-title">Désabonnement…</h1>
+      <p class="auth-subtitle" id="unsub-subtitle">Un instant.</p>
+    </div>
+  </div>
+  <script>
+    (function () {
+      function check() {
+        if (!window.ColdTrendSupabase) {
+          document.addEventListener("coldtrend:supabase-ready", check, { once: true });
+          return;
+        }
+        var params = new URLSearchParams(window.location.search);
+        var token = params.get("token");
+        var titleEl = document.getElementById("unsub-title");
+        var subtitleEl = document.getElementById("unsub-subtitle");
+        if (!token) {
+          titleEl.textContent = "Lien invalide.";
+          subtitleEl.textContent = "";
+          return;
+        }
+        var supabase = window.ColdTrendSupabase;
+        fetch(supabase.supabaseUrl + "/functions/v1/unsubscribe", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", apikey: supabase.supabaseKey },
+          body: JSON.stringify({ token: token })
+        })
+          .then(function (res) { return res.json(); })
+          .then(function (result) {
+            if (result && result.success) {
+              titleEl.textContent = "Tu es désabonné.";
+              subtitleEl.textContent = "Tu ne recevras plus d'emails de relance ColdTrend.";
+            } else {
+              titleEl.textContent = "Lien invalide ou expiré.";
+              subtitleEl.textContent = "";
+            }
+          })
+          .catch(function () {
+            titleEl.textContent = "Une erreur est survenue.";
+            subtitleEl.textContent = "Réessaie dans un instant.";
+          });
+      }
+      check();
+    })();
+  </script>`;
+
+  return authPageShell({
+    title: "Désabonnement",
+    description: "Se désabonner des emails ColdTrend.",
+    bodyHtml: body
+  });
+}
+
 // ---------------------------------------------------------------------------
 // Sécurité — grep de la sortie buildée pour toute variable sensible qui
 // n'aurait rien à faire dans du code servi au navigateur. Ne vérifie pas
@@ -9026,5 +9566,7 @@ writeBuiltFile(path.join(OUT_DIR, "inscription.html"), inscriptionPage());
 writeBuiltFile(path.join(OUT_DIR, "mot-de-passe-oublie.html"), motDePasseOublieePage());
 writeBuiltFile(path.join(OUT_DIR, "reinitialiser-mot-de-passe.html"), reinitialiserMotDePassePage());
 writeBuiltFile(path.join(OUT_DIR, "compte.html"), comptePage());
+writeBuiltFile(path.join(OUT_DIR, "admin.html"), adminPage());
+writeBuiltFile(path.join(OUT_DIR, "desabonnement.html"), desabonnementPage());
 
 console.log("Aucun motif interdit (service_role / sb_secret_ / SUPABASE_SERVICE) trouvé dans la sortie buildée.");
