@@ -109,7 +109,7 @@ const brand = {
 const hero = {
   eyebrow: "Preuve de revenus vérifiés",
   titleLine1: "Ton prochain business commence par une idée, on trouve celle qui te correspond.",
-  prefix: "Transforme-la en site et commence à générer",
+  prefix: "Transforme-la en business qui tourne et génère",
   rotatingPhrases: [
     "tes premiers revenus.",
     "tes premiers clients.",
@@ -610,9 +610,16 @@ function page({ brand, hero, socialProof, notificationStack, pricing, comparison
 
   .hero__title-static {
     display: block;
+    /* Plus petit que la 1ere phrase (hero__title-line1, qui garde la
+       taille pleine de .hero__title) -- hierarchise les deux phrases au
+       lieu de les traiter au meme poids visuel. */
+    font-size: 0.55em;
+    font-weight: 700;
+    color: var(--paper-soft);
   }
 
   .hero__rotator {
+    font-size: 0.55em;
     display: inline-block;
     min-height: 1.2em;
     color: var(--cobalt);
@@ -2484,7 +2491,6 @@ function page({ brand, hero, socialProof, notificationStack, pricing, comparison
               <span class="hero__rotator-text" id="rotator-text">${renderRotatorNoScript(hero.rotatingPhrases)}</span>
             </span>
           </h1>
-          <p class="hero__subhead">${hero.subhead}</p>
           <div class="hero__actions">
             <button type="button" class="btn btn--primary" id="hero-quiz-btn">${hero.ctaPrimary}</button>
             <a class="btn btn--secondary" href="#faq-title">${hero.ctaSecondary}</a>
