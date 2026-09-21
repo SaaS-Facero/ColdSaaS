@@ -6967,9 +6967,29 @@ html, body {
 }
 
 .field.is-filled label,
-.field input:focus + label {
+.field input:focus + label,
+.field input:-webkit-autofill + label,
+.field input:autofill + label {
   transform: translateY(-11px) scale(0.78);
   color: var(--color-cobalt-soft);
+}
+
+/* Détection fiable de l'autofill Chrome/Safari : ces navigateurs ne
+   déclenchent pas toujours un vrai événement 'input' quand ils remplissent
+   le champ (surtout via un gestionnaire de mots de passe tiers), donc le
+   'input.value.length > 0' de initFloatingLabel() peut ne jamais se
+   redéclencher. :-webkit-autofill seul (ci-dessus) suffit pour l'affichage,
+   mais cette animation vide + l'événement 'animationstart' qu'elle déclenche
+   permet à initFloatingLabel() de resynchroniser la classe .is-filled au
+   bon moment plutôt que de dépendre d'un setTimeout arbitraire.
+   Voir https://stackoverflow.com/a/41530164 pour ce pattern. */
+@keyframes onFieldAutofillStart {
+  from {}
+  to {}
+}
+
+.field input:-webkit-autofill {
+  animation-name: onFieldAutofillStart;
 }
 
 .field__check {
@@ -7828,8 +7848,15 @@ function initFloatingLabel(fieldEl) {
   }
   input.addEventListener("input", sync);
   input.addEventListener("blur", sync);
-  // Détection autofill (le navigateur remplit sans déclencher 'input' avant
-  // un premier repaint) : on revérifie après un court délai.
+  // Autofill Chrome/Safari (surtout via un gestionnaire de mots de passe
+  // tiers) : pas toujours de vrai événement 'input', mais :-webkit-autofill
+  // déclenche l'animation vide définie dans authCss() -- 'animationstart' la
+  // capture au moment exact où le navigateur remplit le champ, sans
+  // dépendre d'un setTimeout arbitraire qui peut arriver trop tôt.
+  input.addEventListener("animationstart", function (e) {
+    if (e.animationName === "onFieldAutofillStart") sync();
+  });
+  // Filet de sécurité si l'autofill arrive avant que ce script ne tourne.
   setTimeout(sync, 300);
   sync();
 }
