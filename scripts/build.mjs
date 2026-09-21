@@ -7371,6 +7371,8 @@ html, body {
   font-size: 13px;
   font-family: inherit;
   color: var(--color-paper-soft);
+  text-decoration: none;
+  box-sizing: border-box;
   cursor: pointer;
 }
 
@@ -8663,6 +8665,7 @@ function comptePage() {
             </svg>
           </button>
           <div class="dossier__user-dropdown" id="user-dropdown">
+            <a class="dossier__user-dropdown-item" id="admin-link-btn" href="/admin" style="display:none;">Accéder à l'admin</a>
             <button type="button" class="dossier__user-dropdown-item" id="resend-access-btn" style="display:none;">Renvoyer mon accès par email</button>
             <button type="button" class="dossier__user-dropdown-item" id="signout-btn">Se déconnecter</button>
             <button type="button" class="dossier__user-dropdown-item is-danger" id="delete-account-btn">Supprimer mon compte</button>
@@ -8958,7 +8961,7 @@ function comptePage() {
 
         var profileRes = await supabase
           .from("profiles")
-          .select("intention, budget, temps, secteur, deja_cherche, match_count, paid_at, created_at, prenom")
+          .select("intention, budget, temps, secteur, deja_cherche, match_count, paid_at, created_at, prenom, is_admin")
           .eq("id", user.id)
           .single();
         var profile = profileRes.data || {};
@@ -8971,13 +8974,22 @@ function comptePage() {
         // l'ecran de resultat/paiement au lieu de laisser un /compte sans
         // contenu ni CTA. Voir resumeQuizFromRecoveryLink /
         // resumeToResultScreen dans page().
-        if (profile.match_count === null || profile.match_count === undefined) {
-          window.location.replace("/?resume=quiz");
-          return;
+        // Un compte admin n'a jamais de dossier a completer -- il n'est pas
+        // cense passer le quiz, donc ces deux redirections ne le concernent
+        // jamais, quel que soit l'etat reel de son funnel/paiement.
+        if (!profile.is_admin) {
+          if (profile.match_count === null || profile.match_count === undefined) {
+            window.location.replace("/?resume=quiz");
+            return;
+          }
+          if (!profile.paid_at) {
+            window.location.replace("/?resume=result");
+            return;
+          }
         }
-        if (!profile.paid_at) {
-          window.location.replace("/?resume=result");
-          return;
+
+        if (profile.is_admin) {
+          document.getElementById("admin-link-btn").style.display = "block";
         }
 
         document.getElementById("dossier-day").textContent = "Jour " + (daysSince(profile.created_at) + 1);
