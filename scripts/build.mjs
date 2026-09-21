@@ -1163,10 +1163,13 @@ function page({ brand, hero, socialProof, notificationStack, pricing, comparison
   .faq {
     padding-block: 48px;
     border-top: 1px solid #232936;
+    text-align: center;
   }
 
   .faq__list {
     max-width: 720px;
+    margin: 0 auto;
+    text-align: left;
   }
 
   .faq__item {
@@ -2513,19 +2516,6 @@ function page({ brand, hero, socialProof, notificationStack, pricing, comparison
           ${renderProofItems(socialProof.sources)}
           ${renderProofItems(socialProof.sources, true)}
         </div>
-      </div>
-    </section>
-
-    <section class="compare" aria-labelledby="compare-title">
-      <p class="section-eyebrow">${comparison.eyebrow}</p>
-      <h2 class="section-title" id="compare-title">${comparison.title}</h2>
-      <div class="compare__header">
-        <span>${comparison.columns.criterion}</span>
-        <span>${comparison.columns.ai}</span>
-        <span class="compare__header-col--rich">${comparison.columns.rich}</span>
-      </div>
-      <div class="compare__body">
-        ${renderComparisonRows(comparison)}
       </div>
     </section>
 
@@ -3877,6 +3867,17 @@ function page({ brand, hero, socialProof, notificationStack, pricing, comparison
           propagateAnswerDependencies(id);
           renderTags();
           updateNextEnabled(screenEl);
+
+          // Choix unique : avance automatiquement, pas besoin d'un clic sur
+          // "Continuer" en plus (bouton retiré de ces écrans, voir
+          // renderQuizQuestionScreen). Léger délai pour que la sélection
+          // (et le texte de suivi sur "dejaCherche") reste visible un
+          // instant avant la transition, plutôt qu'un saut instantané.
+          if (type !== "multi") {
+            window.setTimeout(function () {
+              goForwardFromQuestion();
+            }, 450);
+          }
           return;
         }
 
@@ -4261,14 +4262,23 @@ function renderQuizQuestionScreen(question, index) {
       ? `<p class="quiz-followup" id="quiz-followup" aria-live="polite"></p>`
       : "";
 
+  // Choix unique : avance automatiquement au clic (voir le handler
+  // "quiz-option, quiz-chip" plus bas), pas de bouton "Continuer" à
+  // afficher. Choix multiple (secteur) : plusieurs sélections sont
+  // possibles avant de valider, le bouton reste nécessaire.
+  const footerBlock =
+    question.type === "multi"
+      ? `<div class="quiz-footer">
+            <button class="btn btn--primary quiz-next" type="button" disabled>Continuer</button>
+          </div>`
+      : "";
+
   return `<div class="quiz-screen" data-screen="question" data-index="${index}" data-id="${question.id}" data-step-name="${question.stepName}"${skipAttrs}>
           <h2 class="quiz-question-title">${question.title}</h2>
           ${question.subtext ? `<p class="quiz-subtext">${question.subtext}</p>` : ""}
           ${renderQuizOptions(question)}
           ${followupBlock}
-          <div class="quiz-footer">
-            <button class="btn btn--primary quiz-next" type="button" disabled>Continuer</button>
-          </div>
+          ${footerBlock}
         </div>`;
 }
 
