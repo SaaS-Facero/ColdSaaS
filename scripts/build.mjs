@@ -2694,6 +2694,43 @@ function page({ brand, hero, socialProof, notificationStack, pricing, comparison
     transform: scale(1.02);
   }
 
+  /* Toast promo -- bandeau non bloquant, jamais une modale. Chiffres
+     affichés toujours dérivés du compteur reel (promo_codes en base,
+     incrémenté uniquement par stripe-webhook sur paiement confirmé) --
+     jamais un compte à rebours ou une urgence fabriquée. */
+  .promo-toast {
+    margin-top: 16px;
+    padding: 14px 16px;
+    border-radius: 14px;
+    border: 1px solid rgba(0, 196, 140, 0.3);
+    background: rgba(0, 196, 140, 0.06);
+    text-align: left;
+  }
+
+  .promo-toast__text {
+    margin: 0 0 10px;
+    font-size: 13px;
+    line-height: 1.5;
+    color: var(--paper-soft);
+  }
+
+  .promo-toast__text strong {
+    color: var(--verified-green);
+  }
+
+  .promo-toast__cta {
+    display: inline-block;
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--verified-green);
+    text-decoration: none;
+    border-bottom: 1px solid rgba(0, 196, 140, 0.4);
+  }
+
+  .promo-toast__cta:hover {
+    color: var(--verified-green-soft);
+  }
+
   @media (max-width: 380px) {
     .quiz-header,
     .quiz-progress,
@@ -3657,7 +3694,70 @@ function page({ brand, hero, socialProof, notificationStack, pricing, comparison
           });
         }
 
+        showPromoToast();
         transitionTo(paymentScreen, "forward");
+      }
+
+      // Toast non bloquant (jamais une modale) proposant un des 3 codes de
+      // bienvenue, uniquement s'il lui reste des utilisations. Le compteur
+      // vient de promo_codes (lecture publique, écrit uniquement par
+      // stripe-webhook sur un paiement confirmé) -- jamais un chiffre
+      // inventé ou un compte à rebours fabriqué, jamais un code épuisé
+      // affiché comme disponible.
+      function showPromoToast() {
+        var toast = document.getElementById("promo-toast");
+        var supabase = window.ColdTrendSupabase;
+        if (!toast || !supabase) return;
+
+        supabase
+          .from("promo_codes")
+          .select("code, discount_label, max_redemptions, redemptions")
+          .then(function (res) {
+            if (res.error || !res.data) return;
+            var available = res.data.filter(function (row) {
+              return row.redemptions < row.max_redemptions;
+            });
+            if (!available.length) return;
+
+            var chosen = available[Math.floor(Math.random() * available.length)];
+            var remaining = chosen.max_redemptions - chosen.redemptions;
+
+            document.getElementById("promo-toast-text").innerHTML =
+              "Code <strong>" + chosen.code.toUpperCase() + "</strong> (" + chosen.discount_label + ") — plus que " +
+              remaining + " place" + (remaining !== 1 ? "s" : "") + " sur " + chosen.max_redemptions +
+              " (" + chosen.redemptions + " déjà utilisé" + (chosen.redemptions !== 1 ? "s" : "") + ").";
+
+            var ctaLink = document.getElementById("promo-toast-cta");
+            ctaLink.onclick = function (e) {
+              e.preventDefault();
+              applyPromoAndGo(chosen.code);
+            };
+            toast.hidden = false;
+          });
+      }
+
+      // Le Payment Link Stripe est une page hébergée, pas un checkout
+      // qu'on contrôle -- le seul moyen de "poser le code dans le champ
+      // promo" est le paramètre d'URL prévu par Stripe pour ça
+      // (prefilled_promo_code), pas une manipulation de formulaire.
+      function applyPromoAndGo(code) {
+        var supabase = window.ColdTrendSupabase;
+        var payBtn = document.getElementById("quiz-pay-btn");
+        if (!supabase || !payBtn) return;
+        supabase.auth.getUser().then(function (res) {
+          var user = res.data ? res.data.user : null;
+          try {
+            var url = new URL(payBtn.href);
+            url.searchParams.set("prefilled_promo_code", code);
+            if (user) {
+              url.searchParams.set("client_reference_id", user.id);
+              if (user.email) url.searchParams.set("prefilled_email", user.email);
+            }
+            window.location.href = url.toString();
+          } catch (err) {
+            console.warn("[ColdTrend] impossible d'appliquer le code promo :", err);
+          }
+        });
       }
 
       function goForwardFromQuestion() {
@@ -4136,6 +4236,8 @@ function page({ brand, hero, socialProof, notificationStack, pricing, comparison
         if (badge) badge.classList.remove("is-visible");
         var followupEl = document.getElementById("quiz-followup");
         if (followupEl) followupEl.classList.remove("is-visible");
+        var promoToast = document.getElementById("promo-toast");
+        if (promoToast) promoToast.hidden = true;
 
         overlay.classList.add("is-open");
         document.body.style.overflow = "hidden";
@@ -4859,6 +4961,11 @@ function renderQuizOverlay({ quiz, pricing, stripeLink }) {
         </ul>
         <p class="stripe-reassurance">${ICON_LOCK} Paiement sécurisé via <strong>&nbsp;Stripe</strong></p>
         <a class="btn btn--primary btn--cta-final" id="quiz-pay-btn" href="${stripeLink}">Obtenir mon accès — ${pricing.totalPrice}</a>
+
+        <div class="promo-toast" id="promo-toast" hidden>
+          <p class="promo-toast__text" id="promo-toast-text"></p>
+          <a class="promo-toast__cta" id="promo-toast-cta" href="#">Appliquer le code</a>
+        </div>
       </div>
 
       <div class="quiz-screen quiz-resume" data-screen="resume-transition" data-step-name="reprise" id="quiz-resume-transition">

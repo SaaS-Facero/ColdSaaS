@@ -14,6 +14,20 @@
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
+// Correspondance ID Stripe -> code affiché en toast sur l'écran de
+// paiement (voir promo_codes en base). Codés en dur plutôt que lus depuis
+// l'API Stripe : ces ID de Promotion Code sont stables et non sensibles
+// (pas une clé secrète), et ce projet n'a explicitement aucune clé API
+// Stripe (voir commentaire en tête de ce fichier). Le payload du webhook
+// `checkout.session.completed` contient déjà `discounts[].promotion_code`
+// par défaut (pas besoin d'expand) mais seulement sous forme d'ID opaque
+// (`promo_xxx`), jamais le texte humain -- d'où cette table de correspondance.
+const PROMO_CODE_BY_STRIPE_ID: Record<string, string> = {
+  promo_1UIFFqKs6wCNxRh3Pr2CaWeF: "welcome5",
+  promo_1UIFFEKs6wCNxRh3UDJuG9DK: "welcome10",
+  promo_1UIFGWKs6wCNxRh32o3i65UQ: "welcome15"
+};
+
 async function verifyStripeSignature(payload: string, signatureHeader: string | null, secret: string): Promise<boolean> {
   if (!signatureHeader) return false;
   const parts: Record<string, string> = {};
@@ -79,6 +93,24 @@ Deno.serve(async (req) => {
         Deno.env.get("SUPABASE_URL")!,
         Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
       );
+
+      // Compteur maison du toast de l'écran de paiement -- incrémenté
+      // uniquement ici, sur un paiement réellement confirmé (jamais côté
+      // client, jamais de manière optimiste à l'affichage ou au clic).
+      // `discounts` est présent par défaut sur l'objet Checkout Session,
+      // sans expand, mais chaque entrée ne donne que l'ID Stripe opaque du
+      // Promotion Code -- PROMO_CODE_BY_STRIPE_ID fait la traduction.
+      const discounts = Array.isArray(session["discounts"]) ? (session["discounts"] as Array<Record<string, unknown>>) : [];
+      for (const discount of discounts) {
+        const promoStripeId = discount["promotion_code"];
+        if (typeof promoStripeId !== "string") continue;
+        const code = PROMO_CODE_BY_STRIPE_ID[promoStripeId];
+        if (!code) continue;
+        const { error: incrementError } = await supabaseAdmin.rpc("increment_promo_redemption", { p_code: code });
+        if (incrementError) {
+          console.error("[stripe-webhook] échec incrément promo_codes :", incrementError.message);
+        }
+      }
 
       // Deux Payment Links distincts partagent ce webhook : l'accès principal
       // (15€) encode juste l'UUID utilisateur dans client_reference_id ;
