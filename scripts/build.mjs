@@ -110,10 +110,9 @@ const hero = {
   eyebrow: "Preuve de revenus vérifiés",
   prefix: "Découvrez des SaaS avec",
   rotatingPhrases: [
-    "Stripe vérifié",
-    "MRR réel",
-    "Zéro invention",
-    "Audité, pas généré"
+    "preuves vérifiées",
+    "revenus audités",
+    "données Stripe"
   ],
   subhead:
     "ColdTrend indexe des SaaS à vendre ou à copier sur la base de revenus vérifiés — pas d'idées générées par IA, pas de promesses en l'air.",
@@ -483,10 +482,26 @@ function page({ brand, hero, socialProof, notificationStack, pricing, comparison
   /* ---------------- Hero ---------------- */
 
   .hero {
-    padding-block: 56px 40px;
+    position: relative;
+    padding-block: 76px 56px;
+  }
+
+  .hero__pattern {
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+  }
+
+  @media (max-width: 639px) {
+    .hero__pattern-line--desktop-only { display: none; }
   }
 
   .hero__grid {
+    position: relative;
+    z-index: 1;
     display: grid;
     grid-template-columns: 1fr;
     align-items: center;
@@ -587,6 +602,9 @@ function page({ brand, hero, socialProof, notificationStack, pricing, comparison
     display: inline-block;
     min-height: 1.2em;
     color: var(--cobalt);
+    /* Plus léger que le texte fixe (800 sur .hero__title) -- effet "accent
+       qui respire" : pas juste une couleur différente, un poids différent. */
+    font-weight: 600;
     white-space: nowrap;
     overflow: hidden;
     text-align: left;
@@ -742,12 +760,16 @@ function page({ brand, hero, socialProof, notificationStack, pricing, comparison
   }
 
   .ns-root {
-    width: 300px;
+    width: 355px;
     max-width: 100%;
+    /* Deborde legerement du cadre du hero en haut pour casser l'alignement
+       trop sage -- le padding-top du hero (76px, ou plus en desktop via le
+       gap de grille) laisse largement la place sans jamais clipper. */
+    transform: translateY(-24px);
   }
 
   @media (min-width: 960px) {
-    .ns-root { width: 340px; }
+    .ns-root { width: 400px; }
   }
 
   .ns-phone {
@@ -2392,6 +2414,20 @@ function page({ brand, hero, socialProof, notificationStack, pricing, comparison
 <body>
   <main class="wrap">
     <section class="hero">
+      <svg class="hero__pattern" aria-hidden="true" viewBox="0 0 800 600" preserveAspectRatio="xMidYMid slice">
+        <defs>
+          <pattern id="hero-dots" width="32" height="32" patternUnits="userSpaceOnUse">
+            <circle cx="2" cy="2" r="1.4" fill="#8A8F98" />
+          </pattern>
+        </defs>
+        <rect width="800" height="600" fill="url(#hero-dots)" opacity="0.05" />
+        <g stroke="#8A8F98" stroke-width="1" opacity="0.06" fill="none">
+          <line x1="90" y1="70" x2="270" y2="190" />
+          <line x1="600" y1="310" x2="740" y2="130" />
+          <line class="hero__pattern-line--desktop-only" x1="430" y1="40" x2="570" y2="230" />
+          <line class="hero__pattern-line--desktop-only" x1="150" y1="410" x2="350" y2="490" />
+        </g>
+      </svg>
       <div class="hero__grid">
         <div class="hero__copy">
           <div class="brand-bar">
