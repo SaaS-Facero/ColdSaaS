@@ -510,7 +510,7 @@ function page({ brand, hero, socialProof, notificationStack, pricing, comparison
 
   @media (min-width: 960px) {
     .hero__grid {
-      grid-template-columns: 1.1fr 0.9fr;
+      grid-template-columns: 1.25fr 0.75fr;
       gap: 32px;
     }
   }
@@ -587,7 +587,7 @@ function page({ brand, hero, socialProof, notificationStack, pricing, comparison
   }
 
   .hero__title {
-    font-size: clamp(28px, 7vw, 52px);
+    font-size: clamp(30px, 7.5vw, 60px);
     line-height: 1.15;
     font-weight: 800;
     letter-spacing: -0.02em;
@@ -759,6 +759,10 @@ function page({ brand, hero, socialProof, notificationStack, pricing, comparison
     justify-content: center;
   }
 
+  @media (min-width: 960px) {
+    .hero__visual { justify-content: flex-end; }
+  }
+
   .ns-root {
     width: 355px;
     max-width: 100%;
@@ -766,6 +770,10 @@ function page({ brand, hero, socialProof, notificationStack, pricing, comparison
        trop sage -- le padding-top du hero (76px, ou plus en desktop via le
        gap de grille) laisse largement la place sans jamais clipper. */
     transform: translateY(-24px);
+  }
+
+  @media (min-width: 960px) {
+    .ns-root { transform: translateY(-24px) translateX(24px); }
   }
 
   @media (min-width: 960px) {
