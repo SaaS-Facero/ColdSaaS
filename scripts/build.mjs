@@ -108,7 +108,8 @@ const brand = {
 
 const hero = {
   eyebrow: "Preuve de revenus vérifiés",
-  titleLine1: "Ton prochain business commence par une idée, on trouve celle qui te correspond.",
+  titleLine1a: "Ton prochain business commence par une idée,",
+  titleLine1b: "on trouve celle qui te correspond.",
   prefix: "Transforme-la en business qui tourne et génère",
   rotatingPhrases: [
     "tes premiers revenus.",
@@ -608,8 +609,28 @@ function page({ brand, hero, socialProof, notificationStack, pricing, comparison
     margin-bottom: 14px;
   }
 
+  /* Deuxieme partie de la 1ere phrase, en gris degrade -- distincte du
+     debut de phrase qui reste en blanc plein. */
+  .hero__title-line1-muted {
+    background: linear-gradient(180deg, #C5CAD6 0%, #7A8092 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+
+  /* Texte fixe + rotator cote a cote sur la meme ligne (inline-flex,
+     jamais en display:block separe qui les empilait avant) -- passe a la
+     ligne suivante EN BLOC (flex-wrap) si la largeur disponible ne suffit
+     pas, plutot qu'un rotator qui deborde et se coupe. */
+  .hero__title-line2 {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    column-gap: 0.3em;
+    row-gap: 4px;
+  }
+
   .hero__title-static {
-    display: block;
     /* Plus petit que la 1ere phrase (hero__title-line1, qui garde la
        taille pleine de .hero__title) -- hierarchise les deux phrases au
        lieu de les traiter au meme poids visuel. */
@@ -785,23 +806,27 @@ function page({ brand, hero, socialProof, notificationStack, pricing, comparison
   }
 
   .ns-root {
-    width: 355px;
+    /* Revenu a une taille proche de l'original (300px), legerement en
+       dessous -- la version agrandie (355px) dominait trop le bloc de
+       texte a gauche. */
+    width: 280px;
     max-width: 100%;
-    /* Deborde legerement du cadre du hero en haut pour casser l'alignement
-       trop sage -- le padding-top du hero (76px, ou plus en desktop via le
-       gap de grille) laisse largement la place sans jamais clipper. */
-    transform: translateY(-24px);
+    /* Leger debordement, beaucoup plus discret qu'avant (-24px) pour que
+       le telephone reste centre par rapport au bloc de texte une fois
+       reduit, au lieu de sembler decale vers le haut. */
+    transform: translateY(-8px);
   }
 
   @keyframes phone-float {
-    0%, 100% { transform: translateY(-24px) translateX(48px); }
-    50% { transform: translateY(-36px) translateX(48px); }
+    0%, 100% { transform: translateY(-8px) translateX(16px); }
+    50% { transform: translateY(-18px) translateX(16px); }
   }
 
   @media (min-width: 960px) {
-    /* Colle a droite (translateX plus marque qu'avant) + leger flottement
-       vertical continu -- casse encore plus l'alignement statique. */
-    .ns-root { transform: translateY(-24px) translateX(48px); }
+    /* Decalage vers la droite beaucoup plus leger qu'avant (48px -> 16px)
+       -- le telephone plus petit n'a plus besoin d'un grand decalage pour
+       eviter de se coller au texte. */
+    .ns-root { transform: translateY(-8px) translateX(16px); }
   }
 
   @media (min-width: 960px) and (prefers-reduced-motion: no-preference) {
@@ -809,7 +834,7 @@ function page({ brand, hero, socialProof, notificationStack, pricing, comparison
   }
 
   @media (min-width: 960px) {
-    .ns-root { width: 400px; }
+    .ns-root { width: 300px; }
   }
 
   .ns-phone {
@@ -2485,10 +2510,12 @@ function page({ brand, hero, socialProof, notificationStack, pricing, comparison
             ${hero.eyebrow}
           </span>
           <h1 class="hero__title">
-            <span class="hero__title-line1">${hero.titleLine1}</span>
-            <span class="hero__title-static">${hero.prefix}</span>
-            <span class="hero__rotator" id="rotator" aria-live="polite">
-              <span class="hero__rotator-text" id="rotator-text">${renderRotatorNoScript(hero.rotatingPhrases)}</span>
+            <span class="hero__title-line1">${hero.titleLine1a} <span class="hero__title-line1-muted">${hero.titleLine1b}</span></span>
+            <span class="hero__title-line2">
+              <span class="hero__title-static">${hero.prefix}</span>
+              <span class="hero__rotator" id="rotator" aria-live="polite">
+                <span class="hero__rotator-text" id="rotator-text">${renderRotatorNoScript(hero.rotatingPhrases)}</span>
+              </span>
             </span>
           </h1>
           <div class="hero__actions">
