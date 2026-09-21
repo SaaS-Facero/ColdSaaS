@@ -2547,6 +2547,74 @@ function page({ brand, hero, socialProof, notificationStack, pricing, comparison
     color: var(--paper-soft);
   }
 
+  /* Écran de transition "Mon dossier" -- checklist façon reçu (preuve de ce
+     qui est déjà vérifié) + barre de progression réelle, pas un message
+     d'accueil générique. */
+  .quiz-resume__progress-track {
+    width: 100%;
+    height: 6px;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.08);
+    overflow: hidden;
+    margin: 4px 0 10px;
+  }
+
+  .quiz-resume__progress-fill {
+    height: 100%;
+    width: 0%;
+    background: var(--verified-green);
+    transition: width 500ms cubic-bezier(0.22, 1, 0.36, 1);
+  }
+
+  .quiz-resume__progress-label {
+    font-size: 13px;
+    color: var(--steel);
+    margin: 0 0 28px;
+  }
+
+  .quiz-resume__checklist {
+    list-style: none;
+    margin: 0 0 32px;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .quiz-resume__item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 16px;
+    border-radius: 12px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    background: rgba(255, 255, 255, 0.02);
+    font-size: 14px;
+    color: var(--steel);
+  }
+
+  .quiz-resume__item-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 20px;
+    height: 20px;
+    flex-shrink: 0;
+    border-radius: 50%;
+    border: 1.5px solid rgba(255, 255, 255, 0.16);
+  }
+
+  .quiz-resume__item.is-checked {
+    color: var(--paper-soft);
+    border-color: rgba(0, 196, 140, 0.3);
+    background: rgba(0, 196, 140, 0.06);
+  }
+
+  .quiz-resume__item.is-checked .quiz-resume__item-icon {
+    border-color: var(--verified-green);
+    color: var(--verified-green);
+  }
+
   .quiz-payment__teaser {
     background: rgba(255, 255, 255, 0.03);
     border: 1px solid rgba(255, 255, 255, 0.08);
@@ -4303,14 +4371,153 @@ function page({ brand, hero, socialProof, notificationStack, pricing, comparison
         }
       })();
 
+      // Checklist "façon reçu" affichée avant de rouvrir les questions --
+      // chaque champ déjà en base est une ligne vérifiée, pas un simple %.
+      // L'ordre suit TAG_ORDER (déjà utilisé pour les tags de résumé) pour
+      // ne pas introduire un deuxième référentiel d'ordre des questions.
+      var RESUME_CHECKLIST_LABELS = {
+        intention: "Intention",
+        budget: "Budget",
+        temps: "Temps disponible",
+        secteur: "Secteur visé",
+        dejaCherche: "Contexte de recherche"
+      };
+
+      function resumeChecklistItems(profile) {
+        var fieldMap = {
+          intention: profile.intention,
+          budget: profile.budget,
+          temps: profile.temps,
+          secteur: profile.secteur,
+          dejaCherche: profile.deja_cherche
+        };
+        return TAG_ORDER.filter(function (id) {
+          // budget est sauté (pas juste "vide") si intention = copier --
+          // on ne compte pas une case qui ne sera jamais posée contre
+          // l'utilisateur dans son taux de complétion.
+          if (id === "budget" && profile.intention === "copier") return false;
+          return true;
+        }).map(function (id) {
+          var value = fieldMap[id];
+          var isChecked = id === "secteur" ? !!(value && value.length) : value !== null && value !== undefined && value !== "";
+          return { id: id, label: RESUME_CHECKLIST_LABELS[id], checked: isChecked };
+        });
+      }
+
+      // Injecté au build (pas ${'$'}{ICON_CHECK_SMALL} directement : ici on est
+      // dans du JS client, pas dans un template HTML) -- même icône que les
+      // autres checks du quiz (options sélectionnées, badge connecté...).
+      var RESUME_CHECK_ICON = ${JSON.stringify(ICON_CHECK_SMALL)};
+
+      function renderResumeChecklist(profile) {
+        var items = resumeChecklistItems(profile);
+        var checkedCount = items.filter(function (item) { return item.checked; }).length;
+
+        var listEl = document.getElementById("resume-checklist");
+        listEl.innerHTML = items
+          .map(function (item) {
+            return (
+              '<li class="quiz-resume__item' + (item.checked ? " is-checked" : "") + '">' +
+              '<span class="quiz-resume__item-icon" aria-hidden="true">' + (item.checked ? RESUME_CHECK_ICON : "") + "</span>" +
+              "<span>" + item.label + "</span>" +
+              "</li>"
+            );
+          })
+          .join("");
+
+        var pct = items.length ? Math.round((checkedCount / items.length) * 100) : 0;
+        document.getElementById("resume-progress-fill").style.width = pct + "%";
+        document.getElementById("resume-progress-label").textContent =
+          checkedCount + " réponse" + (checkedCount !== 1 ? "s" : "") + " vérifiée" + (checkedCount !== 1 ? "s" : "") + " sur " + items.length;
+
+        var titleEl = document.getElementById("resume-title");
+        if (titleEl) {
+          titleEl.textContent = profile.prenom
+            ? profile.prenom + ", ton dossier est vérifié à " + pct + "%."
+            : "Ton dossier est vérifié à " + pct + "%.";
+        }
+      }
+
       // Retour depuis le lien de relance d'abandon (email envoyé par
-      // supabase/functions/send-abandon-emails) : ?resume=quiz redirige ici
-      // avec un magic link qui vient d'établir la session. On rouvre le
-      // quiz — determineStartIndex() se charge de reprendre au bon écran,
-      // exactement comme pour Google ou email/mot de passe.
+      // supabase/functions/send-abandon-emails) ou depuis "Mon dossier" dans
+      // le header (voir comptePage() : redirection quand match_count n'est
+      // pas encore renseigné) : ?resume=quiz redirige ici avec une session
+      // déjà établie. Plutôt que de rouvrir directement sur la question
+      // suivante (silencieux, aucune indication de ce qui a déjà été
+      // répondu), on affiche d'abord un écran de transition "façon reçu" --
+      // cohérent avec le positionnement preuve/vérification du reste du
+      // site -- puis determineStartIndex() reprend au bon écran une fois
+      // "Terminer mon dossier" cliqué.
       (function resumeQuizFromRecoveryLink() {
         var params = new URLSearchParams(window.location.search);
         if (params.get("resume") !== "quiz") return;
+
+        params.delete("resume");
+        var cleanUrl = window.location.pathname + (params.toString() ? "?" + params.toString() : "");
+        window.history.replaceState({}, "", cleanUrl);
+
+        function openTransitionScreen(profile) {
+          renderResumeChecklist(profile);
+          overlay.classList.add("is-open");
+          document.body.style.overflow = "hidden";
+          resetScreensVisualState();
+          setProgress(0, true);
+          currentScreenEl = null;
+          var transitionScreen = document.getElementById("quiz-resume-transition");
+          transitionTo(transitionScreen, "forward");
+
+          var continueBtn = document.getElementById("resume-continue-btn");
+          continueBtn.onclick = function () {
+            determineStartIndex().then(function (startIndex) {
+              currentQuestionIndex = startIndex;
+              setProgress(startIndex, true);
+              var screenEl = questionScreens[startIndex];
+              updateNextEnabled(screenEl);
+              transitionTo(screenEl, "forward");
+            });
+          };
+        }
+
+        function tryResume() {
+          var supabase = window.ColdTrendSupabase;
+          if (!supabase) return;
+          supabase.auth.getSession().then(function (res) {
+            var user = res.data.session ? res.data.session.user : null;
+            if (!user) return;
+            // Quiz déjà qualifié (match_count renseigné) : rien à reprendre,
+            // ?resume=result est le chemin dédié à ce cas -- ici on se
+            // contente d'un fallback vers l'ouverture normale du quiz.
+            supabase
+              .from("profiles")
+              .select("intention, budget, temps, secteur, deja_cherche, match_count, prenom")
+              .eq("id", user.id)
+              .single()
+              .then(function (profileRes) {
+                var profile = profileRes.data;
+                if (!profile || (profile.match_count !== null && profile.match_count !== undefined)) {
+                  openQuiz();
+                  return;
+                }
+                openTransitionScreen(profile);
+              });
+          });
+        }
+
+        if (window.ColdTrendSupabase) {
+          tryResume();
+        } else {
+          document.addEventListener("coldtrend:supabase-ready", tryResume, { once: true });
+        }
+      })();
+
+      // Retour depuis "Mon dossier" quand le quiz est déjà qualifié
+      // (match_count renseigné) mais pas encore payé : reconstruit l'écran
+      // résultat/paiement directement depuis profiles, sans repasser par les
+      // questions déjà répondues (goToResult() lit `answers`, pas la base --
+      // on le remplit à la main avant de l'appeler).
+      (function resumeToResultScreen() {
+        var params = new URLSearchParams(window.location.search);
+        if (params.get("resume") !== "result") return;
 
         params.delete("resume");
         var cleanUrl = window.location.pathname + (params.toString() ? "?" + params.toString() : "");
@@ -4320,7 +4527,33 @@ function page({ brand, hero, socialProof, notificationStack, pricing, comparison
           var supabase = window.ColdTrendSupabase;
           if (!supabase) return;
           supabase.auth.getSession().then(function (res) {
-            if (res.data.session) openQuiz();
+            var user = res.data.session ? res.data.session.user : null;
+            if (!user) return;
+            supabase
+              .from("profiles")
+              .select("intention, budget, temps, secteur, deja_cherche, match_count")
+              .eq("id", user.id)
+              .single()
+              .then(function (profileRes) {
+                var profile = profileRes.data;
+                if (!profile || profile.match_count === null || profile.match_count === undefined) {
+                  openQuiz();
+                  return;
+                }
+                answers.intention = profile.intention || undefined;
+                answers.budget = profile.budget || undefined;
+                answers.temps = profile.temps || undefined;
+                answers.secteur = profile.secteur || undefined;
+                if (profile.deja_cherche === true) answers.dejaCherche = "yes";
+                else if (profile.deja_cherche === false) answers.dejaCherche = "no";
+                answers.matchCount = profile.match_count;
+
+                overlay.classList.add("is-open");
+                document.body.style.overflow = "hidden";
+                resetScreensVisualState();
+                currentScreenEl = null;
+                goToResult();
+              });
           });
         }
 
@@ -4626,6 +4859,16 @@ function renderQuizOverlay({ quiz, pricing, stripeLink }) {
         </ul>
         <p class="stripe-reassurance">${ICON_LOCK} Paiement sécurisé via <strong>&nbsp;Stripe</strong></p>
         <a class="btn btn--primary btn--cta-final" id="quiz-pay-btn" href="${stripeLink}">Obtenir mon accès — ${pricing.totalPrice}</a>
+      </div>
+
+      <div class="quiz-screen quiz-resume" data-screen="resume-transition" data-step-name="reprise" id="quiz-resume-transition">
+        <h2 class="quiz-question-title" id="resume-title">Ton dossier est en cours de vérification.</h2>
+        <div class="quiz-resume__progress-track" aria-hidden="true">
+          <div class="quiz-resume__progress-fill" id="resume-progress-fill"></div>
+        </div>
+        <p class="quiz-resume__progress-label" id="resume-progress-label"></p>
+        <ul class="quiz-resume__checklist" id="resume-checklist"></ul>
+        <button class="btn btn--primary btn--full" id="resume-continue-btn" type="button">Terminer mon dossier</button>
       </div>
     </div>
   </div>`;
@@ -6572,11 +6815,87 @@ html, body {
 }
 
 .auth-shell {
+  position: relative;
   min-height: 100dvh;
   display: flex;
   align-items: center;
   justify-content: center;
   padding: 24px;
+  overflow: hidden;
+}
+
+/* Fond du hero repris à l'identique (motif points/lignes) sur /connexion
+   uniquement -- dérive lente en boucle, pas une simple image statique, mais
+   assez discrète pour ne pas distraire sur un écran de connexion. */
+.auth-bg-pattern {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 0;
+  animation: authBgDrift 40s linear infinite;
+}
+
+.auth-card {
+  position: relative;
+  z-index: 1;
+}
+
+@keyframes authBgDrift {
+  0% { transform: translate(0, 0); }
+  50% { transform: translate(-1.5%, 1%); }
+  100% { transform: translate(0, 0); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .auth-bg-pattern { animation: none; }
+}
+
+/* Bouton Google + séparateur -- repris à l'identique de l'écran d'auth du
+   quiz (scripts/build.mjs, quiz-google-btn/quiz-auth-divider), avec les
+   tokens --color-* des pages d'auth au lieu de ceux de l'accueil. */
+.quiz-google-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  width: 100%;
+  padding: 13px 16px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: #fff;
+  color: #1F1F1F;
+  font-size: 15px;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+  margin-bottom: 16px;
+  transition: transform 180ms cubic-bezier(0.22, 1.26, 0.36, 1), box-shadow 180ms ease;
+}
+
+.quiz-google-btn:hover {
+  box-shadow: 0 6px 18px -6px rgba(255, 255, 255, 0.35);
+}
+
+.quiz-google-btn:active {
+  transform: scale(0.98);
+}
+
+.quiz-auth-divider {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 0 0 18px;
+  color: var(--color-steel);
+  font-size: 12px;
+}
+
+.quiz-auth-divider::before,
+.quiz-auth-divider::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: rgba(255, 255, 255, 0.1);
 }
 
 .auth-card {
@@ -7632,11 +7951,30 @@ ${crispWidgetScript()}
 
 function connexionPage() {
   const body = `  <div class="auth-shell">
+    <svg class="auth-bg-pattern" aria-hidden="true" viewBox="0 0 800 600" preserveAspectRatio="xMidYMid slice">
+      <defs>
+        <pattern id="auth-dots" width="28" height="28" patternUnits="userSpaceOnUse">
+          <circle cx="2" cy="2" r="1.8" fill="#B8BCC4" />
+        </pattern>
+      </defs>
+      <rect width="800" height="600" fill="url(#auth-dots)" opacity="0.16" />
+      <g stroke="#B8BCC4" stroke-width="1.2" opacity="0.16" fill="none">
+        <line x1="90" y1="70" x2="270" y2="190" />
+        <line x1="600" y1="310" x2="740" y2="130" />
+        <line x1="430" y1="40" x2="570" y2="230" />
+        <line x1="150" y1="410" x2="350" y2="490" />
+      </g>
+    </svg>
     <div class="auth-card">
       <a class="auth-brand" href="/">${brand.name}</a>
       <h1 class="auth-title">Se connecter</h1>
       <p class="auth-subtitle">Retrouve ta sélection de SaaS vérifiés.</p>
       <div class="auth-banner auth-banner--alert" id="login-error" style="display:none;"></div>
+      <button type="button" class="quiz-google-btn" id="login-google-btn">
+        ${ICON_GOOGLE}
+        Continuer avec Google
+      </button>
+      <div class="quiz-auth-divider"><span>ou</span></div>
       <form id="login-form" novalidate>
         ${authField({ id: "login-email", label: "Email", type: "email", autocomplete: "email" })}
         ${authField({ id: "login-password", label: "Mot de passe", type: "password", autocomplete: "current-password" })}
@@ -7661,6 +7999,22 @@ function connexionPage() {
       var loadingState = initButtonLoadingState(submitBtn);
       initFloatingLabel(document.getElementById("field-login-email"));
       initFloatingLabel(document.getElementById("field-login-password"));
+
+      // Redirige vers /compte plutôt que "/" : sa propre logique (déjà en
+      // place pour "Mon dossier" dans le header) décide ensuite où envoyer
+      // l'utilisateur selon l'état réel du dossier (quiz à reprendre,
+      // résultat à débloquer, ou dossier complet) -- pas de double
+      // implémentation de cette décision ici.
+      var googleBtn = document.getElementById("login-google-btn");
+      if (googleBtn) {
+        googleBtn.addEventListener("click", function () {
+          if (!window.ColdTrendSupabase) return;
+          window.ColdTrendSupabase.auth.signInWithOAuth({
+            provider: "google",
+            options: { redirectTo: window.location.origin + "/compte" }
+          });
+        });
+      }
 
       function showError(message) {
         errorBanner.textContent = message;
@@ -8403,11 +8757,27 @@ function comptePage() {
 
         var profileRes = await supabase
           .from("profiles")
-          .select("intention, budget, temps, secteur, deja_cherche, match_count, paid_at, created_at")
+          .select("intention, budget, temps, secteur, deja_cherche, match_count, paid_at, created_at, prenom")
           .eq("id", user.id)
           .single();
         var profile = profileRes.data || {};
         if (!profile.created_at) profile.created_at = user.created_at;
+
+        // Pas de dossier a montrer tant que le quiz n'est pas qualifie --
+        // renvoie vers la reprise (ecran de transition dedie) plutot que
+        // d'afficher un /compte vide. Une fois le quiz termine (match_count
+        // renseigne par persistQuizAnswers) mais sans paiement, renvoie vers
+        // l'ecran de resultat/paiement au lieu de laisser un /compte sans
+        // contenu ni CTA. Voir resumeQuizFromRecoveryLink /
+        // resumeToResultScreen dans page().
+        if (profile.match_count === null || profile.match_count === undefined) {
+          window.location.replace("/?resume=quiz");
+          return;
+        }
+        if (!profile.paid_at) {
+          window.location.replace("/?resume=result");
+          return;
+        }
 
         document.getElementById("dossier-day").textContent = "Jour " + (daysSince(profile.created_at) + 1);
         document.getElementById("dossier-context").textContent = contextLine(profile);
