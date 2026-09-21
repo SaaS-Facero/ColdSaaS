@@ -108,7 +108,7 @@ const brand = {
 
 const hero = {
   eyebrow: "Preuve de revenus vérifiés",
-  prefix: "Découvrez des SaaS avec",
+  prefix: "Trouve ton SaaS avec",
   rotatingPhrases: [
     "preuves vérifiées",
     "revenus audités",
@@ -2416,12 +2416,12 @@ function page({ brand, hero, socialProof, notificationStack, pricing, comparison
     <section class="hero">
       <svg class="hero__pattern" aria-hidden="true" viewBox="0 0 800 600" preserveAspectRatio="xMidYMid slice">
         <defs>
-          <pattern id="hero-dots" width="32" height="32" patternUnits="userSpaceOnUse">
-            <circle cx="2" cy="2" r="1.4" fill="#8A8F98" />
+          <pattern id="hero-dots" width="28" height="28" patternUnits="userSpaceOnUse">
+            <circle cx="2" cy="2" r="1.8" fill="#B8BCC4" />
           </pattern>
         </defs>
-        <rect width="800" height="600" fill="url(#hero-dots)" opacity="0.05" />
-        <g stroke="#8A8F98" stroke-width="1" opacity="0.06" fill="none">
+        <rect width="800" height="600" fill="url(#hero-dots)" opacity="0.16" />
+        <g stroke="#B8BCC4" stroke-width="1.2" opacity="0.16" fill="none">
           <line x1="90" y1="70" x2="270" y2="190" />
           <line x1="600" y1="310" x2="740" y2="130" />
           <line class="hero__pattern-line--desktop-only" x1="430" y1="40" x2="570" y2="230" />
