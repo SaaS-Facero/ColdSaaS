@@ -2952,6 +2952,7 @@ function page({ brand, hero, socialProof, notificationStack, pricing, comparison
       var navHistory = [];
       var currentScreenEl = null;
       var currentQuestionIndex = 0;
+      var multiAdvanceTimer = null;
       var reachedResult = false;
       var transitionInProgress = false;
       // editContext non-null pendant une édition ponctuelle depuis un tag :
@@ -3827,6 +3828,10 @@ function page({ brand, hero, socialProof, notificationStack, pricing, comparison
         }
         overlay.classList.remove("is-open");
         document.body.style.overflow = "";
+        if (multiAdvanceTimer) {
+          window.clearTimeout(multiAdvanceTimer);
+          multiAdvanceTimer = null;
+        }
       }
 
       stage.addEventListener("click", function (e) {
@@ -3868,12 +3873,28 @@ function page({ brand, hero, socialProof, notificationStack, pricing, comparison
           renderTags();
           updateNextEnabled(screenEl);
 
-          // Choix unique : avance automatiquement, pas besoin d'un clic sur
-          // "Continuer" en plus (bouton retiré de ces écrans, voir
-          // renderQuizQuestionScreen). Léger délai pour que la sélection
-          // (et le texte de suivi sur "dejaCherche") reste visible un
-          // instant avant la transition, plutôt qu'un saut instantané.
-          if (type !== "multi") {
+          // Avance automatiquement sur tous les ecrans a options, plus de
+          // bouton "Continuer" (voir renderQuizQuestionScreen). Choix
+          // unique : delai court, juste le temps de voir la selection (et
+          // le texte de suivi sur "dejaCherche"). Choix multiple (secteur) :
+          // debounce plus long, reinitialise a chaque clic -- laisse le
+          // temps de cocher plusieurs cases avant de partir, sans jamais
+          // partir avant que l'utilisateur arrete de cliquer.
+          if (multiAdvanceTimer) {
+            window.clearTimeout(multiAdvanceTimer);
+            multiAdvanceTimer = null;
+          }
+          if (type === "multi") {
+            // Ne programme l'avance que s'il reste au moins une selection --
+            // decocher la derniere case ne doit jamais faire avancer avec
+            // une reponse vide (meme regle que l'ancien bouton disabled).
+            if (answers[id] && answers[id].length > 0) {
+              multiAdvanceTimer = window.setTimeout(function () {
+                multiAdvanceTimer = null;
+                goForwardFromQuestion();
+              }, 1100);
+            }
+          } else {
             window.setTimeout(function () {
               goForwardFromQuestion();
             }, 450);
@@ -3914,6 +3935,13 @@ function page({ brand, hero, socialProof, notificationStack, pricing, comparison
 
       backBtn.addEventListener("click", function () {
         if (navHistory.length === 0) return;
+        // Annule une avance automatique en attente (ecran secteur) : cliquer
+        // Retour pendant le debounce ne doit jamais declencher un forward
+        // programme juste apres.
+        if (multiAdvanceTimer) {
+          window.clearTimeout(multiAdvanceTimer);
+          multiAdvanceTimer = null;
+        }
         // Le bouton Retour classique navigue dans l'historique normal du
         // quiz, pas dans le point de retour d'une édition ponctuelle — les
         // deux mécanismes ne doivent jamais se mélanger.
@@ -4262,16 +4290,12 @@ function renderQuizQuestionScreen(question, index) {
       ? `<p class="quiz-followup" id="quiz-followup" aria-live="polite"></p>`
       : "";
 
-  // Choix unique : avance automatiquement au clic (voir le handler
-  // "quiz-option, quiz-chip" plus bas), pas de bouton "Continuer" à
-  // afficher. Choix multiple (secteur) : plusieurs sélections sont
-  // possibles avant de valider, le bouton reste nécessaire.
-  const footerBlock =
-    question.type === "multi"
-      ? `<div class="quiz-footer">
-            <button class="btn btn--primary quiz-next" type="button" disabled>Continuer</button>
-          </div>`
-      : "";
+  // Avance automatiquement au clic sur tous les écrans à options (voir le
+  // handler "quiz-option, quiz-chip" plus bas) -- jamais de bouton
+  // "Continuer" a afficher. Le choix multiple (secteur) utilise un delai
+  // plus long (debounce, reinitialise a chaque clic) pour laisser le temps
+  // de cocher plusieurs cases avant de partir.
+  const footerBlock = "";
 
   return `<div class="quiz-screen" data-screen="question" data-index="${index}" data-id="${question.id}" data-step-name="${question.stepName}"${skipAttrs}>
           <h2 class="quiz-question-title">${question.title}</h2>
