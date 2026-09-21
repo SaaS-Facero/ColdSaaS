@@ -597,6 +597,21 @@ function page({ brand, hero, socialProof, notificationStack, pricing, comparison
     font-size: 14px;
   }
 
+  /* Renfort visuel du CTA principal du header : deja en Cobalt Blue plein,
+     mais doit capter l'oeil immediatement meme dans une nav chargee -- glow
+     au repos (pas seulement au hover) + leger surdimensionnement vs FAQ/auth. */
+  #nav-cta-btn {
+    padding: 11px 22px;
+    font-size: 15px;
+    box-shadow: 0 0 0 1px rgba(0, 71, 255, 0.35), 0 4px 18px rgba(0, 71, 255, 0.45);
+    transition: box-shadow 0.2s ease, transform 0.2s ease;
+  }
+
+  #nav-cta-btn:hover {
+    box-shadow: 0 0 0 1px rgba(0, 71, 255, 0.5), 0 6px 24px rgba(0, 71, 255, 0.6);
+    transform: translateY(-1px);
+  }
+
   .site-nav__burger {
     display: flex;
     flex-direction: column;
@@ -2627,8 +2642,14 @@ function page({ brand, hero, socialProof, notificationStack, pricing, comparison
     <div class="site-nav__inner wrap">
       <a class="site-nav__brand" href="/">
         <svg class="site-nav__logo" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-          <rect x="1" y="1" width="30" height="30" rx="9" fill="none" stroke="#0047FF" stroke-width="1.6"/>
-          <path d="M9 20l5-8 4 5 5-9" stroke="#0047FF" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+          <path d="M16 2l11 4v8c0 7.2-4.7 12.6-11 16-6.3-3.4-11-8.8-11-16V6l11-4z" stroke="#0047FF" stroke-width="1.6" stroke-linejoin="round"/>
+          <circle cx="11" cy="13" r="1.3" fill="#0047FF"/>
+          <circle cx="16" cy="9" r="1.3" fill="#0047FF"/>
+          <circle cx="21" cy="13" r="1.3" fill="#0047FF"/>
+          <path d="M11 13l5-4 5 4" stroke="#0047FF" stroke-width="1.3" stroke-linecap="round"/>
+          <rect x="10.5" y="18" width="2.4" height="5" rx="0.6" fill="#0047FF"/>
+          <rect x="14.8" y="15.5" width="2.4" height="7.5" rx="0.6" fill="#0047FF"/>
+          <rect x="19.1" y="17" width="2.4" height="6" rx="0.6" fill="#0047FF"/>
         </svg>
         <span class="site-nav__wordmark">
           <span class="site-nav__name">${brand.name}</span>
@@ -7369,8 +7390,12 @@ function authStateJs() {
     var slots = document.querySelectorAll("[data-auth-slot]");
     if (!slots.length) return;
     var isRealUser = user && !user.is_anonymous;
+    // Jamais l'email en clair dans un header/nav visible en permanence --
+    // libelle generique coherent avec le vocabulaire "dossier" deja utilise
+    // sur /compte (timeline "Dossier ouvert", etc.), quel que soit
+    // l'utilisateur.
     var html = isRealUser
-      ? '<a href="/compte">' + (user.email ? user.email.split("@")[0] : "Mon compte") + "</a>"
+      ? '<a href="/compte">Mon dossier</a>'
       : '<a href="/connexion">Se connecter</a>';
     slots.forEach(function (el) {
       el.innerHTML = html;
