@@ -5369,6 +5369,25 @@ function conceptPage({ brand, siteUrl, commPlanPaymentLink }) {
         setupReveals();
       }
 
+      // Trace la selection au clic sur le CTA "Lancer cette version" --
+      // en plus du scroll existant vers #comment-lancer, jamais a la place.
+      // Un seul projet actif a la fois (upsert sur user_id, cf. migration
+      // 0018) : une nouvelle selection remplace l'ancienne.
+      function setupProjectSelection(supabase, session, slug) {
+        function recordSelection() {
+          supabase
+            .from("selected_projects")
+            .upsert({ user_id: session.user.id, listing_slug: slug, selected_at: new Date().toISOString() }, { onConflict: "user_id" })
+            .then(function (res) {
+              if (res.error) console.error("[concept] échec d'enregistrement de la sélection :", res.error.message);
+            });
+        }
+        ["cta-primary", "cta-exit"].forEach(function (id) {
+          var el = document.getElementById(id);
+          if (el) el.addEventListener("click", recordSelection);
+        });
+      }
+
       function setupUpsell(supabase, session, slug) {
         var cta = document.getElementById("upsell-cta");
         try {
@@ -5491,6 +5510,7 @@ function conceptPage({ brand, siteUrl, commPlanPaymentLink }) {
           renderConcept(genBody.concept, listing, range);
           renderCompetitors(competitors);
           setupUpsell(supabase, session, slug);
+          setupProjectSelection(supabase, session, slug);
         } catch (err) {
           console.error("[concept] échec du chargement :", err);
           showError("Un souci technique est survenu. Réessaie dans quelques minutes.");
@@ -6864,6 +6884,85 @@ html, body {
   color: var(--color-cobalt-soft);
 }
 
+/* Section "Mon projet" -- ajoutee sous la timeline narrative existante,
+   pas un onglet separe (decision produit : evite d'introduire un pattern
+   UI nouveau pour une seule fonctionnalite). Refait les memes requetes
+   que /concept/{slug} a l'affichage, ne stocke aucune copie du contenu. */
+.dossier__project {
+  margin-top: 32px;
+  padding-top: 32px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.dossier__project-title {
+  font-size: 16px;
+  font-weight: 800;
+  margin: 0 0 16px;
+  color: var(--color-paper-soft);
+}
+
+.dossier-project-card {
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 14px;
+  padding: 20px;
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.dossier-project-card__top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+
+.dossier-project-card__concept {
+  font-size: 16px;
+  font-weight: 700;
+  margin: 0;
+  color: var(--color-paper-soft);
+}
+
+.dossier-project-card__badge {
+  display: inline-flex;
+  align-items: center;
+  font-size: 11px;
+  font-weight: 700;
+  border-radius: 999px;
+  padding: 3px 9px;
+  color: var(--color-verified-green);
+  background: rgba(0, 196, 140, 0.12);
+  border: 1px solid rgba(0, 196, 140, 0.3);
+  white-space: nowrap;
+}
+
+.dossier-project-card__meta {
+  font-size: 13px;
+  color: var(--color-steel);
+  margin: 0 0 12px;
+}
+
+.dossier-project-card__link,
+.dossier-project-card__concept-link {
+  display: block;
+  font-size: 13px;
+  color: var(--color-cobalt-soft);
+  text-decoration: none;
+  margin-top: 6px;
+}
+
+.dossier-project-empty__text {
+  font-size: 14px;
+  color: var(--color-steel);
+  margin: 0 0 12px;
+}
+
+.dossier-project-empty__cta {
+  font-size: 13px;
+  color: var(--color-cobalt-soft);
+  text-decoration: none;
+}
+
 /* Étapes verrouillées tant que l'accès n'est pas débloqué — se déverrouille
    par une transition d'opacité (JS retire la classe), pas une réapparition
    brute au reload. */
@@ -7661,6 +7760,25 @@ function comptePage() {
       <p class="dossier__context" id="dossier-context"></p>
 
       <ol class="timeline" id="dossier-timeline"></ol>
+
+      <div class="dossier__project" id="dossier-project" style="display:none">
+        <h2 class="dossier__project-title">Mon projet</h2>
+        <div class="dossier-project-card">
+          <div class="dossier-project-card__top">
+            <p class="dossier-project-card__concept" id="project-concept-name"></p>
+            <span class="dossier-project-card__badge" id="project-badge">Vérifié · TrustMRR</span>
+          </div>
+          <p class="dossier-project-card__meta" id="project-meta"></p>
+          <a class="dossier-project-card__link" id="project-link" href="#" target="_blank" rel="noopener">Voir le site source &rarr;</a>
+          <a class="dossier-project-card__concept-link" id="project-concept-link" href="#">Revoir le concept complet &rarr;</a>
+        </div>
+      </div>
+
+      <div class="dossier__project" id="dossier-project-empty" style="display:none">
+        <h2 class="dossier__project-title">Mon projet</h2>
+        <p class="dossier-project-empty__text">Tu n'as pas encore choisi de projet à lancer.</p>
+        <a class="dossier-project-empty__cta" href="/succes">Voir mes résultats &rarr;</a>
+      </div>
     </div>
   </div>
   <div class="dossier-toast" id="dossier-toast" role="status" aria-live="polite"></div>
@@ -7966,6 +8084,62 @@ function comptePage() {
 
         if (profile.paid_at) {
           document.getElementById("resend-access-btn").style.display = "block";
+        }
+
+        loadSelectedProject(supabase, user.id, profile.paid_at);
+      }
+
+      // Refait les memes requetes que /concept/{slug} a l'affichage --
+      // selected_projects ne stocke qu'une reference (listing_slug), jamais
+      // une copie du contenu genere/verifie, pour ne jamais devenir obsolete.
+      async function loadSelectedProject(supabase, userId, paidAt) {
+        if (!paidAt) {
+          document.getElementById("dossier-project-empty").style.display = "";
+          return;
+        }
+        try {
+          var selRes = await supabase.from("selected_projects").select("listing_slug").eq("user_id", userId).maybeSingle();
+          if (!selRes.data) {
+            document.getElementById("dossier-project-empty").style.display = "";
+            return;
+          }
+          var slug = selRes.data.listing_slug;
+
+          var listingRes = await supabase
+            .from("saas_listings")
+            .select("name, website, mrr_usd, source_level")
+            .eq("slug", slug)
+            .eq("active", true)
+            .single();
+          if (listingRes.error || !listingRes.data) {
+            document.getElementById("dossier-project-empty").style.display = "";
+            return;
+          }
+          var listing = listingRes.data;
+
+          var conceptRes = await supabase.from("saas_concepts").select("concept_name").eq("slug", slug).maybeSingle();
+
+          document.getElementById("project-concept-name").textContent =
+            conceptRes.data && conceptRes.data.concept_name ? conceptRes.data.concept_name : listing.name || "SaaS vérifié";
+          document.getElementById("project-badge").textContent =
+            listing.source_level === "verified" ? "Vérifié · TrustMRR" : "Revue par l'équipe";
+          document.getElementById("project-meta").textContent =
+            (listing.name || "SaaS") +
+            " · MRR " +
+            (typeof listing.mrr_usd === "number" ? Math.round(listing.mrr_usd).toLocaleString("fr-FR") + " $" : "non communiqué");
+
+          var linkEl = document.getElementById("project-link");
+          if (listing.website) {
+            linkEl.href = listing.website;
+          } else {
+            linkEl.style.display = "none";
+          }
+          document.getElementById("project-concept-link").href = "/concept?slug=" + encodeURIComponent(slug);
+
+          document.getElementById("dossier-project").style.display = "";
+        } catch (err) {
+          console.error("[compte] échec du chargement du projet sélectionné :", err);
+          document.getElementById("dossier-project-empty").style.display = "";
         }
       }
 
