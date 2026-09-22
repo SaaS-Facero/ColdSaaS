@@ -120,7 +120,7 @@ const hero = {
     "ton premier chiffre d'affaires."
   ],
   subhead:
-    "ColdTrend indexe des SaaS à vendre ou à copier sur la base de revenus vérifiés — pas d'idées générées par IA, pas de promesses en l'air.",
+    "ColdTrend indexe des SaaS à vendre ou à copier sur la base de revenus vérifiés — un générateur IA, mais qui part toujours d'un chiffre confirmé, jamais d'une promesse en l'air.",
   ctaPrimary: "Lancer mon business",
   ctaSecondary: "Comment on vérifie"
 };
@@ -175,34 +175,45 @@ const comparison = {
 const faq = {
   eyebrow: "Questions fréquentes",
   title: "Ce qu'on nous demande le plus",
+  // Repositionnement "générateur IA vérifié" (assumé, pas nié) -- voir
+  // hero.subhead et le followup dejaCherche pour la cohérence du même
+  // message ailleurs sur le site.
   items: [
     {
-      // Formulation volontairement ancrée au présent ("aujourd'hui, 100%")
-      // plutôt qu'un pourcentage codé en dur sans contexte : reste vraie
-      // tant que la composition ne change pas, et devra être mise à jour
-      // le jour où un premier listing Acquire.com/Flippa rejoint la base.
-      q: "Que veut dire exactement le badge « Vérifié » ?",
-      a: "Que le revenu affiché est confirmé par une source indépendante — aujourd'hui, 100% des SaaS listés proviennent de TrustMRR, qui vérifie le revenu par une connexion en lecture seule au processeur de paiement du vendeur (pas une capture d'écran, pas un chiffre auto-déclaré). Si une fiche venait un jour d'ailleurs (Acquire.com, dont l'équipe examine chaque dossier manuellement, ou un listing « Verified » de Flippa), elle porterait un badge distinct « Revue par la plateforme » — jamais confondu avec le badge vert. « Vérifié » veut dire revenu confirmé, pas garantie de rentabilité future : on vérifie un chiffre passé, pas une promesse."
+      q: "C'est pas juste un générateur d'idées IA de plus ?",
+      a: "Oui, on est un générateur IA — mais vérifié. Il ne part jamais d'une page blanche : il travaille sur ~340 SaaS réels dont le revenu est confirmé via TrustMRR (Stripe/LemonSqueezy), et te fait correspondre ou reformule un concept à partir de ce chiffre-là, pas inventé de zéro. La différence avec les autres générateurs : chez eux le prompt part de rien, chez nous il part d'un revenu confirmé."
     },
     {
-      q: "À quelle fréquence la base est mise à jour ?",
-      a: "Chaque SaaS est vérifié au moment de son ajout — il n'y a pas de recalcul automatique en continu aujourd'hui, la base s'enrichit et se retire au fil de l'eau plutôt que par un système entièrement automatisé."
+      q: "Comment vous êtes sûrs que les chiffres sont vrais ?",
+      a: "TrustMRR se connecte en lecture seule au compte de paiement du vendeur (Stripe, LemonSqueezy, etc.) et lit le revenu directement à la source — pas une capture d'écran, pas un chiffre auto-déclaré. C'est ce croisement API qui donne le badge Vérifié, pas une opinion éditoriale."
     },
     {
-      q: "Un remboursement est possible ?",
-      a: "Oui, sous 14 jours si l'accès ne correspond pas à ce qui est décrit ici. Un message suffit, aucun justificatif à fournir."
+      q: "Le badge Vérifié, ça veut dire quoi exactement ?",
+      a: "Que ce SaaS précis a un revenu confirmé par une source de paiement indépendante, à un instant donné. Ça ne garantit pas que le business continuera de tourner pareil demain — on vérifie un chiffre passé, pas une promesse."
     },
     {
-      q: "Sous quel format je reçois l'accès ?",
-      a: "Directement à l'écran juste après le paiement : les SaaS qui correspondent le plus à ton profil, puis un accès permanent à la base complète depuis ton compte."
+      q: "Vous les sortez d'où, ces SaaS ?",
+      a: "De TrustMRR.com, qui liste des SaaS à vendre avec revenu vérifié par API. On sélectionne manuellement ceux qui rentrent dans la base ColdTrend — pas d'import automatique en masse, pas de fiches remplies au hasard."
     },
     {
-      q: "En quoi c'est différent d'un site qui génère des idées avec l'IA ?",
-      a: "On ne génère rien : chaque fiche correspond à un SaaS réel, avec un revenu vérifié ou revu par une plateforme sérieuse — pas une suggestion plausible."
+      q: "La base bouge, ou c'est toujours les mêmes fiches ?",
+      a: "Elle s'enrichit au fil de l'eau à chaque nouvelle vérification TrustMRR, pas sur un cycle fixe annoncé à l'avance. Si tu ne trouves rien aujourd'hui, ça vaut le coup de revenir dans quelques semaines."
     },
     {
-      q: "Et si je ne trouve rien qui me convient ?",
-      a: "Tu es remboursé. La base couvre déjà des dizaines de secteurs et continue de s'étoffer, donc ça vaut aussi le coup d'y revenir plus tard."
+      q: "Je paie, et après ? J'attends un email ?",
+      a: "Non — l'accès s'affiche à l'écran juste après le paiement, direct. Et il reste disponible en permanence depuis ton compte, donc pas besoin de retrouver un email trois mois plus tard."
+    },
+    {
+      q: "Pourquoi payer une fois et pas un abonnement comme tout le monde ?",
+      a: "Parce que tu payes pour débloquer une sélection, pas pour un service qui tourne en continu. Une fois l'accès obtenu, il est à toi, sans date de fin ni reconduction à surveiller."
+    },
+    {
+      q: "Et si aucune idée ne me correspond ?",
+      a: "Tu es remboursé, simplement. La base couvre déjà plusieurs secteurs et continue de grossir, donc ça vaut aussi le coup d'y repasser plus tard avec un profil différent."
+    },
+    {
+      q: "Je peux me faire rembourser si ça me convainc pas ?",
+      a: "Oui, sous 14 jours, sans justificatif à fournir — un message suffit."
     }
   ]
 };
@@ -423,7 +434,7 @@ const quiz = {
         {
           value: "no",
           label: "Pas encore, c'est ma première recherche",
-          followup: "Alors autant commencer avec des chiffres vérifiés plutôt que des idées générées — tu gagnes le détour."
+          followup: "Alors autant commencer avec des chiffres vérifiés plutôt qu'avec des idées sorties d'un prompt sans preuve derrière — tu gagnes le détour."
         }
       ]
     }
