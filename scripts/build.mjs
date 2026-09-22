@@ -197,7 +197,7 @@ const faq = {
     },
     {
       q: "La base bouge, ou c'est toujours les mêmes fiches ?",
-      a: "Elle s'enrichit au fil de l'eau à chaque nouvelle vérification TrustMRR, pas sur un cycle fixe annoncé à l'avance. Si tu ne trouves rien aujourd'hui, ça vaut le coup de revenir dans quelques semaines."
+      a: "Elle s'enrichit au fil de l'eau à chaque nouvelle vérification TrustMRR, pas sur un cycle fixe annoncé à l'avance. Ton accès est permanent : tout ce qui s'ajoute après ton achat reste inclus, sans repayer."
     },
     {
       q: "Je paie, et après ? J'attends un email ?",
