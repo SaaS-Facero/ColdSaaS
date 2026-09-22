@@ -2714,17 +2714,103 @@ function page({ brand, hero, socialProof, notificationStack, pricing, comparison
     margin: 4px 0 32px;
   }
 
-  .quiz-result__entrepreneur-link {
-    display: block;
-    text-align: center;
-    margin-top: 16px;
-    font-size: 13px;
-    color: var(--steel);
-    text-decoration: none;
+  /* Aperçu caviardé -- 2-3 fiches réelles, secteur + fourchette de MRR
+     visibles (dérivée du vrai mrr_usd, jamais un chiffre inventé), nom
+     masqué par une barre pleine -- même logique de redaction que
+     .proof-card ailleurs sur cette page, en plus compact. */
+  .result-preview {
+    width: 100%;
+    max-width: 380px;
+    margin: 24px auto;
+    text-align: left;
   }
 
-  .quiz-result__entrepreneur-link:hover {
+  .result-preview__label {
+    font-size: 12px;
+    text-align: center;
+    color: var(--steel);
+    margin: 0 0 10px;
+  }
+
+  .result-preview__list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .result-preview__card {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 10px 14px;
+    border-radius: 10px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    background: rgba(255, 255, 255, 0.02);
+  }
+
+  .result-preview__name {
+    display: inline-block;
+    width: 96px;
+    height: 12px;
+    border-radius: 4px;
+    background: rgba(255, 255, 255, 0.12);
+  }
+
+  .result-preview__meta {
+    font-size: 12px;
+    color: var(--steel);
+    text-align: right;
+  }
+
+  .result-preview__mrr {
+    color: var(--verified-green);
+    font-weight: 700;
+  }
+
+  /* Chapitre bonus -- bloc distinct, pas un lien perdu en bas d'écran.
+     Pointe vers /compte : le module reste gratuit en soi, mais n'est
+     accessible qu'une fois l'accès débloqué (voir comptePage()). */
+  .result-bonus-chapter {
+    display: block;
+    margin-top: 20px;
+    padding: 16px;
+    border-radius: 14px;
+    border: 1px solid rgba(0, 71, 255, 0.25);
+    background: rgba(0, 71, 255, 0.06);
+    text-decoration: none;
+    text-align: center;
+    transition: border-color 0.2s ease, background 0.2s ease;
+  }
+
+  .result-bonus-chapter:hover {
+    border-color: rgba(0, 71, 255, 0.45);
+    background: rgba(0, 71, 255, 0.1);
+  }
+
+  .result-bonus-chapter__eyebrow {
+    display: block;
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--cobalt-soft);
+    margin-bottom: 6px;
+  }
+
+  .result-bonus-chapter__title {
+    display: block;
+    font-size: 15px;
+    font-weight: 700;
     color: var(--paper-soft);
+    margin-bottom: 4px;
+  }
+
+  .result-bonus-chapter__text {
+    display: block;
+    font-size: 12px;
+    color: var(--steel);
+    line-height: 1.5;
   }
 
   /* Écran de transition "Mon dossier" -- checklist façon reçu (preuve de ce
@@ -2826,6 +2912,18 @@ function page({ brand, hero, socialProof, notificationStack, pricing, comparison
     font-size: 14px;
     color: var(--steel);
     margin-top: 6px;
+  }
+
+  .quiz-return-banner {
+    text-align: center;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--verified-green);
+    background: rgba(0, 196, 140, 0.08);
+    border: 1px solid rgba(0, 196, 140, 0.25);
+    border-radius: 10px;
+    padding: 10px 14px;
+    margin: 0 0 16px;
   }
 
   .included-list {
@@ -3854,6 +3952,51 @@ function page({ brand, hero, socialProof, notificationStack, pricing, comparison
         }
       }
 
+      // Aperçu caviardé de l'écran résultat -- 2-3 fiches réelles filtrées
+      // sur le profil, jamais un exemple inventé. Le nom n'est jamais
+      // sélectionné (pas juste masqué en CSS) : impossible à faire fuiter
+      // par erreur. Le MRR est arrondi à la tranche de 1000 en-dessous pour
+      // rester un teaser, pas le chiffre exact réservé à l'accès payant.
+      function fetchResultPreview(ans, cb) {
+        var supabase = window.ColdTrendSupabase;
+        if (!supabase) {
+          cb([]);
+          return;
+        }
+        var query = supabase.from("saas_listings_public").select("secteur, mrr_usd").gt("mrr_usd", 0).limit(3);
+        var sectorIds = ans.secteur || [];
+        if (sectorIds.length) {
+          var orParts = sectorIds.map(function (id) {
+            return "secteur.cs.{" + id + "}";
+          });
+          if (orParts.indexOf("secteur.cs.{both}") === -1) orParts.push("secteur.cs.{both}");
+          query = query.or(orParts.join(","));
+        }
+        query.then(function (res) {
+          cb(!res.error && res.data ? res.data : []);
+        });
+      }
+
+      function renderResultPreview(rows) {
+        var wrap = document.getElementById("result-preview");
+        var list = document.getElementById("result-preview-list");
+        if (!wrap || !list || !rows.length) return;
+        list.innerHTML = rows
+          .map(function (row) {
+            var sectorText = (row.secteur || []).map(function (id) { return SECTOR_LABELS[id] || id; }).join(", ") || "—";
+            var floor = Math.floor((row.mrr_usd || 0) / 1000) * 1000;
+            var mrrText = floor + "€ – " + (floor + 1000) + "€ / mois";
+            return (
+              '<div class="result-preview__card">' +
+              '<span class="result-preview__name" aria-hidden="true"></span>' +
+              '<span class="result-preview__meta">' + sectorText + " · <span class=\"result-preview__mrr\">" + mrrText + "</span></span>" +
+              "</div>"
+            );
+          })
+          .join("");
+        wrap.hidden = false;
+      }
+
       function sectorSummary() {
         var sectorIds = answers.secteur || [];
         var names = sectorIds.map(function (id) {
@@ -3897,6 +4040,7 @@ function page({ brand, hero, socialProof, notificationStack, pricing, comparison
       function goToResult() {
         reachedResult = true;
         transitionTo(resultScreen, "forward");
+        fetchResultPreview(answers, renderResultPreview);
 
         // Compteur seedé affiché tout de suite (jamais d'écran vide pendant le
         // temps réseau), remplacé par le vrai comptage filtré dès qu'il arrive
@@ -4006,6 +4150,8 @@ function page({ brand, hero, socialProof, notificationStack, pricing, comparison
           document.getElementById("welcome-offer-eyebrow").textContent = offer.isFirstView
             ? "Offre de bienvenue — ta première visite ici"
             : "Ton offre de reprise";
+          var returnBanner = document.getElementById("quiz-return-banner");
+          if (returnBanner) returnBanner.hidden = offer.isFirstView;
           document.getElementById("welcome-offer-price-old").textContent = oldPrice;
           document.getElementById("welcome-offer-price-new").textContent = newPrice;
 
@@ -4631,6 +4777,10 @@ function page({ brand, hero, socialProof, notificationStack, pricing, comparison
         if (followupEl) followupEl.classList.remove("is-visible");
         var welcomeOfferBlock = document.getElementById("welcome-offer-block");
         if (welcomeOfferBlock) welcomeOfferBlock.hidden = true;
+        var resultPreviewBlock = document.getElementById("result-preview");
+        if (resultPreviewBlock) resultPreviewBlock.hidden = true;
+        var returnBannerReset = document.getElementById("quiz-return-banner");
+        if (returnBannerReset) returnBannerReset.hidden = true;
         var priceBlockDefault = document.getElementById("price-block-default");
         if (priceBlockDefault) priceBlockDefault.hidden = false;
         var quizPayBtnReset = document.getElementById("quiz-pay-btn");
@@ -5410,8 +5560,19 @@ function renderQuizOverlay({ quiz, pricing, stripeLink }) {
         <div class="quiz-result__match" id="quiz-count-match">0</div>
         <p class="quiz-result__match-label" id="quiz-match-label">correspondent à ton profil</p>
         <p class="quiz-result-meta" id="quiz-result-meta"></p>
+
+        <div class="result-preview" id="result-preview" hidden>
+          <p class="result-preview__label">Un aperçu, avant de débloquer le reste</p>
+          <div class="result-preview__list" id="result-preview-list"></div>
+        </div>
+
         <button class="btn btn--primary btn--full" id="quiz-see-offer-btn" type="button">Voir mon accès</button>
-        <a class="quiz-result__entrepreneur-link" href="/profil-entrepreneur">Va plus loin : découvre ton profil entrepreneur &rarr;</a>
+
+        <a class="result-bonus-chapter" href="/compte">
+          <span class="result-bonus-chapter__eyebrow">Chapitre bonus, gratuit</span>
+          <span class="result-bonus-chapter__title">Ton profil entrepreneur</span>
+          <span class="result-bonus-chapter__text">9 questions courtes, un profil généré pour toi — disponible depuis ton dossier une fois ton accès débloqué.</span>
+        </a>
       </div>
 
       <div class="quiz-screen" data-screen="payment" data-step-name="paiement">
@@ -5420,6 +5581,7 @@ function renderQuizOverlay({ quiz, pricing, stripeLink }) {
           <div class="price-block__daily">Moins de <strong>${pricing.dailyPrice}</strong> par jour</div>
           <div class="price-block__total">${pricing.totalPrice} — ${pricing.totalNote}</div>
         </div>
+        <p class="quiz-return-banner" id="quiz-return-banner" hidden>Bon retour — reprends exactement là où tu en étais.</p>
         <div class="welcome-offer" id="welcome-offer-block" hidden>
           <p class="welcome-offer__eyebrow" id="welcome-offer-eyebrow"></p>
           <div class="welcome-offer__price">
@@ -5432,6 +5594,8 @@ function renderQuizOverlay({ quiz, pricing, stripeLink }) {
           <li>${ICON_CHECK_SMALL} Accès à toute la base de SaaS vérifiés via TrustMRR</li>
           <li>${ICON_CHECK_SMALL} Résultats affichés à l'écran juste après le paiement</li>
           <li>${ICON_CHECK_SMALL} Mises à jour continues, sans frais supplémentaire</li>
+          <li>${ICON_CHECK_SMALL} Accès à vie, paiement unique — jamais d'abonnement</li>
+          <li>${ICON_CHECK_SMALL} Filtrage par secteur, budget et temps disponible</li>
         </ul>
         <p class="stripe-reassurance">${ICON_LOCK} Paiement sécurisé via <strong>&nbsp;Stripe</strong></p>
         <a class="btn btn--primary btn--cta-final" id="quiz-pay-btn" href="${stripeLink}">Obtenir mon accès — ${pricing.totalPrice}</a>
@@ -8238,6 +8402,53 @@ html, body {
   text-decoration: none;
 }
 
+/* Chapitre bonus -- même traitement visuel que son équivalent sur l'écran
+   résultat du quiz (result-bonus-chapter), adapté aux tokens --color-*
+   de /compte. Module gratuit en soi, mais /compte lui-même n'est
+   accessible qu'après paiement (voir check() dans comptePage()) -- de
+   facto réservé aux comptes payés par la position du lien, pas par une
+   condition explicite ici. */
+.dossier-bonus-chapter {
+  display: block;
+  margin-top: 24px;
+  padding: 18px;
+  border-radius: var(--radius-lg);
+  border: 1px solid rgba(0, 71, 255, 0.25);
+  background: rgba(0, 71, 255, 0.06);
+  text-decoration: none;
+  transition: border-color 0.2s ease, background 0.2s ease;
+}
+
+.dossier-bonus-chapter:hover {
+  border-color: rgba(0, 71, 255, 0.45);
+  background: rgba(0, 71, 255, 0.1);
+}
+
+.dossier-bonus-chapter__eyebrow {
+  display: block;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--color-cobalt-soft);
+  margin-bottom: 6px;
+}
+
+.dossier-bonus-chapter__title {
+  display: block;
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--color-paper-soft);
+  margin-bottom: 4px;
+}
+
+.dossier-bonus-chapter__text {
+  display: block;
+  font-size: 13px;
+  color: var(--color-steel);
+  line-height: 1.5;
+}
+
 /* Étapes verrouillées tant que l'accès n'est pas débloqué — se déverrouille
    par une transition d'opacité (JS retire la classe), pas une réapparition
    brute au reload. */
@@ -9275,6 +9486,12 @@ function comptePage() {
         <p class="dossier-project-empty__text">Tu n'as pas encore choisi de projet à lancer.</p>
         <a class="dossier-project-empty__cta" href="/succes">Voir mes résultats &rarr;</a>
       </div>
+
+      <a class="dossier-bonus-chapter" href="/profil-entrepreneur">
+        <span class="dossier-bonus-chapter__eyebrow">Chapitre bonus, gratuit</span>
+        <span class="dossier-bonus-chapter__title">Ton profil entrepreneur</span>
+        <span class="dossier-bonus-chapter__text">9 questions courtes, un profil généré rien que pour toi.</span>
+      </a>
     </div>
   </div>
   <div class="dossier-toast" id="dossier-toast" role="status" aria-live="polite"></div>
