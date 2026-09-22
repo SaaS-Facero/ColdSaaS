@@ -193,7 +193,7 @@ const faq = {
     },
     {
       q: "Vous les sortez d'où, ces SaaS ?",
-      a: "De TrustMRR.com, qui liste des SaaS à vendre avec revenu vérifié par API. On sélectionne manuellement ceux qui rentrent dans la base ColdTrend — pas d'import automatique en masse, pas de fiches remplies au hasard. Ce qu'on te montre ensuite dépend de tes réponses au quiz (secteur, budget, temps disponible) : la base est la même pour tout le monde, la sélection qu'on t'en sort non."
+      a: "Ce qu'on te montre dépend de tes réponses au quiz (secteur, budget, temps disponible) : la base est la même pour tout le monde, la sélection qu'on t'en sort non."
     },
     {
       q: "La base bouge, ou c'est toujours les mêmes fiches ?",
