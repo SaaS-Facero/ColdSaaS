@@ -178,42 +178,45 @@ const faq = {
   // Repositionnement "générateur IA vérifié" (assumé, pas nié) -- voir
   // hero.subhead et le followup dejaCherche pour la cohérence du même
   // message ailleurs sur le site.
+  //
+  // Points 9 et 10 volontairement absents de ce tableau (pas de placeholder
+  // vide affiché dans l'accordéon) : "Et si aucune idée ne me correspond ?"
+  // et "Je peux me faire rembourser si ça me convainc pas ?" attendent une
+  // politique de remboursement confirmée -- ne pas en écrire une ici sans
+  // validation explicite. La FAQ précédente affichait "sous 14 jours, sans
+  // justificatif" ; à reconfirmer avant de la remettre.
   items: [
     {
       q: "C'est pas juste un générateur d'idées IA de plus ?",
-      a: "Ça dépend du chemin. Si tu veux racheter un SaaS, chaque fiche est une entreprise réelle avec un revenu confirmé par TrustMRR — pas de génération là-dedans. Si tu veux copier / t'inspirer, le concept est généré par IA, mais toujours à partir de données de marché réelles et vérifiées (fourchettes de MRR par secteur, sur ~340 SaaS TrustMRR) — jamais un prompt qui part de rien."
+      a: "Si, on utilise l'IA — mais chaque concept est généré à partir d'un prompt qui varie selon ton profil (secteur, budget, réponses au quiz), pas un template générique renvoyé à tout le monde. La différence : les chiffres de revenu, eux, ne sont jamais générés — ils viennent de TrustMRR/Stripe. L'IA personnalise le concept, jamais les données financières."
     },
     {
       q: "Comment vous êtes sûrs que les chiffres sont vrais ?",
-      a: "TrustMRR se connecte en lecture seule au compte de paiement du vendeur (Stripe, LemonSqueezy, etc.) et lit le revenu directement à la source — pas une capture d'écran, pas un chiffre auto-déclaré. C'est ce croisement API qui donne le badge Vérifié, pas une opinion éditoriale."
+      a: "Chaque MRR affiché est récupéré directement depuis TrustMRR ou Stripe, pas estimé ni déclaré à la main."
     },
     {
       q: "Le badge Vérifié, ça veut dire quoi exactement ?",
-      a: "Sur le chemin racheter : que ce SaaS précis a un revenu confirmé par une source de paiement indépendante, à un instant donné — pas une garantie de rentabilité future. Sur le chemin copier : que les données de marché utilisées pour générer le concept (fourchette de MRR du secteur) sont vérifiées, pas que l'entreprise existe telle quelle."
+      a: "Que le revenu du SaaS a été confirmé via une source financière tierce (TrustMRR/Stripe), pas juste affirmé par le vendeur."
     },
     {
       q: "Vous les sortez d'où, ces SaaS ?",
-      a: "Pour racheter : de TrustMRR.com, revenu vérifié par API, sélection manuelle dans la base ColdTrend. Pour copier : le concept est généré à partir de ces mêmes données de marché vérifiées, pas d'une fiche importée précise. Dans les deux cas, ce qu'on te montre dépend de tes réponses au quiz (secteur, budget, temps disponible)."
+      a: "De bases publiques de SaaS à vendre ou à forte traction, filtrées et vérifiées avant d'être ajoutées."
     },
     {
       q: "La base bouge, ou c'est toujours les mêmes fiches ?",
-      a: "Elle s'enrichit au fil de l'eau à chaque nouvelle vérification TrustMRR, pas sur un cycle fixe annoncé à l'avance. Ton accès est permanent : tout ce qui s'ajoute après ton achat reste inclus, sans repayer."
+      a: "Elle est mise à jour régulièrement, sans frais supplémentaire pour toi."
     },
     {
       q: "Je paie, et après ? J'attends un email ?",
-      a: "Non — l'accès s'affiche à l'écran juste après le paiement, direct. Et il reste disponible en permanence depuis ton compte, donc pas besoin de retrouver un email trois mois plus tard."
+      a: "Non, tes résultats s'affichent directement à l'écran juste après le paiement."
     },
     {
       q: "Pourquoi payer une fois et pas un abonnement comme tout le monde ?",
-      a: "Parce que tu payes pour débloquer une sélection, pas pour un service qui tourne en continu. Une fois l'accès obtenu, il est à toi, sans date de fin ni reconduction à surveiller."
+      a: "Parce que l'accès est à vie — tu payes une fois, tu gardes l'accès aux mises à jour de la base sans repayer."
     },
     {
-      q: "Et si aucune idée ne me correspond ?",
-      a: "Tu es remboursé, simplement. La base couvre déjà plusieurs secteurs et continue de grossir, donc ça vaut aussi le coup d'y repasser plus tard avec un profil différent."
-    },
-    {
-      q: "Je peux me faire rembourser si ça me convainc pas ?",
-      a: "Oui, sous 14 jours, sans justificatif à fournir — un message suffit."
+      q: "Vous allez aussi générer les vidéos publicitaires ?",
+      a: "Oui, en plus du concept et de son argumentaire, tu pourras bientôt générer une vidéo publicitaire directement depuis ton espace, adaptée à ton SaaS."
     }
   ]
 };
@@ -1437,8 +1440,26 @@ function page({ brand, hero, socialProof, notificationStack, pricing, comparison
     text-align: left;
   }
 
+  /* Apparition au scroll -- même pattern que [data-reveal] sur
+     concept.html/profil-entrepreneur.html (opacity + translateY, toggle
+     .is-visible via IntersectionObserver), réimplémenté ici car cette page
+     ne charge pas les tokens --ease-out-expo des autres pages. */
   .faq__item {
     border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 10px;
+    opacity: 0;
+    transform: translateY(16px);
+    transition: opacity 500ms cubic-bezier(0.16, 1, 0.3, 1), transform 500ms cubic-bezier(0.16, 1, 0.3, 1), background 280ms cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
+  .faq__item.is-visible {
+    opacity: 1;
+    transform: translateY(0);
+  }
+
+  .faq__item.is-open {
+    background: rgba(0, 71, 255, 0.06);
+    padding-inline: 4px;
   }
 
   .faq__question {
@@ -1461,7 +1482,7 @@ function page({ brand, hero, socialProof, notificationStack, pricing, comparison
   .faq__chevron {
     flex-shrink: 0;
     color: var(--steel);
-    transition: transform 260ms cubic-bezier(0.22, 1.26, 0.36, 1);
+    transition: transform 280ms cubic-bezier(0.16, 1, 0.3, 1);
   }
 
   .faq__item.is-open .faq__chevron {
@@ -1471,7 +1492,7 @@ function page({ brand, hero, socialProof, notificationStack, pricing, comparison
   .faq__answer-wrap {
     display: grid;
     grid-template-rows: 0fr;
-    transition: grid-template-rows 260ms cubic-bezier(0.22, 1.26, 0.36, 1);
+    transition: grid-template-rows 280ms cubic-bezier(0.16, 1, 0.3, 1);
   }
 
   .faq__item.is-open .faq__answer-wrap {
@@ -1480,6 +1501,25 @@ function page({ brand, hero, socialProof, notificationStack, pricing, comparison
 
   .faq__answer-inner {
     overflow: hidden;
+    opacity: 0;
+    transition: opacity 280ms cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
+  .faq__item.is-open .faq__answer-inner {
+    opacity: 1;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .faq__item {
+      opacity: 1;
+      transform: none;
+      transition: none !important;
+    }
+    .faq__chevron,
+    .faq__answer-wrap,
+    .faq__answer-inner {
+      transition: none !important;
+    }
   }
 
   .faq__answer {
@@ -3278,6 +3318,32 @@ function page({ brand, hero, socialProof, notificationStack, pricing, comparison
         });
       });
 
+      // ---- FAQ apparition au scroll --------------------------------------
+      // Même logique que [data-reveal] sur concept.html : IntersectionObserver
+      // natif, .is-visible ajoutée une fois puis désobservée (jamais de
+      // ré-animation en scrollant de haut en bas). Le stagger vient du
+      // transition-delay déjà posé inline par renderFaqItems().
+      (function () {
+        var faqReduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+        var faqItems = document.querySelectorAll("[data-faq-item]");
+        if (!faqItems.length) return;
+        if (faqReduceMotion || !("IntersectionObserver" in window)) {
+          faqItems.forEach(function (el) { el.classList.add("is-visible"); });
+          return;
+        }
+        var faqObserver = new IntersectionObserver(
+          function (entries) {
+            entries.forEach(function (entry) {
+              if (!entry.isIntersecting) return;
+              entry.target.classList.add("is-visible");
+              faqObserver.unobserve(entry.target);
+            });
+          },
+          { threshold: 0.15 }
+        );
+        faqItems.forEach(function (el) { faqObserver.observe(el); });
+      })();
+
       // ---- Analytics --------------------------------------------------------
       // Écrit réellement dans la table Supabase funnel_events (voir
       // supabase/migrations/0003_funnel_events.sql) — ce n'était qu'un stub
@@ -4801,7 +4867,12 @@ function renderComparisonRows(comparison) {
 function renderFaqItems(items) {
   return items
     .map(
-      (item, index) => `<div class="faq__item" data-faq-item>
+      // transition-delay a une valeur par propriété listée dans `transition`
+      // (opacity, transform, background, dans cet ordre) -- seules les deux
+      // premières (le reveal au scroll) sont décalées en cascade, le
+      // background d'ouverture reste instantané au clic, sinon ouvrir
+      // l'item #8 traînerait le tint de 720ms derrière le clic.
+      (item, index) => `<div class="faq__item" data-faq-item style="transition-delay:${index * 90}ms,${index * 90}ms,0ms">
           <button class="faq__question" type="button" aria-expanded="false" id="faq-q-${index}">
             <span>${item.q}</span>
             <span class="faq__chevron">${ICON_CHEVRON_DOWN}</span>
