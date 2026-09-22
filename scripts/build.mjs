@@ -339,36 +339,29 @@ const quiz = {
   // Écrans de type "question" — navigués par index, avec skip conditionnel.
   // Le dernier ("capture") est rendu différemment (formulaire, pas d'options)
   // mais suit la même mécanique d'avancement dans le moteur JS ci-dessous.
+  // Refonte funnel (auth déplacée juste avant le résultat, jamais avant) --
+  // voir persistDraftLocally()/determineStartIndex() dans le script client :
+  // tant qu'aucun compte n'existe, la progression vit en localStorage, pas
+  // en base (aucune session à qui écrire avant l'écran "auth").
+  // `chapter` marque les 5 questions "réelles" qui comptent pour la barre
+  // de progression segmentée -- intro/mirror/auth n'ont pas leur propre
+  // segment (framing, pas avancement).
   questions: [
     {
-      // Première question du quiz, pas un gate avant — même barre de
-      // progression, même carte, même style de bouton que les autres
-      // questions. Voir resolve-identity (supabase/functions/) : un seul
-      // appel serveur qui gère "nouveau compte ou existant" en une fois, et
-      // la transition vers la question 2 démarre AVANT sa réponse
-      // (transition optimiste, cf. handleAuthSubmit dans le script plus bas).
-      id: "auth",
-      stepName: "auth",
-      type: "auth",
-      title: "Pour garder ta sélection au chaud.",
-      subtext: "Un compte pour retrouver tes résultats plus tard — pas de confirmation par email, pas d'attente."
-    },
-    {
-      // Preuve visuelle redactée plutôt qu'une affirmation textuelle ou un
-      // chiffre inventé façon concurrent : le montant et le nom du SaaS sont
-      // partiellement masqués (comme une fiche Stripe qu'on aurait le droit
-      // de montrer sans révéler l'identité du vendeur), mais RIEN n'est
-      // fabriqué — c'est un exemple réel de ce que "vérifié" veut dire chez
-      // ColdTrend, pas une preuve sociale gonflée.
-      id: "proof",
-      stepName: "preuve",
-      type: "proof",
-      title: "Chaque SaaS ici a un revenu vérifié — pas une estimation.",
-      subtext: "Voici le type de preuve qu'on croise (Stripe × TrustMRR) avant qu'un SaaS apparaisse dans ta sélection."
+      // Écran de contexte narratif, remplace l'ancienne ouverture directe
+      // sur "auth" -- pose le cadre avant toute question plutôt que de
+      // commencer par demander un compte.
+      id: "intro",
+      stepName: "intro",
+      type: "intro",
+      title: "Pas un quiz de plus.",
+      subtext: "5 questions, aucune pour te trier dans une case — chacune sert à filtrer une base réelle de SaaS vérifiés selon ta situation, pas à deviner qui tu es.",
+      cta: "Commencer"
     },
     {
       id: "intention",
       stepName: "intention",
+      chapter: 1,
       title: "Tu veux racheter un SaaS qui tourne déjà, ou t'inspirer d'un concept pour repartir de zéro ?",
       type: "single",
       options: [
@@ -385,34 +378,9 @@ const quiz = {
       ]
     },
     {
-      id: "budget",
-      stepName: "budget",
-      title: "Pour ne te montrer que ce que tu peux vraiment acheter.",
-      type: "single",
-      skipIf: { field: "intention", equals: "copier" },
-      options: [
-        { value: "low", label: "Moins de 5 000 €" },
-        { value: "mid", label: "5 000 – 20 000 €" },
-        { value: "high", label: "20 000 – 50 000 €" },
-        { value: "undecided", label: "Je regarde, pas encore de budget fixé" }
-      ]
-    },
-    {
-      id: "temps",
-      stepName: "temps",
-      title: "Combien d'heures par semaine tu peux vraiment y consacrer ?",
-      subtext: "Pas besoin de tout plaquer. La plupart de nos utilisateurs démarrent à côté d'un job.",
-      type: "single",
-      options: [
-        { value: "low", label: "Moins de 5h" },
-        { value: "midlow", label: "5–10h" },
-        { value: "midhigh", label: "10–20h" },
-        { value: "full", label: "Temps plein" }
-      ]
-    },
-    {
       id: "secteur",
       stepName: "secteur",
+      chapter: 1,
       title: "Tu vises plutôt les entreprises ou les particuliers ?",
       subtext: "Certains SaaS vérifiés touchent les deux, on te les montre dans tous les cas.",
       type: "multi",
@@ -424,8 +392,56 @@ const quiz = {
       ]
     },
     {
+      id: "budget",
+      stepName: "budget",
+      chapter: 1,
+      title: "Pour ne te montrer que ce que tu peux vraiment acheter.",
+      type: "single",
+      skipIf: { field: "intention", equals: "copier" },
+      options: [
+        {
+          value: "low",
+          label: "Moins de 5 000 €",
+          followup: "La plupart démarrent avec moins que prévu — ça affine le tri, ça n'exclut de rien."
+        },
+        { value: "mid", label: "5 000 – 20 000 €" },
+        { value: "high", label: "20 000 – 50 000 €" },
+        {
+          value: "undecided",
+          label: "Je regarde, pas encore de budget fixé",
+          followup: "La plupart démarrent avec moins que prévu — ça affine le tri, ça n'exclut de rien."
+        }
+      ]
+    },
+    {
+      // Charnière de fin de chapitre 1 -- climax émotionnel du quiz, pas une
+      // question. Le texte est généré dynamiquement par buildMirrorText()
+      // dans le script client à partir des réponses réelles (intention,
+      // secteur, budget) -- jamais une phrase piochée au hasard dans une
+      // liste fixe façon horoscope.
+      id: "mirror",
+      stepName: "miroir",
+      type: "mirror",
+      eyebrow: "Ce qu'on a compris jusqu'ici"
+    },
+    {
+      id: "temps",
+      stepName: "temps",
+      chapter: 2,
+      title: "Combien d'heures par semaine tu peux vraiment y consacrer ?",
+      subtext: "Pas besoin de tout plaquer. La plupart de nos utilisateurs démarrent à côté d'un job.",
+      type: "single",
+      options: [
+        { value: "low", label: "Moins de 5h" },
+        { value: "midlow", label: "5–10h" },
+        { value: "midhigh", label: "10–20h" },
+        { value: "full", label: "Temps plein" }
+      ]
+    },
+    {
       id: "dejaCherche",
       stepName: "frustration",
+      chapter: 2,
       title: "Tu as déjà passé des heures sur des listes d'idées génériques, sans rien trouver de crédible ?",
       type: "single",
       options: [
@@ -440,6 +456,19 @@ const quiz = {
           followup: "Alors autant commencer avec des chiffres vérifiés plutôt qu'avec des idées sorties d'un prompt sans preuve derrière — tu gagnes le détour."
         }
       ]
+    },
+    {
+      // Dernière étape avant le résultat (déplacée depuis le tout début du
+      // funnel) -- voir resolve-identity (supabase/functions/) : un seul
+      // appel serveur qui gère "nouveau compte ou existant" en une fois.
+      // Le bouton Google reste en première position visuelle, avant le
+      // séparateur "ou" et les champs email/mot de passe -- même hiérarchie
+      // qu'avant le déplacement, pas relégué en option secondaire.
+      id: "auth",
+      stepName: "auth",
+      type: "auth",
+      title: "Dernière étape — pour garder ce qu'on vient de construire.",
+      subtext: "Tes réponses sont déjà là, on ne te les redemande pas. Juste un compte pour les retrouver."
     }
   ]
 };
@@ -1605,8 +1634,23 @@ function page({ brand, hero, socialProof, notificationStack, pricing, comparison
 
   .quiz-progress {
     display: flex;
+    align-items: center;
     gap: 6px;
     padding: 16px 20px 0;
+  }
+
+  /* Segmentée par chapitre plutôt qu'une seule barre continue -- deux
+     groupes de segments avec un espaceur visuel entre eux, pas juste
+     l'avancement brut. */
+  .quiz-progress__group {
+    display: flex;
+    flex: 1;
+    gap: 6px;
+  }
+
+  .quiz-progress__group-gap {
+    width: 10px;
+    flex-shrink: 0;
   }
 
   .quiz-progress__seg {
@@ -2610,6 +2654,39 @@ function page({ brand, hero, socialProof, notificationStack, pricing, comparison
     text-align: center;
   }
 
+  .quiz-screen.quiz-intro {
+    justify-content: center;
+    text-align: center;
+  }
+
+  /* Écran miroir -- climax du quiz, doit visuellement se distinguer du
+     reste : fond Cobalt Blue à faible opacité en pleine bordure d'écran
+     (pas juste un fond de carte), apparition plus lente gérée dans
+     transitionTo() (MIRROR_ENTER_TRANSITION), pas ici. */
+  .quiz-screen.quiz-mirror {
+    justify-content: center;
+    text-align: center;
+    background: radial-gradient(ellipse at 50% 40%, rgba(0, 71, 255, 0.14), transparent 70%);
+    border-radius: 20px;
+  }
+
+  .quiz-mirror__eyebrow {
+    font-size: 12px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--cobalt-soft);
+    margin: 0 0 16px;
+  }
+
+  .quiz-mirror__text {
+    font-size: clamp(19px, 4.4vw, 25px);
+    font-weight: 700;
+    line-height: 1.45;
+    color: var(--paper-soft);
+    margin: 0 0 32px;
+  }
+
   .quiz-result__count {
     font-size: clamp(40px, 10vw, 56px);
     font-weight: 800;
@@ -3453,14 +3530,24 @@ function page({ brand, hero, socialProof, notificationStack, pricing, comparison
       }
 
       var reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+      // cubic-bezier(0.16,1,0.3,1) -- même easing "reveal" que le reste du
+      // site (FAQ, /concept.html), pas une nouvelle courbe inventée pour le
+      // quiz. Les hovers (options, boutons) restent sur leurs transitions
+      // CSS existantes, non touchées ici.
       var ENTER_TRANSITION = reduceMotion
         ? "opacity 220ms ease-out"
-        : "transform 420ms cubic-bezier(0.22, 1.26, 0.36, 1), opacity 420ms cubic-bezier(0.22, 1.26, 0.36, 1)";
+        : "transform 420ms cubic-bezier(0.16, 1, 0.3, 1), opacity 420ms cubic-bezier(0.16, 1, 0.3, 1)";
       var EXIT_TRANSITION = reduceMotion
         ? "opacity 220ms ease-out"
         : "transform 280ms cubic-bezier(0.4, 0, 1, 1), opacity 280ms cubic-bezier(0.4, 0, 1, 1)";
       var EXIT_MS = reduceMotion ? 220 : 280;
       var ENTER_MS = reduceMotion ? 220 : 420;
+      // Écran miroir -- climax émotionnel du quiz, doit se sentir différent
+      // du reste : apparition nettement plus lente sur la même courbe.
+      var MIRROR_ENTER_TRANSITION = reduceMotion
+        ? "opacity 220ms ease-out"
+        : "transform 700ms cubic-bezier(0.16, 1, 0.3, 1), opacity 700ms cubic-bezier(0.16, 1, 0.3, 1)";
+      var MIRROR_ENTER_MS = reduceMotion ? 220 : 700;
 
       var answers = {};
       var navHistory = [];
@@ -3487,6 +3574,19 @@ function page({ brand, hero, socialProof, notificationStack, pricing, comparison
         var i = fromIndex + 1;
         while (i < questionScreens.length && isSkipped(i)) i += 1;
         return i;
+      }
+
+      // Traduit un index brut de questionScreens (intro/miroir/auth compris)
+      // en nombre de segments "réels" à remplir dans la barre segmentée --
+      // seules les questions marquées data-chapter comptent, et seulement
+      // si elles n'ont pas été sautées (skipIf), sinon un budget sauté
+      // gonflerait artificiellement la progression.
+      function progressFillCount(index) {
+        var count = 0;
+        for (var i = 0; i < index && i < questionScreens.length; i += 1) {
+          if (questionScreens[i].hasAttribute("data-chapter") && !isSkipped(i)) count += 1;
+        }
+        return count;
       }
 
       function setProgress(filledCount, instant) {
@@ -3517,8 +3617,8 @@ function page({ brand, hero, socialProof, notificationStack, pricing, comparison
           return;
         }
 
-        if (id === "proof") {
-          // Écran purement informatif, rien à répondre — mais openQuiz()
+        if (id === "proof" || id === "intro" || id === "mirror") {
+          // Écrans purement informatifs, rien à répondre — mais openQuiz()
           // désactive TOUS les boutons .quiz-next à l'ouverture (y compris
           // celui-ci), donc il faut le réactiver explicitement ici, pas
           // juste "ne pas y toucher".
@@ -3561,6 +3661,12 @@ function page({ brand, hero, socialProof, notificationStack, pricing, comparison
 
         transitionInProgress = true;
 
+        var isMirrorScreen = nextEl.getAttribute("data-id") === "mirror";
+        if (isMirrorScreen) {
+          var mirrorTextEl = document.getElementById("quiz-mirror-text");
+          if (mirrorTextEl) mirrorTextEl.textContent = buildMirrorText(answers);
+        }
+
         var enterFrom = direction === "back" ? -24 : 24;
         var exitTo = direction === "back" ? 24 : -24;
 
@@ -3571,13 +3677,15 @@ function page({ brand, hero, socialProof, notificationStack, pricing, comparison
         nextEl.classList.add("is-active");
         void nextEl.offsetWidth;
 
-        nextEl.style.transition = ENTER_TRANSITION;
+        var enterTransition = isMirrorScreen ? MIRROR_ENTER_TRANSITION : ENTER_TRANSITION;
+        var enterMs = isMirrorScreen ? MIRROR_ENTER_MS : ENTER_MS;
+        nextEl.style.transition = enterTransition;
         nextEl.style.opacity = "1";
         nextEl.style.transform = "translateX(0)";
         window.setTimeout(function () {
           nextEl.style.pointerEvents = "auto";
           transitionInProgress = false;
-        }, ENTER_MS);
+        }, enterMs);
 
         if (prevEl) {
           prevEl.style.transition = EXIT_TRANSITION;
@@ -3754,6 +3862,38 @@ function page({ brand, hero, socialProof, notificationStack, pricing, comparison
         return names.length ? names.join(", ") : "";
       }
 
+      // Écran miroir -- assemblage déterministe de fragments réels liés aux
+      // réponses (intention/secteur/budget), jamais un template complet
+      // piochué au hasard dans une liste type horoscope. Chaque fragment
+      // reformule une réponse déjà donnée en trait valorisant, jamais une
+      // généralité qui pourrait s'appliquer à n'importe qui.
+      function buildMirrorText(a) {
+        var parts = [];
+
+        if (a.intention === "racheter") {
+          parts.push("Tu ne pars pas de zéro : tu veux un revenu qui existe déjà.");
+        } else if (a.intention === "copier") {
+          parts.push("Tu préfères construire toi-même, sur une base qui a déjà prouvé qu'elle marche.");
+        }
+
+        var sectors = a.secteur || [];
+        if (sectors.indexOf("both") !== -1) {
+          parts.push("Tu ne t'interdis rien côté clientèle.");
+        } else if (sectors.indexOf("b2b") !== -1) {
+          parts.push("Des clients pros, pas du volume au hasard.");
+        } else if (sectors.indexOf("b2c") !== -1) {
+          parts.push("Du grand public, pas des cycles de vente à rallonge.");
+        }
+
+        if (a.budget === "low" || a.budget === "undecided") {
+          parts.push("Et tu avances prudent, sans te mettre en danger financièrement.");
+        } else if (a.budget === "mid" || a.budget === "high") {
+          parts.push("Avec un vrai coussin pour ne pas improviser en cours de route.");
+        }
+
+        return parts.join(" ");
+      }
+
       function goToResult() {
         reachedResult = true;
         transitionTo(resultScreen, "forward");
@@ -3925,12 +4065,13 @@ function page({ brand, hero, socialProof, notificationStack, pricing, comparison
         var next = findNextQuestionIndex(currentQuestionIndex);
         currentQuestionIndex = next;
         updateBackVisibility();
+        saveDraftLocally();
         persistProgress(next);
         if (next >= questionScreens.length) {
-          setProgress(TOTAL_STEPS);
+          setProgress(progressFillCount(questionScreens.length));
           goToResult();
         } else {
-          setProgress(next);
+          setProgress(progressFillCount(next));
           var screenEl = questionScreens[next];
           updateNextEnabled(screenEl);
           transitionTo(screenEl, "forward");
@@ -3964,17 +4105,24 @@ function page({ brand, hero, socialProof, notificationStack, pricing, comparison
 
         // Transition optimiste — identique à goForwardFromQuestion, mais
         // déclenchée AVANT que resolveIdentityRequest() n'ait répondu.
+        // "auth" est maintenant le DERNIER écran avant le résultat (voir
+        // quiz.questions) -- il n'y a plus jamais de "prochaine question"
+        // après lui, contrairement à l'ancien ordre où c'était la première.
         navHistory.push(currentQuestionIndex);
         var next = findNextQuestionIndex(currentQuestionIndex);
         currentQuestionIndex = next;
         updateBackVisibility();
-        setProgress(next);
-        var screenEl = questionScreens[next];
-        updateNextEnabled(screenEl);
-        transitionTo(screenEl, "forward");
-
         authResolutionPromise = resolveIdentityRequest(email, password);
-        persistProgress(next);
+
+        if (next >= questionScreens.length) {
+          setProgress(progressFillCount(questionScreens.length));
+          goToResult();
+        } else {
+          setProgress(progressFillCount(next));
+          var screenEl = questionScreens[next];
+          updateNextEnabled(screenEl);
+          transitionTo(screenEl, "forward");
+        }
       }
 
       function resolveIdentityRequest(email, password) {
@@ -4040,11 +4188,25 @@ function page({ brand, hero, socialProof, notificationStack, pricing, comparison
 
       function fixAuthAndGoBack() {
         hideAuthBanner();
-        navHistory = [];
-        currentQuestionIndex = 0;
-        setProgress(0, true);
+        // "auth" n'est plus forcément à l'index 0 (déplacé en dernier) --
+        // on le retrouve par son data-id plutôt que de supposer sa position.
+        // L'échec arrive après la transition optimiste vers le résultat
+        // (voir handleAuthSubmit) : reachedResult doit repasser à false, le
+        // compte n'a en réalité jamais été confirmé.
+        var authIndex = -1;
+        for (var i = 0; i < questionScreens.length; i += 1) {
+          if (questionScreens[i].getAttribute("data-id") === "auth") {
+            authIndex = i;
+            break;
+          }
+        }
+        if (authIndex === -1) return;
+        reachedResult = false;
+        navHistory = buildNavHistoryUpTo(authIndex);
+        currentQuestionIndex = authIndex;
+        setProgress(progressFillCount(authIndex), true);
         updateBackVisibility();
-        var authScreen = questionScreens[0];
+        var authScreen = questionScreens[authIndex];
         var emailInput = document.getElementById("quiz-auth-email");
         var passwordInput = document.getElementById("quiz-auth-password");
         emailInput.value = answers.email || "";
@@ -4052,6 +4214,49 @@ function page({ brand, hero, socialProof, notificationStack, pricing, comparison
         updateNextEnabled(authScreen);
         transitionTo(authScreen, "back");
         passwordInput.focus();
+      }
+
+      // ---- Brouillon pré-auth (localStorage) -----------------------------
+      //
+      // "auth" est maintenant le DERNIER écran avant le résultat -- aucune
+      // session n'existe tant qu'il n'est pas soumis, donc aucune écriture
+      // Supabase n'est possible avant ce point (persistProgress() no-op
+      // silencieusement faute d'utilisateur). Le brouillon vit en
+      // localStorage jusque-là, migré vers `profiles` par persistQuizAnswers()
+      // une fois le compte créé (voir goToResult()), puis vidé.
+      var QUIZ_DRAFT_KEY = "coldtrend_quiz_draft";
+
+      function saveDraftLocally() {
+        try {
+          window.localStorage.setItem(
+            QUIZ_DRAFT_KEY,
+            JSON.stringify({ answers: answers, stepIndex: currentQuestionIndex })
+          );
+        } catch (err) {
+          // Stockage indisponible (navigation privée, quota) -- pas grave,
+          // la session courante fonctionne quand même, seule la reprise
+          // après fermeture d'onglet serait perdue.
+        }
+      }
+
+      function loadDraftLocally() {
+        try {
+          var raw = window.localStorage.getItem(QUIZ_DRAFT_KEY);
+          if (!raw) return null;
+          var parsed = JSON.parse(raw);
+          if (!parsed || typeof parsed.stepIndex !== "number") return null;
+          return parsed;
+        } catch (err) {
+          return null;
+        }
+      }
+
+      function clearDraftLocally() {
+        try {
+          window.localStorage.removeItem(QUIZ_DRAFT_KEY);
+        } catch (err) {
+          /* rien à faire si le storage est indisponible */
+        }
       }
 
       // Sauvegarde les réponses du quiz dans profiles une fois le résultat
@@ -4085,7 +4290,12 @@ function page({ brand, hero, socialProof, notificationStack, pricing, comparison
               .then(function (res) {
                 if (res.error) {
                   console.warn("[ColdTrend] mise à jour profiles échouée :", res.error.message);
+                  return;
                 }
+                // Le compte a maintenant tout en base -- le brouillon
+                // localStorage n'a plus de raison d'exister (et redeviendrait
+                // faux si l'utilisateur relance un quiz plus tard).
+                clearDraftLocally();
               });
           })
           .catch(function (err) {
@@ -4252,7 +4462,7 @@ function page({ brand, hero, socialProof, notificationStack, pricing, comparison
         };
 
         currentQuestionIndex = targetIndex;
-        setProgress(targetIndex, true);
+        setProgress(progressFillCount(targetIndex), true);
         var screenEl = questionScreens[targetIndex];
         transitionTo(screenEl, "back");
         restoreAnswersUI();
@@ -4278,6 +4488,7 @@ function page({ brand, hero, socialProof, notificationStack, pricing, comparison
         editContext = null;
         hideEditBar();
         propagateAnswerDependencies(ctx.questionId);
+        saveDraftLocally();
         persistProgress(currentQuestionIndex);
         showToast("Réponse mise à jour");
         returnFromEdit(ctx, true);
@@ -4292,7 +4503,7 @@ function page({ brand, hero, socialProof, notificationStack, pricing, comparison
           goToResult();
         } else {
           currentQuestionIndex = ctx.returnIndex;
-          setProgress(ctx.returnIndex, true);
+          setProgress(progressFillCount(ctx.returnIndex), true);
           updateBackVisibility();
           transitionTo(questionScreens[ctx.returnIndex], "back");
         }
@@ -4312,13 +4523,47 @@ function page({ brand, hero, socialProof, notificationStack, pricing, comparison
         return built;
       }
 
-      // Si une session non-anonyme existe déjà (retour sur un appareil déjà
-      // connecté — la session est persistée nativement en localStorage par
-      // le SDK), l'écran auth est sauté. Si en plus funnel_last_step indique
-      // un quiz commencé mais pas fini, les réponses déjà données sont
-      // restaurées depuis profiles — pas de redémarrage à zéro.
+      // Le brouillon localStorage passe en premier, avant même de vérifier
+      // la session : c'est la source la plus fraîche (elle survit à un
+      // redirect complet, par ex. après le clic "Continuer avec Google" à
+      // l'écran auth -- désormais le DERNIER écran, donc potentiellement
+      // après 5 questions déjà répondues, contrairement à `answers` en
+      // mémoire qui ne survivrait pas au rechargement de page). La reprise
+      // depuis `profiles` (funnel_last_step) ci-dessous ne sert plus que
+      // pour un retour sur un autre appareil sans ce localStorage, ou un
+      // compte créé avant cette refonte du funnel.
       function determineStartIndex() {
         var supabase = window.ColdTrendSupabase;
+        var draft = loadDraftLocally();
+        if (draft && draft.stepIndex > 0 && draft.stepIndex < questionScreens.length) {
+          answers = draft.answers || {};
+          navHistory = buildNavHistoryUpTo(draft.stepIndex);
+          restoreAnswersUI();
+          updateBackVisibility();
+          if (!supabase) return Promise.resolve(draft.stepIndex);
+          return supabase.auth.getSession().then(function (res) {
+            var user = res.data.session ? res.data.session.user : null;
+            if (!user || user.is_anonymous) return draft.stepIndex;
+            showConnectedBadge();
+            // Le compte existe déjà (ex: retour d'un redirect Google
+            // complet, qui recharge la page en plein milieu du brouillon) --
+            // si le brouillon pointait sur "auth" ou au-delà, tout est déjà
+            // répondu ET le compte confirmé : plus rien à demander, direct
+            // au résultat plutôt que de remontrer l'écran auth.
+            var authIndex = -1;
+            for (var i = 0; i < questionScreens.length; i += 1) {
+              if (questionScreens[i].getAttribute("data-id") === "auth") {
+                authIndex = i;
+                break;
+              }
+            }
+            if (authIndex !== -1 && draft.stepIndex >= authIndex) {
+              return questionScreens.length;
+            }
+            return draft.stepIndex;
+          });
+        }
+
         if (!supabase) return Promise.resolve(0);
         return supabase.auth
           .getSession()
@@ -4402,7 +4647,12 @@ function page({ brand, hero, socialProof, notificationStack, pricing, comparison
 
         determineStartIndex().then(function (startIndex) {
           currentQuestionIndex = startIndex;
-          setProgress(startIndex, true);
+          if (startIndex >= questionScreens.length) {
+            setProgress(progressFillCount(questionScreens.length));
+            goToResult();
+            return;
+          }
+          setProgress(progressFillCount(startIndex), true);
           var screenEl = questionScreens[startIndex];
           updateNextEnabled(screenEl);
           transitionTo(screenEl, "forward");
@@ -4448,12 +4698,19 @@ function page({ brand, hero, socialProof, notificationStack, pricing, comparison
               b.classList.toggle("is-selected", b === optBtn);
             });
 
-            if (id === "dejaCherche") {
+            if (id === "dejaCherche" || id === "budget") {
               var followupEl2 = document.getElementById("quiz-followup");
               var followupText = optBtn.getAttribute("data-followup");
-              if (followupEl2 && followupText) {
-                followupEl2.textContent = followupText;
-                followupEl2.classList.add("is-visible");
+              // Le budget n'a une reassurance que sur les réponses
+              // "inconfortables" (low/undecided) -- pas la peine de forcer
+              // une phrase là où il n'y a rien à dédramatiser (mid/high).
+              if (followupEl2) {
+                if (followupText) {
+                  followupEl2.textContent = followupText;
+                  followupEl2.classList.add("is-visible");
+                } else {
+                  followupEl2.classList.remove("is-visible");
+                }
               }
             }
           }
@@ -4540,7 +4797,7 @@ function page({ brand, hero, socialProof, notificationStack, pricing, comparison
         }
         var prevIndex = navHistory.pop();
         currentQuestionIndex = prevIndex;
-        setProgress(prevIndex, true);
+        setProgress(progressFillCount(prevIndex), true);
         updateBackVisibility();
         var screenEl = questionScreens[prevIndex];
         updateNextEnabled(screenEl);
@@ -4727,7 +4984,12 @@ function page({ brand, hero, socialProof, notificationStack, pricing, comparison
           continueBtn.onclick = function () {
             determineStartIndex().then(function (startIndex) {
               currentQuestionIndex = startIndex;
-              setProgress(startIndex, true);
+              if (startIndex >= questionScreens.length) {
+                setProgress(progressFillCount(questionScreens.length));
+                goToResult();
+                return;
+              }
+              setProgress(progressFillCount(startIndex), true);
               var screenEl = questionScreens[startIndex];
               updateNextEnabled(screenEl);
               transitionTo(screenEl, "forward");
@@ -4964,8 +5226,33 @@ function renderQuizQuestionScreen(question, index) {
     ? ` data-skip-field="${question.skipIf.field}" data-skip-equals="${question.skipIf.equals}"`
     : "";
 
+  if (question.type === "intro") {
+    // Écran de contexte, pas une question -- même bouton .quiz-next que le
+    // reste pour rester dans le même moteur d'avancement (goForwardFromQuestion).
+    return `<div class="quiz-screen quiz-intro" data-screen="question" data-index="${index}" data-id="${question.id}" data-step-name="${question.stepName}"${skipAttrs}>
+          <h2 class="quiz-question-title">${question.title}</h2>
+          <p class="quiz-subtext">${question.subtext}</p>
+          <div class="quiz-footer">
+            <button class="btn btn--primary quiz-next" type="button">${question.cta}</button>
+          </div>
+        </div>`;
+  }
+
+  if (question.type === "mirror") {
+    // Charnière de fin de chapitre 1 -- le texte de #quiz-mirror-text est
+    // rempli dynamiquement par buildMirrorText() dans transitionTo(), pas
+    // ici (les réponses ne sont connues qu'au moment où l'écran s'affiche).
+    return `<div class="quiz-screen quiz-mirror" data-screen="question" data-index="${index}" data-id="${question.id}" data-step-name="${question.stepName}"${skipAttrs}>
+          <p class="quiz-mirror__eyebrow">${question.eyebrow}</p>
+          <p class="quiz-mirror__text" id="quiz-mirror-text"></p>
+          <div class="quiz-footer">
+            <button class="btn btn--primary quiz-next" type="button">Continuer — Chapitre 2</button>
+          </div>
+        </div>`;
+  }
+
   if (question.type === "auth") {
-    // Première question du parcours, pas un gate à part : même carte, même
+    // Dernière étape du parcours, pas un gate à part : même carte, même
     // bouton "Continuer" (classe .quiz-next partagée avec les autres
     // écrans). Le fond en mesh-gradient (.quiz-auth-mesh) et le stagger
     // d'apparition des deux champs (.quiz-auth-field--1/--2) sont les seuls
@@ -5049,7 +5336,7 @@ function renderQuizQuestionScreen(question, index) {
   }
 
   const followupBlock =
-    question.id === "dejaCherche"
+    question.id === "dejaCherche" || question.id === "budget"
       ? `<p class="quiz-followup" id="quiz-followup" aria-live="polite"></p>`
       : "";
 
@@ -5060,7 +5347,9 @@ function renderQuizQuestionScreen(question, index) {
   // de cocher plusieurs cases avant de partir.
   const footerBlock = "";
 
-  return `<div class="quiz-screen" data-screen="question" data-index="${index}" data-id="${question.id}" data-step-name="${question.stepName}"${skipAttrs}>
+  const chapterAttr = question.chapter ? ` data-chapter="${question.chapter}"` : "";
+
+  return `<div class="quiz-screen" data-screen="question" data-index="${index}" data-id="${question.id}" data-step-name="${question.stepName}"${skipAttrs}${chapterAttr}>
           <h2 class="quiz-question-title">${question.title}</h2>
           ${question.subtext ? `<p class="quiz-subtext">${question.subtext}</p>` : ""}
           ${renderQuizOptions(question)}
@@ -5071,7 +5360,19 @@ function renderQuizQuestionScreen(question, index) {
 
 function renderQuizOverlay({ quiz, pricing, stripeLink }) {
   const questionScreens = quiz.questions.map(renderQuizQuestionScreen).join("\n        ");
-  const totalSteps = quiz.questions.length + 1; // + écran résultat = 7 au total
+
+  // Barre segmentée par chapitre, pas un simple avancement brut -- seules
+  // les 5 questions "réelles" (marquées `chapter`) ont un segment ; intro,
+  // miroir et auth sont des moments de cadrage, pas de la progression
+  // comptabilisée. Voir progressFillCount() côté client pour la conversion
+  // index d'écran -> nombre de segments remplis.
+  function renderChapterSegs(count) {
+    return Array.from({ length: count })
+      .map(() => `<span class="quiz-progress__seg"><span class="quiz-progress__seg-fill"></span></span>`)
+      .join("\n        ");
+  }
+  const chapter1Count = quiz.questions.filter((q) => q.chapter === 1).length;
+  const chapter2Count = quiz.questions.filter((q) => q.chapter === 2).length;
 
   return `<div class="quiz-overlay" id="quiz-overlay" role="dialog" aria-modal="true" aria-label="Trouver ton SaaS">
     <div class="quiz-header">
@@ -5080,9 +5381,13 @@ function renderQuizOverlay({ quiz, pricing, stripeLink }) {
       <button class="quiz-close" id="quiz-close-btn" type="button" aria-label="Fermer">${ICON_CLOSE}</button>
     </div>
     <div class="quiz-progress" id="quiz-progress">
-      ${Array.from({ length: totalSteps })
-        .map(() => `<span class="quiz-progress__seg"><span class="quiz-progress__seg-fill"></span></span>`)
-        .join("\n      ")}
+      <div class="quiz-progress__group" data-chapter="1">
+        ${renderChapterSegs(chapter1Count)}
+      </div>
+      <div class="quiz-progress__group-gap" aria-hidden="true"></div>
+      <div class="quiz-progress__group" data-chapter="2">
+        ${renderChapterSegs(chapter2Count)}
+      </div>
     </div>
     <div class="quiz-banner quiz-banner--alert" id="quiz-auth-banner" role="alert">
       <span id="quiz-auth-banner-text"></span>
