@@ -343,8 +343,8 @@ const quiz = {
   // voir persistDraftLocally()/determineStartIndex() dans le script client :
   // tant qu'aucun compte n'existe, la progression vit en localStorage, pas
   // en base (aucune session à qui écrire avant l'écran "auth").
-  // `chapter` marque les 5 questions "réelles" qui comptent pour la barre
-  // de progression segmentée -- intro/mirror/auth n'ont pas leur propre
+  // Le champ chapter marque les 5 questions "réelles" qui comptent pour la
+  // barre de progression segmentée -- intro/mirror/auth n'ont pas leur propre
   // segment (framing, pas avancement).
   questions: [
     {
@@ -4222,7 +4222,7 @@ function page({ brand, hero, socialProof, notificationStack, pricing, comparison
       // session n'existe tant qu'il n'est pas soumis, donc aucune écriture
       // Supabase n'est possible avant ce point (persistProgress() no-op
       // silencieusement faute d'utilisateur). Le brouillon vit en
-      // localStorage jusque-là, migré vers `profiles` par persistQuizAnswers()
+      // localStorage jusque-là, migré vers profiles par persistQuizAnswers()
       // une fois le compte créé (voir goToResult()), puis vidé.
       var QUIZ_DRAFT_KEY = "coldtrend_quiz_draft";
 
@@ -4527,9 +4527,9 @@ function page({ brand, hero, socialProof, notificationStack, pricing, comparison
       // la session : c'est la source la plus fraîche (elle survit à un
       // redirect complet, par ex. après le clic "Continuer avec Google" à
       // l'écran auth -- désormais le DERNIER écran, donc potentiellement
-      // après 5 questions déjà répondues, contrairement à `answers` en
+      // après 5 questions déjà répondues, contrairement à answers en
       // mémoire qui ne survivrait pas au rechargement de page). La reprise
-      // depuis `profiles` (funnel_last_step) ci-dessous ne sert plus que
+      // depuis profiles (funnel_last_step) ci-dessous ne sert plus que
       // pour un retour sur un autre appareil sans ce localStorage, ou un
       // compte créé avant cette refonte du funnel.
       function determineStartIndex() {
@@ -5362,7 +5362,7 @@ function renderQuizOverlay({ quiz, pricing, stripeLink }) {
   const questionScreens = quiz.questions.map(renderQuizQuestionScreen).join("\n        ");
 
   // Barre segmentée par chapitre, pas un simple avancement brut -- seules
-  // les 5 questions "réelles" (marquées `chapter`) ont un segment ; intro,
+  // les 5 questions "réelles" (marquées chapter) ont un segment ; intro,
   // miroir et auth sont des moments de cadrage, pas de la progression
   // comptabilisée. Voir progressFillCount() côté client pour la conversion
   // index d'écran -> nombre de segments remplis.
