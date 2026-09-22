@@ -126,8 +126,14 @@ const hero = {
 };
 
 const socialProof = {
-  label: "Données croisées et vérifiées via",
-  sources: ["Stripe", "TrustMRR", "Stripe Connect", "TrustMRR Verified", "Stripe", "TrustMRR"]
+  titleLine1: "Les outils qui vont transformer",
+  titleLine2: "ton idée en réalité",
+  logos: [
+    { src: "/logos/trustmrr.png", alt: "TrustMRR" },
+    { src: "/logos/stripe.png", alt: "Stripe" },
+    { src: "/logos/whop.png", alt: "Whop" },
+    { src: "/logos/claude.png", alt: "Claude" }
+  ]
 };
 
 // Notification stack — MRR climbs gently across the pool (1 850€ -> 21 400€),
@@ -1197,21 +1203,47 @@ function page({ brand, hero, socialProof, notificationStack, pricing, comparison
   /* ---------------- Social proof strip ---------------- */
 
   .proof {
-    padding-block: 28px 48px;
+    position: relative;
+    padding-block: 56px 60px;
     border-top: 1px solid #232936;
+    overflow: hidden;
   }
 
-  .proof__label {
+  /* Glow radial discret derrière le titre -- pas une décoration isolée,
+     juste assez pour renforcer le titre sans distraire du marquee. */
+  .proof__glow {
+    position: absolute;
+    top: -100px;
+    left: 50%;
+    width: 560px;
+    height: 340px;
+    transform: translateX(-50%);
+    background: radial-gradient(closest-side, rgba(0, 71, 255, 0.22), transparent);
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .proof__title {
+    position: relative;
+    z-index: 1;
     text-align: center;
-    font-size: 12px;
-    font-weight: 600;
-    letter-spacing: 0.05em;
-    text-transform: uppercase;
-    color: var(--steel);
-    margin: 0 0 18px;
+    font-size: clamp(20px, 3.6vw, 30px);
+    font-weight: 800;
+    line-height: 1.3;
+    margin: 0 0 36px;
+    color: var(--paper-soft);
+  }
+
+  .proof__title-accent {
+    background: linear-gradient(180deg, #FFFFFF 0%, #B8BCC4 55%, #8A8F98 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
   }
 
   .proof__track-viewport {
+    position: relative;
+    z-index: 1;
     overflow: hidden;
     mask-image: linear-gradient(to right, transparent, black 12%, black 88%, transparent);
     -webkit-mask-image: linear-gradient(to right, transparent, black 12%, black 88%, transparent);
@@ -1220,9 +1252,15 @@ function page({ brand, hero, socialProof, notificationStack, pricing, comparison
   .proof__track {
     display: flex;
     align-items: center;
-    gap: 40px;
+    gap: 20px;
     width: max-content;
-    animation: proof-scroll 22s linear infinite;
+    animation: proof-scroll 30s linear infinite;
+  }
+
+  /* Pause au hover global du marquee -- indépendante du hover par carte
+     individuelle ci-dessous (lift + glow), les deux coexistent. */
+  .proof__track-viewport:hover .proof__track {
+    animation-play-state: paused;
   }
 
   @media (prefers-reduced-motion: reduce) {
@@ -1234,26 +1272,40 @@ function page({ brand, hero, socialProof, notificationStack, pricing, comparison
     to { transform: translateX(-50%); }
   }
 
-  .proof__item {
-    display: inline-flex;
+  .proof__card {
+    display: flex;
     align-items: center;
-    gap: 8px;
-    font-weight: 700;
-    font-size: 15px;
-    color: var(--steel);
-    white-space: nowrap;
-  }
-
-  .proof__item svg {
-    width: 14px;
-    height: 14px;
+    justify-content: center;
     flex-shrink: 0;
-    color: var(--cobalt);
+    width: 148px;
+    height: 84px;
+    border-radius: 16px;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+    transition: transform 0.28s cubic-bezier(0.22, 1, 0.36, 1), box-shadow 0.28s ease, border-color 0.28s ease;
   }
 
-  .proof__item strong {
-    color: var(--paper-soft);
-    font-weight: 800;
+  .proof__card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 12px 28px -8px rgba(0, 71, 255, 0.35);
+    border-color: rgba(0, 71, 255, 0.35);
+  }
+
+  .proof__logo {
+    max-width: 68%;
+    max-height: 42%;
+    /* Grayscale + luminosité relevée : un logo sombre (Stripe) comme un
+       logo clair (Whop, TrustMRR) doivent rester lisibles au repos sur une
+       card quasi-noire -- un simple grayscale(1) sans correction de
+       luminosité rendrait Stripe presque invisible. */
+    filter: grayscale(1) brightness(2.4) opacity(0.55);
+    transition: filter 0.28s ease;
+  }
+
+  .proof__card:hover .proof__logo {
+    filter: none;
   }
 
   /* ---------------- Shared section chrome (comparison / FAQ / transition) ---------------- */
@@ -2888,12 +2940,16 @@ function page({ brand, hero, socialProof, notificationStack, pricing, comparison
       </div>
     </section>
 
-    <section class="proof" aria-label="Sources de données vérifiées">
-      <p class="proof__label">${socialProof.label}</p>
+    <section class="proof" aria-label="Outils utilisés">
+      <div class="proof__glow" aria-hidden="true"></div>
+      <h2 class="proof__title">
+        ${socialProof.titleLine1}<br />
+        <span class="proof__title-accent">${socialProof.titleLine2}</span>
+      </h2>
       <div class="proof__track-viewport">
         <div class="proof__track" id="proof-track">
-          ${renderProofItems(socialProof.sources)}
-          ${renderProofItems(socialProof.sources, true)}
+          ${renderProofLogos(socialProof.logos)}
+          ${renderProofLogos(socialProof.logos, true)}
         </div>
       </div>
     </section>
@@ -4705,15 +4761,16 @@ function page({ brand, hero, socialProof, notificationStack, pricing, comparison
 `;
 }
 
-function renderProofItems(sources, ariaHidden) {
-  return sources
+// Composant réutilisable : liste de logos { src, alt } -> deux passages
+// dupliqués (le second aria-hidden) pour une boucle de marquee sans coupure
+// visible, même technique déjà en place ailleurs sur cette page (mask-image
+// + translateX(-50%)).
+function renderProofLogos(logos, ariaHidden) {
+  return logos
     .map(
-      (name) => `<span class="proof__item"${ariaHidden ? ' aria-hidden="true"' : ""}>
-        <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-          <path d="M20 6L9 17l-5-5" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
-        </svg>
-        <strong>${name}</strong>
-      </span>`
+      (logo) => `<div class="proof__card"${ariaHidden ? ' aria-hidden="true"' : ""}>
+        <img class="proof__logo" src="${logo.src}" alt="${ariaHidden ? "" : logo.alt}" loading="lazy" />
+      </div>`
     )
     .join("\n          ");
 }
