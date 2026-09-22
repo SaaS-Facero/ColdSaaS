@@ -181,7 +181,7 @@ const faq = {
   items: [
     {
       q: "C'est pas juste un générateur d'idées IA de plus ?",
-      a: "Oui, on est un générateur IA — mais vérifié. Il ne part jamais d'une page blanche : il travaille sur ~340 SaaS réels dont le revenu est confirmé via TrustMRR (Stripe/LemonSqueezy), et te fait correspondre ou reformule un concept à partir de ce chiffre-là, pas inventé de zéro. La différence avec les autres générateurs : chez eux le prompt part de rien, chez nous il part d'un revenu confirmé."
+      a: "Ça dépend du chemin. Si tu veux racheter un SaaS, chaque fiche est une entreprise réelle avec un revenu confirmé par TrustMRR — pas de génération là-dedans. Si tu veux copier / t'inspirer, le concept est généré par IA, mais toujours à partir de données de marché réelles et vérifiées (fourchettes de MRR par secteur, sur ~340 SaaS TrustMRR) — jamais un prompt qui part de rien."
     },
     {
       q: "Comment vous êtes sûrs que les chiffres sont vrais ?",
@@ -189,11 +189,11 @@ const faq = {
     },
     {
       q: "Le badge Vérifié, ça veut dire quoi exactement ?",
-      a: "Que ce SaaS précis a un revenu confirmé par une source de paiement indépendante, à un instant donné. Ça ne garantit pas que le business continuera de tourner pareil demain — on vérifie un chiffre passé, pas une promesse."
+      a: "Sur le chemin racheter : que ce SaaS précis a un revenu confirmé par une source de paiement indépendante, à un instant donné — pas une garantie de rentabilité future. Sur le chemin copier : que les données de marché utilisées pour générer le concept (fourchette de MRR du secteur) sont vérifiées, pas que l'entreprise existe telle quelle."
     },
     {
       q: "Vous les sortez d'où, ces SaaS ?",
-      a: "Ce qu'on te montre dépend de tes réponses au quiz (secteur, budget, temps disponible) : la base est la même pour tout le monde, la sélection qu'on t'en sort non."
+      a: "Pour racheter : de TrustMRR.com, revenu vérifié par API, sélection manuelle dans la base ColdTrend. Pour copier : le concept est généré à partir de ces mêmes données de marché vérifiées, pas d'une fiche importée précise. Dans les deux cas, ce qu'on te montre dépend de tes réponses au quiz (secteur, budget, temps disponible)."
     },
     {
       q: "La base bouge, ou c'est toujours les mêmes fiches ?",
