@@ -355,7 +355,7 @@ const quiz = {
       stepName: "intro",
       type: "intro",
       title: "Pas un quiz de plus.",
-      subtext: "5 questions, aucune pour te trier dans une case — chacune sert à filtrer une base réelle de SaaS vérifiés selon ta situation, pas à deviner qui tu es.",
+      subtext: "7 questions, aucune pour te trier dans une case — chacune sert à filtrer une base réelle de SaaS vérifiés selon ta situation, pas à deviner qui tu es.",
       cta: "Commencer"
     },
     {
@@ -374,6 +374,51 @@ const quiz = {
           value: "copier",
           label: "Copier / m'inspirer",
           hint: "Tu gardes l'idée validée, tu codes ta propre version."
+        }
+      ]
+    },
+    {
+      // Réponse réutilisée dans buildMirrorText() (fragment situation) --
+      // jamais une question posée sans réemploi en aval. "autre" n'ouvre
+      // pas de champ libre (le moteur d'avance auto du quiz ne gère pas de
+      // sous-flux texte sans casser le pattern clic -> avance immédiate) :
+      // elle reste sélectionnable mais reçoit un fragment miroir générique.
+      id: "situation",
+      stepName: "situation",
+      chapter: 1,
+      title: "Aujourd'hui, tu gagnes ta vie comment ?",
+      type: "single",
+      options: [
+        { value: "salarie", label: "Salarié", hint: "Tu as un revenu stable, tu explores en parallèle." },
+        { value: "independant", label: "Indépendant", hint: "Tu es déjà seul aux commandes de ton activité." },
+        { value: "etudiant", label: "Étudiant", hint: "Tu as du temps mais pas encore de revenu fixe." },
+        {
+          value: "activite_en_ligne",
+          label: "J'ai déjà une activité en ligne",
+          hint: "Tu connais déjà les bases, tu cherches ta prochaine idée."
+        },
+        { value: "autre", label: "Autre", hint: "Ta situation ne rentre pas dans une case toute faite." }
+      ]
+    },
+    {
+      // Réponse réutilisée dans buildMirrorText() (fragment passif).
+      id: "passif",
+      stepName: "passif",
+      chapter: 1,
+      title: "Tu en es où avec le business en ligne ?",
+      type: "single",
+      options: [
+        { value: "jamais_lance", label: "Je n'ai jamais rien lancé", hint: "Premier projet, aucune expérience à corriger." },
+        {
+          value: "lance_abandonne",
+          label: "J'ai lancé, puis abandonné",
+          hint: "Tu sais déjà à quoi ressemble le moment où on décroche."
+        },
+        { value: "deja_vendu", label: "J'ai déjà vendu quelque chose", hint: "Tu as déjà validé que tu peux convertir." },
+        {
+          value: "ca_tourne",
+          label: "J'ai déjà un truc qui tourne",
+          hint: "Tu cherches à diversifier, pas à repartir de zéro."
         }
       ]
     },
@@ -4018,6 +4063,22 @@ function page({ brand, hero, socialProof, notificationStack, pricing, comparison
         } else if (a.intention === "copier") {
           parts.push("Tu préfères construire toi-même, sur une base qui a déjà prouvé qu'elle marche.");
         }
+
+        var SITUATION_FRAGMENTS = {
+          salarie: "Tu as un revenu stable, tu explores en parallèle.",
+          independant: "Tu es déjà seul aux commandes de ton activité.",
+          etudiant: "Tu as du temps mais pas encore de revenu fixe.",
+          activite_en_ligne: "Tu connais déjà les bases, tu cherches ta prochaine idée."
+        };
+        if (SITUATION_FRAGMENTS[a.situation]) parts.push(SITUATION_FRAGMENTS[a.situation]);
+
+        var PASSIF_FRAGMENTS = {
+          jamais_lance: "Premier projet, aucune expérience à corriger.",
+          lance_abandonne: "Tu sais déjà à quoi ressemble le moment où on décroche.",
+          deja_vendu: "Tu as déjà validé que tu peux convertir.",
+          ca_tourne: "Tu cherches à diversifier, pas à repartir de zéro."
+        };
+        if (PASSIF_FRAGMENTS[a.passif]) parts.push(PASSIF_FRAGMENTS[a.passif]);
 
         var sectors = a.secteur || [];
         if (sectors.indexOf("both") !== -1) {
