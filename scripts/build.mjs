@@ -4961,15 +4961,22 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
       function restoreAnswersUI() {
         questionScreens.forEach(function (screenEl) {
           var id = screenEl.getAttribute("data-id");
-          if (id === "auth" || answers[id] === undefined) return;
           if (id === "objectifRevenu") {
+            // Toujours resynchronisé, même si answers.objectifRevenu est
+            // encore undefined (brouillon sauvegardé avant l'ajout de cette
+            // question, ou reprise depuis profiles qui ne la connaît pas) --
+            // sinon le slider affiche sa valeur par défaut sans que answers
+            // ne la reflète, et generate-user-concept ne la recevrait jamais.
             var sliderInput = document.getElementById("revenue-slider-input");
             if (sliderInput) {
-              sliderInput.value = String(answers.objectifRevenu);
+              if (typeof answers.objectifRevenu === "number") {
+                sliderInput.value = String(answers.objectifRevenu);
+              }
               updateRevenueSlider();
             }
             return;
           }
+          if (id === "auth" || answers[id] === undefined) return;
           var optionsWrap = screenEl.querySelector("[data-quiz-options]");
           if (!optionsWrap) return;
           var type = optionsWrap.getAttribute("data-type");
