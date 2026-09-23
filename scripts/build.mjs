@@ -3125,6 +3125,29 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
     opacity: 0.5;
   }
 
+  /* Paiement -- deuxième climax du parcours (avec le résultat) : fond
+     double dégradé asymétrique (pas juste un cercle centré) + grille de
+     points très fine, cohérent avec l'écran résultat sans être identique.
+     Pas de position: relative -- idem que les autres écrans texturés. */
+  .quiz-screen.quiz-payment::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    background:
+      radial-gradient(1100px 560px at 18% -8%, rgba(0, 71, 255, 0.14), transparent 60%),
+      radial-gradient(900px 520px at 88% 8%, rgba(138, 143, 152, 0.06), transparent 55%);
+  }
+  .quiz-screen.quiz-payment::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    background-image: radial-gradient(rgba(255, 255, 255, 0.06) 1px, transparent 1px);
+    background-size: 24px 24px;
+    opacity: 0.4;
+  }
+
   @media (prefers-reduced-motion: reduce) {
     .quiz-screen.quiz-mirror::before { transition: opacity 220ms ease-out; }
     .quiz-screen.quiz-mirror::after { animation: none; opacity: 0.7; }
@@ -3703,9 +3726,18 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
     font-size: 17px;
     padding: 17px;
     transition: transform 180ms cubic-bezier(0.4, 0, 0.2, 1), box-shadow 180ms cubic-bezier(0.4, 0, 0.2, 1), background 0.18s ease;
+    animation: cta-final-breathe 3.6s ease-in-out infinite;
+  }
+
+  /* Respiration très légère au repos -- attire l'œil sans clignoter,
+     s'arrête net au survol (le hover a sa propre ombre, plus marquée). */
+  @keyframes cta-final-breathe {
+    0%, 100% { box-shadow: 0 6px 18px -8px rgba(0, 71, 255, 0.4); }
+    50% { box-shadow: 0 6px 24px -6px rgba(0, 71, 255, 0.65); }
   }
 
   .btn--cta-final:hover {
+    animation-play-state: paused;
     transform: translateY(-2px);
     box-shadow: 0 12px 28px -8px rgba(0, 71, 255, 0.65);
   }
@@ -3715,7 +3747,7 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
   }
 
   @media (prefers-reduced-motion: reduce) {
-    .btn--cta-final { transition: none; }
+    .btn--cta-final { transition: none; animation: none; box-shadow: 0 6px 18px -8px rgba(0, 71, 255, 0.4); }
     .btn--cta-final:hover { transform: none; }
   }
 
@@ -6466,7 +6498,7 @@ function renderQuizOverlay({ quiz, pricing, stripeLink }) {
         </a>
       </div>
 
-      <div class="quiz-screen" data-screen="payment" data-step-name="paiement">
+      <div class="quiz-screen quiz-payment" data-screen="payment" data-step-name="paiement">
         <p class="quiz-payment__teaser" id="quiz-teaser"></p>
 
         <div class="payment-card" id="payment-card">
