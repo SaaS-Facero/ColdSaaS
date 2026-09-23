@@ -3686,6 +3686,7 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
     margin-top: 28px;
     padding-top: 20px;
     border-top: 1px solid rgba(255, 255, 255, 0.08);
+    text-align: left;
   }
 
   .payment-faq__title {
@@ -3749,6 +3750,25 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
   @media (prefers-reduced-motion: reduce) {
     .btn--cta-final { transition: none; animation: none; box-shadow: 0 6px 18px -8px rgba(0, 71, 255, 0.4); }
     .btn--cta-final:hover { transform: none; }
+  }
+
+  /* Même respiration que le CTA de paiement -- même bouton "climax",
+     un écran plus tôt dans le parcours (le résultat, avant même d'arriver
+     à l'écran de paiement). */
+  #quiz-see-offer-btn {
+    animation: cta-final-breathe 3.6s ease-in-out infinite;
+    transition: transform 180ms cubic-bezier(0.4, 0, 0.2, 1), box-shadow 180ms cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  #quiz-see-offer-btn:hover {
+    animation-play-state: paused;
+    transform: translateY(-2px);
+    box-shadow: 0 12px 28px -8px rgba(0, 71, 255, 0.65);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    #quiz-see-offer-btn { animation: none; transition: none; box-shadow: 0 6px 18px -8px rgba(0, 71, 255, 0.4); }
+    #quiz-see-offer-btn:hover { transform: none; }
   }
 
   /* Offre de bienvenue -- remplace le price-block par défaut une fois le
@@ -6496,6 +6516,11 @@ function renderQuizOverlay({ quiz, pricing, stripeLink }) {
           <span class="result-bonus-chapter__title">Ton profil entrepreneur</span>
           <span class="result-bonus-chapter__text">9 questions courtes, un profil généré pour toi — disponible depuis ton dossier une fois ton accès débloqué.</span>
         </a>
+
+        <div class="payment-faq">
+          <p class="payment-faq__title">Questions fréquentes</p>
+          ${renderFaqItems(paymentFaqItems)}
+        </div>
       </div>
 
       <div class="quiz-screen quiz-payment" data-screen="payment" data-step-name="paiement">
