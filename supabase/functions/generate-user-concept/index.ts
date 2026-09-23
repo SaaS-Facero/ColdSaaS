@@ -94,7 +94,13 @@ Format de sortie : JSON strict, aucun texte hors JSON.`;
 
   const sectorText = a.secteur.length ? a.secteur.map((s) => SECTOR_LABELS[s] || s).join(", ") : "non communiqué";
   const user = `Profil :
-- Intention : ${a.intention === "racheter" ? "Racheter un SaaS existant" : a.intention === "copier" ? "Copier / s'inspirer pour repartir de zéro" : "non communiqué"}
+- Intention : ${
+    a.intention === "rachat" || a.intention === "racheter"
+      ? "Racheter un SaaS existant"
+      : a.intention === "creation" || a.intention === "copier"
+        ? "Créer son propre concept, repartir de zéro"
+        : "non communiqué"
+  }
 - Situation actuelle : ${a.situation ? SITUATION_LABELS[a.situation] || a.situation : "non communiqué"}
 - Expérience business en ligne : ${a.passif ? PASSIF_LABELS[a.passif] || a.passif : "non communiqué"}
 - Secteur visé : ${sectorText}
@@ -146,8 +152,23 @@ Deno.serve(async (req) => {
 
   const admin = createClient(supabaseUrl, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
 
-  const { data: cached } = await admin.from("user_concepts").select("*").eq("user_id", userId).maybeSingle();
-  if (cached) return json({ concept: cached, cached: true });
+  // situation/passif/objectifRevenu ne sont pas encore des colonnes profiles
+  // (voir commentaire dans scripts/build.mjs, quiz.questions) -- récupérées
+  // côté client et transmises dans le corps de la requête plutôt qu'en base.
+  // forceRegenerate contourne le cache : utilisé par le lien "tu cherches
+  // plutôt à racheter ?" sur l'écran résultat, sans quoi cet endpoint
+  // renverrait indéfiniment l'ancien concept généré pour "creation".
+  let body: { situation?: string; passif?: string; objectifRevenu?: number; forceRegenerate?: boolean } = {};
+  try {
+    body = await req.json();
+  } catch {
+    /* corps vide accepté -- champs manquants restent "non communiqué" */
+  }
+
+  if (!body.forceRegenerate) {
+    const { data: cached } = await admin.from("user_concepts").select("*").eq("user_id", userId).maybeSingle();
+    if (cached) return json({ concept: cached, cached: true });
+  }
 
   const { data: profileRow, error: profileErr } = await admin
     .from("profiles")
@@ -160,16 +181,6 @@ Deno.serve(async (req) => {
   if (!openRouterKey) {
     console.error("[generate-user-concept] OPENROUTER_API_KEY manquante.");
     return json({ error: "Configuration manquante." }, 500);
-  }
-
-  // situation/passif/objectifRevenu ne sont pas encore des colonnes profiles
-  // (voir commentaire dans scripts/build.mjs, quiz.questions) -- récupérées
-  // côté client et transmises dans le corps de la requête plutôt qu'en base.
-  let body: { situation?: string; passif?: string; objectifRevenu?: number } = {};
-  try {
-    body = await req.json();
-  } catch {
-    /* corps vide accepté -- champs manquants restent "non communiqué" */
   }
 
   const { system, user } = buildPrompt({

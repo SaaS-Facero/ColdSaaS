@@ -350,29 +350,15 @@ const quiz = {
       stepName: "intro",
       type: "intro",
       title: "Pas un quiz de plus.",
-      subtext: "8 questions, aucune pour te trier dans une case — chacune sert à générer un concept de SaaS qui correspond vraiment à ta situation, pas à deviner qui tu es.",
+      subtext: "7 questions, aucune pour te trier dans une case — chacune sert à générer un concept de SaaS qui correspond vraiment à ta situation, pas à deviner qui tu es.",
       cta: "Commencer"
     },
     {
-      id: "intention",
-      stepName: "intention",
-      chapter: 1,
-      title: "Tu veux racheter un SaaS qui tourne déjà, ou t'inspirer d'un concept pour repartir de zéro ?",
-      type: "single",
-      options: [
-        {
-          value: "racheter",
-          label: "Racheter",
-          hint: "Tu reprends les clients, le revenu, l'historique. Tu démarres avec du chiffre d'affaires."
-        },
-        {
-          value: "copier",
-          label: "Copier / m'inspirer",
-          hint: "Tu gardes l'idée validée, tu codes ta propre version."
-        }
-      ]
-    },
-    {
+      // Écran "intention" (Racheter/Copier) retiré du parcours visible --
+      // intention prend désormais "creation" par défaut, en interne, sans
+      // écran dédié. Bascule possible vers "rachat" uniquement via le lien
+      // discret sur l'écran résultat (voir #result-intention-toggle), qui
+      // retague profiles.intention et régénère le concept en conséquence.
       // Réponse réutilisée dans buildMirrorText() (fragment situation) --
       // jamais une question posée sans réemploi en aval. "autre" n'ouvre
       // pas de champ libre (le moteur d'avance auto du quiz ne gère pas de
@@ -443,9 +429,11 @@ const quiz = {
       chapter: 1,
       chapterLabel: "Ton budget",
       chapterIcon: "budget",
-      title: "Pour ne te montrer que ce que tu peux vraiment acheter.",
+      // skipIf retiré : sans écran "intention", plus aucun cas ne le
+      // déclenchait (l'ancienne condition dépendait de la réponse "copier"
+      // à cet écran) -- budget reste pertinent quel que soit intention.
+      title: "Pour orienter le concept vers un budget de démarrage réaliste.",
       type: "single",
-      skipIf: { field: "intention", equals: "copier" },
       options: [
         {
           value: "low",
@@ -3235,6 +3223,41 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
     display: inline-flex;
   }
 
+  /* Lien discret -- volontairement en retrait (Steel Gray, pas de fond,
+     petit), jamais présenté comme un second CTA concurrent du bouton
+     principal. Bascule intention -> "rachat" et régénère le concept, voir
+     handleIntentionToggle() côté client. */
+  .result-intention-toggle {
+    display: block;
+    width: 100%;
+    background: none;
+    border: none;
+    padding: 14px 0 0;
+    font-family: inherit;
+    font-size: 13px;
+    color: var(--steel);
+    text-align: center;
+    cursor: pointer;
+    transition: color 180ms ease;
+  }
+
+  .result-intention-toggle:hover {
+    color: var(--paper-soft);
+  }
+
+  .result-intention-toggle:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+  }
+
+  .result-intention-toggle__status {
+    font-size: 12px;
+    color: var(--cobalt-soft);
+    text-align: center;
+    margin: 6px 0 0;
+    min-height: 1em;
+  }
+
   /* Chapitre bonus -- bloc distinct, pas un lien perdu en bas d'écran.
      Pointe vers /compte : le module reste gratuit en soi, mais n'est
      accessible qu'une fois l'accès débloqué (voir comptePage()). */
@@ -3657,7 +3680,7 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
 
     <section class="transition-cta" id="pricing">
       <h2 class="transition-cta__title">Trouve ton SaaS en 60 secondes</h2>
-      <p class="transition-cta__lead">Huit questions rapides pour générer un concept de SaaS qui correspond à ton budget, ton temps et ton secteur.</p>
+      <p class="transition-cta__lead">Sept questions rapides pour générer un concept de SaaS qui correspond à ton budget, ton temps et ton secteur.</p>
       <button class="btn btn--primary" id="quiz-open-btn" type="button">Trouve ton SaaS en 60 secondes</button>
     </section>
   </main>
@@ -4146,10 +4169,11 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
       }
 
       // ---- Accumulateur de tags — libellés d'affichage ----------------
-      var INTENTION_LABELS = { racheter: "Racheter", copier: "Copier" };
+      // intention retiré de TAG_ORDER : plus d'écran dédié à rouvrir en
+      // édition (voir enterEditMode()), donc plus de chip cliquable pour ce
+      // champ -- la valeur reste interne (défaut "creation").
       var DEJA_CHERCHE_LABELS = { yes: "Déjà cherché", no: "Nouvelle recherche" };
       var QUESTION_LABELS = {
-        intention: "Intention",
         budget: "Budget",
         temps: "Temps",
         secteur: "Secteur",
@@ -4157,12 +4181,11 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
       };
       // Ordre d'affichage fixe des tags, indépendant de l'ordre dans lequel
       // les questions ont été répondues.
-      var TAG_ORDER = ["intention", "budget", "temps", "secteur", "dejaCherche"];
+      var TAG_ORDER = ["budget", "temps", "secteur", "dejaCherche"];
 
       function tagValueLabel(id) {
         var value = answers[id];
         if (value === undefined) return null;
-        if (id === "intention") return INTENTION_LABELS[value] || value;
         if (id === "budget") return BUDGET_LABELS[value] || value;
         if (id === "temps") return TIME_LABELS[value] || value;
         if (id === "dejaCherche") return DEJA_CHERCHE_LABELS[value] || value;
@@ -4192,7 +4215,10 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
         : "transform 700ms cubic-bezier(0.16, 1, 0.3, 1), opacity 700ms cubic-bezier(0.16, 1, 0.3, 1)";
       var MIRROR_ENTER_MS = reduceMotion ? 220 : 700;
 
-      var answers = {};
+      // intention n'a plus d'écran dédié -- "creation" est la valeur par
+      // défaut interne, jamais demandée explicitement. Seule bascule
+      // possible : le lien discret sur l'écran résultat (-> "rachat").
+      var answers = { intention: "creation" };
       var navHistory = [];
       var currentScreenEl = null;
       var currentQuestionIndex = 0;
@@ -4433,17 +4459,64 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
       // exemple inventé côté client). situation/passif ne sont pas encore
       // des colonnes profiles (voir quiz.questions plus haut) donc transmis
       // dans le corps de la requête plutôt qu'en base.
-      function fetchGeneratedConcept(ans, cb) {
+      function fetchGeneratedConcept(ans, cb, forceRegenerate) {
         callEdgeFunctionAuthed("generate-user-concept", {
           situation: ans.situation || null,
           passif: ans.passif || null,
-          objectifRevenu: typeof ans.objectifRevenu === "number" ? ans.objectifRevenu : null
+          objectifRevenu: typeof ans.objectifRevenu === "number" ? ans.objectifRevenu : null,
+          forceRegenerate: !!forceRegenerate
         })
           .then(function (res) {
             cb(res && res.concept ? res.concept : null);
           })
           .catch(function () {
             cb(null);
+          });
+      }
+
+      // Lien discret "tu cherches plutôt à racheter ?" -- retague
+      // profiles.intention côté client (même pattern que persistQuizAnswers,
+      // RLS déjà en place pour l'update de sa propre ligne), puis régénère
+      // le concept avec forceRegenerate:true pour contourner le cache
+      // (sinon generate-user-concept renverrait l'ancien concept "creation"
+      // tel quel).
+      function handleIntentionToggle() {
+        var btn = document.getElementById("result-intention-toggle");
+        var statusEl = document.getElementById("result-intention-toggle-status");
+        var supabase = window.ColdTrendSupabase;
+        if (!supabase || !btn) return;
+
+        btn.disabled = true;
+        if (statusEl) statusEl.textContent = "Régénération du concept en cours…";
+
+        supabase.auth
+          .getUser()
+          .then(function (res) {
+            var user = res.data ? res.data.user : null;
+            if (!user) throw new Error("no session");
+            return supabase.from("profiles").update({ intention: "rachat" }).eq("id", user.id);
+          })
+          .then(function () {
+            answers.intention = "rachat";
+            fetchGeneratedConcept(
+              answers,
+              function (concept) {
+                btn.disabled = false;
+                if (!concept) {
+                  if (statusEl) statusEl.textContent = "Échec de la régénération, réessaie plus tard.";
+                  return;
+                }
+                answers.concept = concept;
+                renderConceptTeaser(concept);
+                if (statusEl) statusEl.textContent = "Concept mis à jour pour un rachat de SaaS.";
+                btn.style.display = "none";
+              },
+              true
+            );
+          })
+          .catch(function () {
+            btn.disabled = false;
+            if (statusEl) statusEl.textContent = "Échec de la mise à jour, réessaie plus tard.";
           });
       }
 
@@ -4490,10 +4563,13 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
       function buildMirrorParts(a) {
         var parts = [];
 
-        if (a.intention === "racheter") {
+        // "rachat"/"racheter" couvrent respectivement la nouvelle et
+        // l'ancienne valeur (comptes créés avant le retrait de l'écran
+        // dédié) -- "creation"/"copier" (défaut désormais silencieux) ne
+        // déclenche plus de fragment dédié, le mirror reste focalisé sur ce
+        // qui a été réellement répondu.
+        if (a.intention === "rachat" || a.intention === "racheter") {
           parts.push("Tu ne pars pas de zéro : tu veux un revenu qui existe déjà.");
-        } else if (a.intention === "copier") {
-          parts.push("Tu préfères construire toi-même, sur une base qui a déjà prouvé qu'elle marche.");
         }
 
         var SITUATION_FRAGMENTS = {
@@ -5039,31 +5115,12 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
         quizTagsEl.classList.toggle("is-visible", html !== "");
       }
 
-      // Retire un tag avec un fade-out visible avant de reconstruire la
-      // liste — jamais une disparition brutale, et toujours suite à une
-      // action que l'utilisateur vient de faire (ici : intention basculée
-      // vers "copier", qui rend budget inapplicable).
-      function fadeOutAndRemoveTag(id) {
-        var tagEl = quizTagsEl ? quizTagsEl.querySelector('[data-tag-id="' + id + '"]') : null;
-        if (!tagEl) {
-          renderTags();
-          return;
-        }
-        tagEl.classList.add("is-removing");
-        window.setTimeout(renderTags, 220);
-      }
-
-      // Unique dépendance réelle entre questions dans ce quiz (voir audit) :
-      // intention -> budget. Si intention passe à "copier" et que budget
-      // avait déjà une réponse, budget devient skip conditionnel (moteur
-      // existant, isSkipped()) : son tag doit disparaître proprement et sa
-      // réponse être purgée, jamais laissée en state fantôme.
-      function propagateAnswerDependencies(changedId) {
-        if (changedId === "intention" && answers.intention === "copier" && answers.budget !== undefined) {
-          delete answers.budget;
-          fadeOutAndRemoveTag("budget");
-        }
-      }
+      // propagateAnswerDependencies()/fadeOutAndRemoveTag() retirés : leur
+      // seule raison d'être était la dépendance intention -> budget (budget
+      // skip conditionnel si intention == "copier" via l'ancien écran
+      // dédié). Cet écran n'existe plus et budget n'est plus jamais sauté
+      // (voir quiz.questions) -- plus aucune dépendance réelle entre
+      // questions dans ce quiz.
 
       function hideEditBar() {
         if (quizEditBarEl) quizEditBarEl.classList.remove("is-visible");
@@ -5121,7 +5178,6 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
         var ctx = editContext;
         editContext = null;
         hideEditBar();
-        propagateAnswerDependencies(ctx.questionId);
         saveDraftLocally();
         persistProgress(currentQuestionIndex);
         showToast("Réponse mise à jour");
@@ -5171,6 +5227,10 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
         var draft = loadDraftLocally();
         if (draft && draft.stepIndex > 0 && draft.stepIndex < questionScreens.length) {
           answers = draft.answers || {};
+          // Brouillon sauvegardé avant le retrait de l'écran "intention",
+          // ou answers.intention jamais posé -- même valeur par défaut que
+          // l'ouverture normale du quiz.
+          if (!answers.intention) answers.intention = "creation";
           navHistory = buildNavHistoryUpTo(draft.stepIndex);
           restoreAnswersUI();
           updateBackVisibility();
@@ -5216,7 +5276,7 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
                 if (!profile || lastStep <= 0 || lastStep >= questionScreens.length) {
                   return findNextQuestionIndex(0);
                 }
-                answers.intention = profile.intention || undefined;
+                answers.intention = profile.intention || "creation";
                 answers.budget = profile.budget || undefined;
                 answers.temps = profile.temps || undefined;
                 answers.secteur = profile.secteur || undefined;
@@ -5235,7 +5295,7 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
       }
 
       function openQuiz() {
-        answers = {};
+        answers = { intention: "creation" };
         navHistory = [];
         currentQuestionIndex = 0;
         currentScreenEl = null;
@@ -5352,7 +5412,6 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
               }
             }
           }
-          propagateAnswerDependencies(id);
           renderTags();
           updateNextEnabled(screenEl);
 
@@ -5397,6 +5456,11 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
 
         if (e.target.closest("#quiz-see-offer-btn")) {
           goToPayment();
+          return;
+        }
+
+        if (e.target.closest("#result-intention-toggle")) {
+          handleIntentionToggle();
           return;
         }
       });
@@ -5546,7 +5610,6 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
       // L'ordre suit TAG_ORDER (déjà utilisé pour les tags de résumé) pour
       // ne pas introduire un deuxième référentiel d'ordre des questions.
       var RESUME_CHECKLIST_LABELS = {
-        intention: "Intention",
         budget: "Budget",
         temps: "Temps disponible",
         secteur: "Secteur visé",
@@ -5555,19 +5618,14 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
 
       function resumeChecklistItems(profile) {
         var fieldMap = {
-          intention: profile.intention,
           budget: profile.budget,
           temps: profile.temps,
           secteur: profile.secteur,
           dejaCherche: profile.deja_cherche
         };
-        return TAG_ORDER.filter(function (id) {
-          // budget est sauté (pas juste "vide") si intention = copier --
-          // on ne compte pas une case qui ne sera jamais posée contre
-          // l'utilisateur dans son taux de complétion.
-          if (id === "budget" && profile.intention === "copier") return false;
-          return true;
-        }).map(function (id) {
+        // budget n'est plus jamais sauté (voir quiz.questions) -- plus de
+        // filtre conditionnel ici.
+        return TAG_ORDER.map(function (id) {
           var value = fieldMap[id];
           var isChecked = id === "secteur" ? !!(value && value.length) : value !== null && value !== undefined && value !== "";
           return { id: id, label: RESUME_CHECKLIST_LABELS[id], checked: isChecked };
@@ -5715,7 +5773,7 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
                   openQuiz();
                   return;
                 }
-                answers.intention = profile.intention || undefined;
+                answers.intention = profile.intention || "creation";
                 answers.budget = profile.budget || undefined;
                 answers.temps = profile.temps || undefined;
                 answers.secteur = profile.secteur || undefined;
@@ -6149,6 +6207,9 @@ function renderQuizOverlay({ quiz, pricing, stripeLink }) {
         </div>
 
         <button class="btn btn--primary btn--full" id="quiz-see-offer-btn" type="button">Débloquer mon concept complet</button>
+
+        <button class="result-intention-toggle" id="result-intention-toggle" type="button">Tu cherches plutôt à racheter un SaaS existant ? &rarr;</button>
+        <p class="result-intention-toggle__status" id="result-intention-toggle-status" aria-live="polite"></p>
 
         <a class="result-bonus-chapter" href="/compte">
           <span class="result-bonus-chapter__eyebrow">Chapitre bonus, gratuit</span>
@@ -9929,7 +9990,11 @@ function comptePage() {
       var SESSION_SEEN_KEY = "coldtrend_dossier_seen";
       var reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
-      var INTENTION_LABELS = { racheter: "racheter", copier: "copier" };
+      // racheter/copier : anciennes valeurs (comptes créés avant le retrait
+      // de l'écran "intention" dédié) -- rachat/creation : valeurs actuelles
+      // ("creation" par défaut silencieux, "rachat" via le lien discret de
+      // l'écran résultat).
+      var INTENTION_LABELS = { racheter: "racheter", copier: "copier", rachat: "racheter", creation: "créer" };
       var SECTOR_LABELS = ${JSON.stringify(quiz.sectorLabels)};
       var BUDGET_LABELS = ${JSON.stringify(quiz.budgetLabels)};
       var TIME_LABELS = ${JSON.stringify(quiz.timeLabels)};
