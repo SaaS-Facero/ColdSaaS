@@ -512,8 +512,8 @@ const quiz = {
       id: "auth",
       stepName: "auth",
       type: "auth",
-      title: "Dernière étape — pour garder ce qu'on vient de construire.",
-      subtext: "Tes réponses sont déjà là, on ne te les redemande pas. Juste un compte pour les retrouver."
+      title: "On garde ce qu'on vient de construire.",
+      subtext: "Tes réponses sont déjà là, on ne te les redemande pas. Juste un compte pour les retrouver — la suite continue juste après."
     }
   ]
 };
