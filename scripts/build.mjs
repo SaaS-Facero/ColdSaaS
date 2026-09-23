@@ -3989,7 +3989,7 @@ function page({ brand, hero, socialProof, notificationStack, pricing, comparison
             return (
               '<div class="result-preview__card">' +
               '<span class="result-preview__name" aria-hidden="true"></span>' +
-              '<span class="result-preview__meta">' + sectorText + " · <span class=\"result-preview__mrr\">" + mrrText + "</span></span>" +
+              '<span class="result-preview__meta">' + sectorText + ' · <span class="result-preview__mrr">' + mrrText + "</span></span>" +
               "</div>"
             );
           })
