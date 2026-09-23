@@ -381,6 +381,8 @@ const quiz = {
       id: "situation",
       stepName: "situation",
       chapter: 1,
+      chapterLabel: "Ta situation",
+      chapterIcon: "situation",
       title: "Aujourd'hui, tu gagnes ta vie comment ?",
       type: "single",
       options: [
@@ -400,6 +402,8 @@ const quiz = {
       id: "passif",
       stepName: "passif",
       chapter: 1,
+      chapterLabel: "Ton parcours",
+      chapterIcon: "passif",
       title: "Tu en es où avec le business en ligne ?",
       type: "single",
       options: [
@@ -421,6 +425,8 @@ const quiz = {
       id: "secteur",
       stepName: "secteur",
       chapter: 1,
+      chapterLabel: "Ton secteur",
+      chapterIcon: "secteur",
       title: "Tu vises plutôt les entreprises ou les particuliers ?",
       subtext: "Certains concepts touchent les deux, le canal d'acquisition s'adapte selon ton choix.",
       type: "multi",
@@ -435,6 +441,8 @@ const quiz = {
       id: "budget",
       stepName: "budget",
       chapter: 1,
+      chapterLabel: "Ton budget",
+      chapterIcon: "budget",
       title: "Pour ne te montrer que ce que tu peux vraiment acheter.",
       type: "single",
       skipIf: { field: "intention", equals: "copier" },
@@ -464,6 +472,8 @@ const quiz = {
       id: "objectifRevenu",
       stepName: "objectif-revenu",
       chapter: 1,
+      chapterLabel: "Ton objectif",
+      chapterIcon: "objectif",
       title: "Combien de revenu tu vises, à terme ?",
       type: "slider",
       min: 0,
@@ -485,6 +495,8 @@ const quiz = {
       id: "temps",
       stepName: "temps",
       chapter: 2,
+      chapterLabel: "Ton temps",
+      chapterIcon: "temps",
       title: "Combien d'heures par semaine tu peux vraiment y consacrer ?",
       subtext: "Pas besoin de tout plaquer. La plupart de nos utilisateurs démarrent à côté d'un job.",
       type: "single",
@@ -499,6 +511,8 @@ const quiz = {
       id: "dejaCherche",
       stepName: "frustration",
       chapter: 2,
+      chapterLabel: "Ta recherche",
+      chapterIcon: "recherche",
       title: "Tu as déjà passé des heures sur des listes d'idées génériques, sans rien trouver de crédible ?",
       type: "single",
       options: [
@@ -1800,7 +1814,17 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
     text-align: left;
     cursor: pointer;
     font-family: inherit;
-    transition: border-color 180ms ease, background 180ms ease, transform 180ms cubic-bezier(0.22, 1.26, 0.36, 1);
+    transition: border-color 180ms ease, background 180ms ease,
+      transform 200ms cubic-bezier(0.4, 0, 0.2, 1), box-shadow 200ms cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  /* Spécificité (.quiz-screen.is-active .quiz-option) volontairement égalée
+     ici -- sinon la règle d'apparition de l'écran (même sélecteur, 3
+     classes) l'emporterait sur le hover et le translateY ne s'appliquerait
+     jamais une fois l'écran actif. */
+  .quiz-screen.is-active .quiz-option:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 10px 24px -12px rgba(0, 0, 0, 0.5);
   }
 
   .quiz-option__body {
@@ -1830,14 +1854,111 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
     display: flex;
     align-items: center;
     justify-content: center;
-    color: transparent;
-    transition: border-color 180ms ease, background 180ms ease, color 180ms ease;
+    color: #fff;
+    transition: border-color 180ms ease, background 180ms ease;
+  }
+
+  /* La coche elle-même reste toujours dans le DOM (color: #fff dès le
+     départ) -- c'est sa mise à l'échelle qui la rend visible ou non, pas
+     une bascule de couleur : une apparition en scale depuis 0, pas un
+     simple fondu. */
+  .quiz-option__check svg {
+    transform: scale(0);
+    transition: transform 220ms cubic-bezier(0.34, 1.56, 0.64, 1);
   }
 
   .quiz-option.is-selected .quiz-option__check {
     border-color: var(--cobalt);
     background: var(--cobalt);
-    color: #fff;
+  }
+
+  .quiz-option.is-selected .quiz-option__check svg {
+    transform: scale(1);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .quiz-option__check svg { transition: none; }
+    .quiz-screen.is-active .quiz-option:hover { transform: none; }
+  }
+
+  .quiz-chapter-icon {
+    color: var(--steel);
+    margin: 0 0 10px;
+    line-height: 0;
+  }
+
+  .quiz-chapter-label {
+    font-size: 12px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--steel);
+    margin: 0 0 14px;
+  }
+
+  /* Rythme d'apparition par écran -- label/icône, puis titre, puis chaque
+     carte de réponse en cascade, puis le CTA en dernier. Purement en CSS,
+     rejoué à chaque fois qu'un écran regagne .is-active (voir transitionTo()
+     qui bascule cette classe) -- aucun nouvel observateur JS nécessaire. */
+  .quiz-screen .quiz-chapter-icon,
+  .quiz-screen .quiz-chapter-label,
+  .quiz-screen .quiz-question-title,
+  .quiz-screen .quiz-subtext,
+  .quiz-screen .quiz-option,
+  .quiz-screen .revenue-slider,
+  .quiz-screen .revenue-slider__note,
+  .quiz-screen .quiz-footer {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+
+  .quiz-screen.is-active .quiz-chapter-icon,
+  .quiz-screen.is-active .quiz-chapter-label,
+  .quiz-screen.is-active .quiz-question-title,
+  .quiz-screen.is-active .quiz-subtext,
+  .quiz-screen.is-active .quiz-option,
+  .quiz-screen.is-active .revenue-slider,
+  .quiz-screen.is-active .revenue-slider__note,
+  .quiz-screen.is-active .quiz-footer {
+    opacity: 1;
+    transform: none;
+    transition: opacity 380ms cubic-bezier(0.16, 1, 0.3, 1), transform 380ms cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
+  .quiz-screen.is-active .quiz-chapter-icon { transition-delay: 0ms; }
+  .quiz-screen.is-active .quiz-chapter-label { transition-delay: 60ms; }
+  .quiz-screen.is-active .quiz-question-title { transition-delay: 140ms; }
+  .quiz-screen.is-active .quiz-subtext { transition-delay: 200ms; }
+  .quiz-screen.is-active .revenue-slider { transition-delay: 220ms; }
+  .quiz-screen.is-active .revenue-slider__note { transition-delay: 280ms; }
+  .quiz-screen.is-active .quiz-option:nth-child(1) { transition-delay: 220ms; }
+  .quiz-screen.is-active .quiz-option:nth-child(2) { transition-delay: 290ms; }
+  .quiz-screen.is-active .quiz-option:nth-child(3) { transition-delay: 360ms; }
+  .quiz-screen.is-active .quiz-option:nth-child(4) { transition-delay: 430ms; }
+  .quiz-screen.is-active .quiz-option:nth-child(5) { transition-delay: 500ms; }
+  .quiz-screen.is-active .quiz-footer { transition-delay: 620ms; }
+
+  /* .quiz-options est le conteneur flex des cartes, jamais lui-même animé
+     (seuls ses enfants .quiz-option le sont) -- évite un double décalage. */
+  .quiz-screen .quiz-options,
+  .quiz-screen.is-active .quiz-options {
+    opacity: 1;
+    transform: none;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .quiz-screen .quiz-chapter-icon,
+    .quiz-screen .quiz-chapter-label,
+    .quiz-screen .quiz-question-title,
+    .quiz-screen .quiz-subtext,
+    .quiz-screen .quiz-option,
+    .quiz-screen .revenue-slider,
+    .quiz-screen .revenue-slider__note,
+    .quiz-screen .quiz-footer {
+      opacity: 1;
+      transform: none;
+      transition: none !important;
+    }
   }
 
   .quiz-options[data-type="single"] .quiz-option__check {
@@ -1893,19 +2014,32 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
     background: rgba(0, 71, 255, 0.12);
     border-radius: 999px;
     padding: 4px 12px;
-    margin: 0 0 12px;
+    margin: 0 0 14px;
+    transition: opacity 300ms var(--ease-standard, ease), background 300ms var(--ease-standard, ease);
   }
+  .revenue-slider__badge.is-changing { opacity: 0; }
+  /* Chiffre central -- grand format, drop-shadow Cobalt Blue qui s'intensifie
+     avec la position (voir updateRevenueSlider(), pas une valeur fixe) ;
+     .is-pulsing marque le pas franchi (changement de valeur affichée) et
+     .is-released la confirmation au relâchement -- deux pulses distincts,
+     jamais à chaque pixel de drag. */
   .revenue-slider__value {
-    font-size: clamp(32px, 8vw, 44px);
+    font-size: clamp(3rem, 8vw, 5rem);
     font-weight: 800;
     letter-spacing: -0.02em;
     color: var(--paper-soft);
-    margin: 0 0 20px;
+    margin: 0 0 24px;
     font-variant-numeric: tabular-nums;
+    filter: drop-shadow(0 0 0 rgba(0, 71, 255, 0));
+    transition: filter 200ms var(--ease-standard, ease);
+  }
+  .revenue-slider__value.is-pulsing,
+  .revenue-slider__value.is-released {
+    animation: revenue-value-pulse 340ms var(--ease-standard, ease);
   }
   .revenue-slider__control {
     position: relative;
-    height: 28px;
+    height: 32px;
     display: flex;
     align-items: center;
   }
@@ -1913,7 +2047,7 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
     position: absolute;
     left: 0;
     right: 0;
-    height: 6px;
+    height: 9px;
     border-radius: 999px;
     background: rgba(255, 255, 255, 0.1);
     overflow: hidden;
@@ -1926,22 +2060,22 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
     width: 100%;
     transform-origin: left center;
     transform: scaleX(0);
-    background: linear-gradient(90deg, var(--cobalt-dark), var(--cobalt));
-    transition: transform 150ms ease-out, background 150ms ease-out;
+    background: linear-gradient(90deg, var(--steel), var(--cobalt));
+    transition: transform 150ms ease-out;
   }
   .revenue-slider__input {
     position: relative;
     z-index: 1;
     width: 100%;
-    height: 28px;
+    height: 32px;
     margin: 0;
     background: transparent;
     appearance: none;
     -webkit-appearance: none;
     cursor: pointer;
   }
-  .revenue-slider__input::-webkit-slider-runnable-track { background: transparent; height: 28px; }
-  .revenue-slider__input::-moz-range-track { background: transparent; height: 28px; border: none; }
+  .revenue-slider__input::-webkit-slider-runnable-track { background: transparent; height: 32px; }
+  .revenue-slider__input::-moz-range-track { background: transparent; height: 32px; border: none; }
   .revenue-slider__input::-webkit-slider-thumb {
     -webkit-appearance: none;
     width: 22px;
@@ -1949,8 +2083,9 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
     border-radius: 999px;
     background: #fff;
     border: 3px solid var(--cobalt);
-    margin-top: 3px;
+    margin-top: 5px;
     box-shadow: 0 2px 6px rgba(0, 0, 0, 0.35);
+    transition: transform 150ms var(--ease-standard, ease), box-shadow 150ms var(--ease-standard, ease);
   }
   .revenue-slider__input::-moz-range-thumb {
     width: 22px;
@@ -1959,13 +2094,34 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
     background: #fff;
     border: 3px solid var(--cobalt);
     box-shadow: 0 2px 6px rgba(0, 0, 0, 0.35);
+    transition: transform 150ms var(--ease-standard, ease), box-shadow 150ms var(--ease-standard, ease);
   }
-  .revenue-slider__scale {
+  .revenue-slider__input:active::-webkit-slider-thumb {
+    transform: scale(1.15);
+    box-shadow: 0 4px 14px rgba(0, 71, 255, 0.55);
+  }
+  .revenue-slider__input:active::-moz-range-thumb {
+    transform: scale(1.15);
+    box-shadow: 0 4px 14px rgba(0, 71, 255, 0.55);
+  }
+  .revenue-slider__ticks {
     display: flex;
     justify-content: space-between;
-    font-size: 12px;
+    margin-top: 10px;
+  }
+  .revenue-slider__tick {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    font-size: 11px;
     color: var(--steel);
-    margin-top: 8px;
+  }
+  .revenue-slider__tick::before {
+    content: "";
+    width: 1px;
+    height: 5px;
+    background: rgba(255, 255, 255, 0.18);
   }
   .revenue-slider__math {
     font-size: 13px;
@@ -1977,8 +2133,18 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
     color: var(--steel);
     margin: 16px 0 0;
   }
+  @keyframes revenue-value-pulse {
+    0% { transform: scale(1); }
+    50% { transform: scale(1.02); }
+    100% { transform: scale(1); }
+  }
   @media (prefers-reduced-motion: reduce) {
     .revenue-slider__fill { transition: none; }
+    .revenue-slider__value { transition: none; }
+    .revenue-slider__value.is-pulsing,
+    .revenue-slider__value.is-released { animation: none; }
+    .revenue-slider__input::-webkit-slider-thumb,
+    .revenue-slider__input::-moz-range-thumb { transition: none; }
   }
 
   .quiz-chips {
@@ -2824,12 +2990,109 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
   /* Écran miroir -- climax du quiz, doit visuellement se distinguer du
      reste : fond Cobalt Blue à faible opacité en pleine bordure d'écran
      (pas juste un fond de carte), apparition plus lente gérée dans
-     transitionTo() (MIRROR_ENTER_TRANSITION), pas ici. */
+     transitionTo() (MIRROR_ENTER_TRANSITION), pas ici. Le dégradé est passé
+     en ::before pour pouvoir le faire apparaître en fondu (600-700ms,
+     "moment différent") plutôt qu'un fond statique déjà là au premier
+     rendu. */
   .quiz-screen.quiz-mirror {
     justify-content: center;
     text-align: center;
-    background: radial-gradient(ellipse at 50% 40%, rgba(0, 71, 255, 0.14), transparent 70%);
     border-radius: 20px;
+    position: relative;
+  }
+
+  .quiz-screen.quiz-mirror::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    border-radius: 20px;
+    background: radial-gradient(ellipse at 50% 40%, rgba(0, 71, 255, 0.14), transparent 70%);
+    opacity: 0;
+    transition: opacity 700ms cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
+  .quiz-screen.quiz-mirror.is-active::before {
+    opacity: 1;
+  }
+
+  /* Halo respirant -- pulsation très douce, jamais un effet qui distrait ;
+     désactivé sous prefers-reduced-motion avec le reste. */
+  .quiz-screen.quiz-mirror::after {
+    content: "";
+    position: absolute;
+    inset: 10% 20%;
+    z-index: -1;
+    border-radius: 999px;
+    background: radial-gradient(circle, rgba(0, 71, 255, 0.18), transparent 72%);
+    animation: mirror-breathe 5s ease-in-out infinite;
+  }
+
+  @keyframes mirror-breathe {
+    0%, 100% { opacity: 0.5; }
+    50% { opacity: 1; }
+  }
+
+  /* Chapitre 1 (situation) -- lignes horizontales fines évoquant une
+     structure/organigramme, calque discret derrière le contenu. */
+  .quiz-screen[data-id="situation"] {
+    position: relative;
+  }
+  .quiz-screen[data-id="situation"]::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    background-image: repeating-linear-gradient(
+      0deg,
+      rgba(255, 255, 255, 0.06),
+      rgba(255, 255, 255, 0.06) 1px,
+      transparent 1px,
+      transparent 34px
+    );
+    opacity: 0.6;
+  }
+
+  /* Budget / objectif de revenu -- dégradé radial doux centré sur le
+     contenu, Cobalt Blue très dilué. */
+  .quiz-screen[data-id="budget"],
+  .quiz-screen[data-id="objectifRevenu"] {
+    position: relative;
+  }
+  .quiz-screen[data-id="budget"]::before,
+  .quiz-screen[data-id="objectifRevenu"]::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    background: radial-gradient(circle at 50% 35%, rgba(0, 71, 255, 0.07), transparent 65%);
+  }
+
+  /* Résultat/concept -- fond le plus riche du parcours : dégradé radial
+     plus marqué + grille de points très fine, cohérent avec /concept/{slug}. */
+  .quiz-screen.quiz-result {
+    position: relative;
+  }
+  .quiz-screen.quiz-result::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    background: radial-gradient(circle at 50% 20%, rgba(0, 71, 255, 0.16), transparent 62%);
+  }
+  .quiz-screen.quiz-result::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    background-image: radial-gradient(rgba(255, 255, 255, 0.08) 1px, transparent 1px);
+    background-size: 22px 22px;
+    opacity: 0.5;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .quiz-screen.quiz-mirror::before { transition: opacity 220ms ease-out; }
+    .quiz-screen.quiz-mirror::after { animation: none; opacity: 0.7; }
   }
 
   .quiz-mirror__eyebrow {
@@ -2849,11 +3112,49 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
     margin: 0 0 32px;
   }
 
+  /* Révélation phrase par phrase (voir transitionTo()) -- chaque <span>
+     reçoit son propre transition-delay inline, la classe .is-visible est
+     ajoutée juste après pour déclencher la transition. */
+  .quiz-mirror__part {
+    display: inline;
+    opacity: 0;
+    transition: opacity 600ms cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
+  .quiz-mirror__part.is-visible {
+    opacity: 1;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .quiz-mirror__part {
+      opacity: 1;
+      transition: none;
+    }
+  }
+
   .quiz-result__concept-name {
     font-size: clamp(28px, 7vw, 38px);
     font-weight: 800;
     color: var(--cobalt);
     line-height: 1.2;
+    clip-path: inset(0 100% 0 0);
+    opacity: 0;
+    transform: translateY(6px);
+    transition: clip-path 700ms cubic-bezier(0.16, 1, 0.3, 1), opacity 500ms cubic-bezier(0.16, 1, 0.3, 1),
+      transform 500ms cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
+  .quiz-result__concept-name.is-revealed {
+    clip-path: inset(0 0 0 0);
+    opacity: 1;
+    transform: none;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .quiz-result__concept-name {
+      clip-path: none;
+      transition: opacity 220ms ease-out;
+    }
   }
 
   .quiz-result__concept-eyebrow {
@@ -2906,6 +3207,21 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
     border-radius: 10px;
     border: 1px solid rgba(255, 255, 255, 0.08);
     background: rgba(255, 255, 255, 0.02);
+    animation: result-teaser-pulse 3.2s ease-in-out infinite;
+  }
+
+  .result-preview__card:nth-child(2) { animation-delay: 0.4s; }
+  .result-preview__card:nth-child(3) { animation-delay: 0.8s; }
+
+  /* Suggère qu'il y a du contenu à débloquer derrière -- une respiration
+     très subtile, jamais un clignotement qui distrairait du CTA. */
+  @keyframes result-teaser-pulse {
+    0%, 100% { border-color: rgba(255, 255, 255, 0.08); background: rgba(255, 255, 255, 0.02); }
+    50% { border-color: rgba(0, 71, 255, 0.22); background: rgba(0, 71, 255, 0.05); }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .result-preview__card { animation: none; }
   }
 
   .result-preview__meta-label {
@@ -3754,6 +4070,20 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
       // Appelée à l'init (valeur par défaut) et à chaque "input" sur le
       // slider (voir le handler délégué sur #stage) -- jamais seulement au
       // relâchement, pour un affichage en direct pendant le drag.
+      var revenueBadgeChangeTimer = null;
+
+      // Séparé de updateRevenueSlider() : appelé uniquement au relâchement
+      // ("change", pas "input") pour la pulsation de confirmation -- un
+      // retour haptique visuel n'a de sens qu'une fois le choix arrêté, pas
+      // à chaque pixel de drag.
+      function pulseRevenueValueOnRelease() {
+        var valueEl = document.getElementById("revenue-slider-value");
+        if (!valueEl || reduceMotion) return;
+        valueEl.classList.remove("is-released");
+        void valueEl.offsetWidth;
+        valueEl.classList.add("is-released");
+      }
+
       function updateRevenueSlider() {
         var input = document.getElementById("revenue-slider-input");
         if (!input) return;
@@ -3764,14 +4094,45 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
         var max = Number(input.max);
         var pct = (v - min) / (max - min);
 
-        document.getElementById("revenue-slider-value").textContent = formatRevenueValue(v);
-        document.getElementById("revenue-slider-badge").textContent = revenueBadgeLabel(v);
+        var valueEl = document.getElementById("revenue-slider-value");
+        var newValueText = formatRevenueValue(v);
+        if (valueEl.textContent !== newValueText) {
+          valueEl.textContent = newValueText;
+          // Pulse discret à chaque changement de tranche réel (le step du
+          // slider fait déjà ce filtrage -- pas besoin de le refaire ici),
+          // jamais au repos ni en boucle.
+          if (!reduceMotion) {
+            valueEl.classList.remove("is-pulsing");
+            void valueEl.offsetWidth;
+            valueEl.classList.add("is-pulsing");
+          }
+        }
+        // Glow Cobalt Blue qui s'intensifie avec la position -- un
+        // renforcement discret, jamais un effet qui distrait.
+        valueEl.style.filter = "drop-shadow(0 0 " + (6 + pct * 10) + "px rgba(0, 71, 255, " + (0.15 + pct * 0.35) + "))";
+
+        var badgeEl = document.getElementById("revenue-slider-badge");
+        var newBadgeText = revenueBadgeLabel(v);
+        if (!badgeEl.textContent) {
+          // Premier rendu -- pas de fondu à faire, rien à croiser.
+          badgeEl.textContent = newBadgeText;
+        } else if (badgeEl.textContent !== newBadgeText) {
+          // Fondu croisé plutôt qu'un remplacement de texte brutal : on
+          // masque, on change le texte pendant que c'est invisible, on
+          // réaffiche -- jamais les deux libellés visibles en même temps.
+          window.clearTimeout(revenueBadgeChangeTimer);
+          badgeEl.classList.add("is-changing");
+          revenueBadgeChangeTimer = window.setTimeout(
+            function () {
+              badgeEl.textContent = newBadgeText;
+              badgeEl.classList.remove("is-changing");
+            },
+            reduceMotion ? 0 : 150
+          );
+        }
 
         var fillEl = document.getElementById("revenue-slider-fill");
         fillEl.style.transform = "scaleX(" + pct + ")";
-        // L'intensité du dégradé croît avec la position -- jamais une
-        // couleur différente, juste le même cobalt qui se densifie.
-        fillEl.style.opacity = String(0.7 + pct * 0.3);
 
         var mathEl = document.getElementById("revenue-slider-math");
         if (v > 0) {
@@ -3953,7 +4314,21 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
         var isMirrorScreen = nextEl.getAttribute("data-id") === "mirror";
         if (isMirrorScreen) {
           var mirrorTextEl = document.getElementById("quiz-mirror-text");
-          if (mirrorTextEl) mirrorTextEl.textContent = buildMirrorText(answers);
+          if (mirrorTextEl) {
+            // Révélation phrase par phrase, rythme lent ("on te lit
+            // vraiment") -- chaque fragment de buildMirrorParts() est déjà
+            // une phrase complète, pas un découpage arbitraire mot à mot.
+            var mirrorParts = buildMirrorParts(answers);
+            mirrorTextEl.innerHTML = mirrorParts
+              .map(function (part, i) {
+                return '<span class="quiz-mirror__part" style="transition-delay:' + i * 380 + 'ms">' + part + " </span>";
+              })
+              .join("");
+            void mirrorTextEl.offsetWidth;
+            Array.prototype.forEach.call(mirrorTextEl.querySelectorAll(".quiz-mirror__part"), function (partEl) {
+              partEl.classList.add("is-visible");
+            });
+          }
         }
 
         var enterFrom = direction === "back" ? -24 : 24;
@@ -4076,11 +4451,24 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
         var nameEl = document.getElementById("quiz-concept-name");
         var taglineEl = document.getElementById("quiz-concept-tagline");
         if (!concept) {
-          if (nameEl) nameEl.textContent = "Ton concept";
+          // État d'attente -- affiché tel quel, sans l'animation de reveal
+          // (réservée au moment où le vrai nom généré arrive).
+          if (nameEl) {
+            nameEl.textContent = "Ton concept";
+            nameEl.classList.add("is-revealed");
+          }
           if (taglineEl) taglineEl.textContent = "Débloque ton accès pour voir le concept complet généré pour toi.";
           return;
         }
-        if (nameEl) nameEl.textContent = concept.concept_name;
+        if (nameEl) {
+          nameEl.textContent = concept.concept_name;
+          // Reveal progressif (clip-path qui s'ouvre) au moment où le vrai
+          // nom remplace le "…" de chargement -- jamais un affichage
+          // statique immédiat pour le climax du parcours.
+          nameEl.classList.remove("is-revealed");
+          void nameEl.offsetWidth;
+          nameEl.classList.add("is-revealed");
+        }
         if (taglineEl) taglineEl.textContent = concept.tagline;
         if (wrap) wrap.hidden = false;
       }
@@ -4098,7 +4486,7 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
       // piochué au hasard dans une liste type horoscope. Chaque fragment
       // reformule une réponse déjà donnée en trait valorisant, jamais une
       // généralité qui pourrait s'appliquer à n'importe qui.
-      function buildMirrorText(a) {
+      function buildMirrorParts(a) {
         var parts = [];
 
         if (a.intention === "racheter") {
@@ -4145,7 +4533,7 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
           parts.push("Avec un objectif à " + formatRevenueValue(a.objectifRevenu) + ".");
         }
 
-        return parts.join(" ");
+        return parts;
       }
 
       function goToResult() {
@@ -5014,6 +5402,15 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
         }
       });
 
+      // "change" (relâchement du drag/du clavier), distinct de "input" (live
+      // pendant le drag) -- la pulsation de confirmation ne doit jouer
+      // qu'une fois le choix arrêté.
+      stage.addEventListener("change", function (e) {
+        if (e.target.id === "revenue-slider-input") {
+          pulseRevenueValueOnRelease();
+        }
+      });
+
       // Valeur/badge/barre affichés dès l'ouverture du quiz, avant toute
       // interaction -- le slider a déjà une valeur par défaut au rendu
       // serveur (voir renderQuizQuestionScreen), l'écran ne doit jamais
@@ -5460,6 +5857,47 @@ function renderProofBackground() {
           </div>`;
 }
 
+// Icônes de chapitre du quiz -- traits fins, outline uniquement (jamais
+// remplies), même famille visuelle que ICON_CHECK_SMALL/ICON_ARROW_LEFT
+// (définies plus bas dans le fichier), juste plus grandes (28px) pour tenir
+// seules au-dessus du label. Déclarées ici (avant QUIZ_CHAPTER_ICONS qui les
+// référence) plutôt que groupées avec les autres ICON_* -- des `const` de
+// premier niveau s'évaluent dans l'ordre du fichier, pas à l'appel.
+const ICON_QUIZ_SITUATION =
+  '<svg width="28" height="28" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="12" cy="8" r="3.5" stroke="currentColor" stroke-width="1.75"/><path d="M5 20c0-3.6 3.13-6.5 7-6.5s7 2.9 7 6.5" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"/></svg>';
+const ICON_QUIZ_PASSIF =
+  '<svg width="28" height="28" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M4 16l4.5-5 3.5 3 6-7.5" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/><path d="M14 6h4v4" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/><path d="M4 20h16" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"/></svg>';
+const ICON_QUIZ_SECTEUR =
+  '<svg width="32" height="24" viewBox="0 0 32 24" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="2" y="6" width="10" height="16" rx="1" stroke="currentColor" stroke-width="1.75"/><path d="M5.5 9.5h1M5.5 13h1M5.5 16.5h1M9.5 9.5h1M9.5 13h1M9.5 16.5h1" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><circle cx="23" cy="9.5" r="3" stroke="currentColor" stroke-width="1.75"/><path d="M18 22c0-3 2.24-5.5 5-5.5s5 2.5 5 5.5" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"/></svg>';
+const ICON_QUIZ_BUDGET =
+  '<svg width="28" height="28" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="12" cy="12" r="8.5" stroke="currentColor" stroke-width="1.75"/><path d="M9.3 14.5c.4 1 1.4 1.6 2.7 1.6 1.6 0 2.7-.8 2.7-2s-1-1.7-2.7-2c-1.7-.3-2.7-.8-2.7-2s1.1-2 2.7-2c1.3 0 2.3.6 2.7 1.6" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><path d="M12 7.3v1.1M12 15.6v1.1" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>';
+const ICON_QUIZ_TEMPS =
+  '<svg width="28" height="28" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="12" cy="12" r="8.5" stroke="currentColor" stroke-width="1.75"/><path d="M12 7.5V12l3.2 2" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+const ICON_QUIZ_OBJECTIF =
+  '<svg width="28" height="28" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="12" cy="12" r="8.5" stroke="currentColor" stroke-width="1.75"/><circle cx="12" cy="12" r="4.5" stroke="currentColor" stroke-width="1.75"/><circle cx="12" cy="12" r="1.2" fill="currentColor"/></svg>';
+const ICON_QUIZ_RECHERCHE =
+  '<svg width="28" height="28" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="10.5" cy="10.5" r="6.5" stroke="currentColor" stroke-width="1.75"/><path d="M19 19l-4-4" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"/></svg>';
+
+const QUIZ_CHAPTER_ICONS = {
+  situation: ICON_QUIZ_SITUATION,
+  passif: ICON_QUIZ_PASSIF,
+  secteur: ICON_QUIZ_SECTEUR,
+  budget: ICON_QUIZ_BUDGET,
+  objectif: ICON_QUIZ_OBJECTIF,
+  temps: ICON_QUIZ_TEMPS,
+  recherche: ICON_QUIZ_RECHERCHE
+};
+
+// Icône + libellé de chapitre au-dessus du titre -- absent sur les
+// écrans sans chapterIcon (intention, intro, mirror, auth...) plutôt que
+// d'inventer une icône pour des écrans qui n'en avaient pas dans le brief.
+function renderChapterHeader(question) {
+  if (!question.chapterIcon) return "";
+  const icon = QUIZ_CHAPTER_ICONS[question.chapterIcon] || "";
+  return `<div class="quiz-chapter-icon" data-reveal style="transition-delay:0ms" aria-hidden="true">${icon}</div>
+          <p class="quiz-chapter-label" data-reveal style="transition-delay:60ms">${question.chapterLabel || ""}</p>`;
+}
+
 function renderQuizQuestionScreen(question, index) {
   const skipAttrs = question.skipIf
     ? ` data-skip-field="${question.skipIf.field}" data-skip-equals="${question.skipIf.equals}"`
@@ -5580,6 +6018,7 @@ function renderQuizQuestionScreen(question, index) {
     // objectif"), alors qu'aucune interaction n'a encore eu lieu.
     const initial = Math.round((question.min + question.max) / 2 / question.step) * question.step;
     return `<div class="quiz-screen" data-screen="question" data-index="${index}" data-id="${question.id}" data-step-name="${question.stepName}"${skipAttrs}${question.chapter ? ` data-chapter="${question.chapter}"` : ""}>
+          ${renderChapterHeader(question)}
           <h2 class="quiz-question-title">${question.title}</h2>
           ${question.subtext ? `<p class="quiz-subtext">${question.subtext}</p>` : ""}
           <div class="revenue-slider">
@@ -5591,7 +6030,13 @@ function renderQuizQuestionScreen(question, index) {
               </div>
               <input type="range" class="revenue-slider__input" id="revenue-slider-input" min="${question.min}" max="${question.max}" step="${question.step}" value="${initial}" aria-label="${question.title}" />
             </div>
-            <div class="revenue-slider__scale"><span>0 €</span><span>20 000 € et plus</span></div>
+            <div class="revenue-slider__ticks">
+              <span class="revenue-slider__tick">0 €</span>
+              <span class="revenue-slider__tick">5 000 €</span>
+              <span class="revenue-slider__tick">10 000 €</span>
+              <span class="revenue-slider__tick">15 000 €</span>
+              <span class="revenue-slider__tick">20 000 €</span>
+            </div>
             <p class="revenue-slider__math" id="revenue-slider-math"></p>
           </div>
           <p class="revenue-slider__note">Ça nous aide à orienter le concept vers un modèle économique cohérent avec ton objectif.</p>
@@ -5616,6 +6061,7 @@ function renderQuizQuestionScreen(question, index) {
   const chapterAttr = question.chapter ? ` data-chapter="${question.chapter}"` : "";
 
   return `<div class="quiz-screen" data-screen="question" data-index="${index}" data-id="${question.id}" data-step-name="${question.stepName}"${skipAttrs}${chapterAttr}>
+          ${renderChapterHeader(question)}
           <h2 class="quiz-question-title">${question.title}</h2>
           ${question.subtext ? `<p class="quiz-subtext">${question.subtext}</p>` : ""}
           ${renderQuizOptions(question)}
