@@ -5573,7 +5573,7 @@ function successPage({ brand, siteUrl }) {
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>${brand.name} — Accès confirmé</title>
-<meta name="description" content="Ton paiement est confirmé, voici les SaaS qui correspondent le plus à ton profil." />
+<meta name="description" content="Ton paiement est confirmé, voici ton concept de SaaS généré pour toi." />
 <meta name="robots" content="noindex" />
 <style>
   :root { color-scheme: dark; }
@@ -5720,6 +5720,28 @@ function successPage({ brand, siteUrl }) {
   .badge--partial { color: #D9A23D; background: rgba(217, 162, 61, 0.12); border: 1px solid rgba(217, 162, 61, 0.3); }
   #empty-state, #error-state { text-align: center; color: #8A8F98; font-size: 14px; margin-top: 24px; display: none; }
   #empty-state.is-visible, #error-state.is-visible { display: block; }
+
+  .concept-card {
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 14px;
+    padding: 24px 20px;
+  }
+  .concept-card__eyebrow {
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: #0047FF;
+    margin: 0 0 8px;
+  }
+  .concept-card__name { font-size: 22px; font-weight: 800; color: #F5F6F8; margin: 0 0 6px; }
+  .concept-card__tagline { font-size: 15px; color: #F5F6F8; margin: 0 0 16px; }
+  .concept-card__description { font-size: 14px; line-height: 1.6; color: #C7CBD4; margin: 0 0 20px; }
+  .concept-card__row { margin-bottom: 14px; }
+  .concept-card__label { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.03em; color: #8A8F98; margin: 0 0 4px; }
+  .concept-card__value { font-size: 14px; line-height: 1.5; color: #E4E6EB; margin: 0; }
+  .concept-card__note { font-size: 12px; font-style: italic; color: #8A8F98; margin: 16px 0 0; }
 </style>
 </head>
 <body>
@@ -5736,14 +5758,36 @@ function successPage({ brand, siteUrl }) {
 
     <div id="results-zone">
       <div class="result-intro">
-        <h2 id="results-title">Voici ce qu'on a trouvé pour toi.</h2>
-        <p id="results-subtitle"></p>
+        <h2 id="results-title">Ton concept complet.</h2>
+        <p id="results-subtitle">Généré pour toi, à partir de ton profil.</p>
       </div>
-      <div id="results-list"></div>
+      <div class="concept-card">
+        <p class="concept-card__eyebrow">Concept généré pour toi</p>
+        <h3 class="concept-card__name" id="concept-name"></h3>
+        <p class="concept-card__tagline" id="concept-tagline"></p>
+        <p class="concept-card__description" id="concept-description"></p>
+        <div class="concept-card__row">
+          <p class="concept-card__label">Cible</p>
+          <p class="concept-card__value" id="concept-persona"></p>
+        </div>
+        <div class="concept-card__row">
+          <p class="concept-card__label">Canaux d'acquisition</p>
+          <p class="concept-card__value" id="concept-channels"></p>
+        </div>
+        <div class="concept-card__row">
+          <p class="concept-card__label">Palette</p>
+          <p class="concept-card__value" id="concept-palette"></p>
+        </div>
+        <div class="concept-card__row">
+          <p class="concept-card__label">Style de logo</p>
+          <p class="concept-card__value" id="concept-logo"></p>
+        </div>
+        <p class="concept-card__note" id="concept-note" style="display:none"></p>
+      </div>
     </div>
 
-    <div id="empty-state">Aucune correspondance à afficher pour l'instant — reviens bientôt, la base s'enrichit régulièrement.</div>
-    <div id="error-state">Un souci technique empêche d'afficher tes résultats. Écris-nous via le chat, on corrige ça vite.</div>
+    <div id="empty-state">Ton concept n'a pas encore pu être généré — écris-nous via le chat, on s'en occupe.</div>
+    <div id="error-state">Un souci technique empêche d'afficher ton concept. Écris-nous via le chat, on corrige ça vite.</div>
 
     <div class="card">
       <a class="btn" href="${siteUrl}">Retour à l'accueil</a>
@@ -5754,258 +5798,62 @@ function successPage({ brand, siteUrl }) {
   <script src="/js/supabase-client.js"></script>
   <script>
     (function () {
-      // Seuils de tranche de budget identiques à la vue SQL
-      // saas_listings_public (migration 0011) -- on interroge saas_listings
-      // directement ici (accès complet réservé authenticated+paid par RLS,
-      // voir migration 0008), donc budget_bucket n'est pas déjà calculé et
-      // doit être reproduit à l'identique côté client.
-      function budgetBucket(askingPriceUsd) {
-        if (typeof askingPriceUsd !== "number") return null;
-        if (askingPriceUsd < 5000) return "low";
-        if (askingPriceUsd < 20000) return "mid";
-        if (askingPriceUsd < 50000) return "high";
-        return "over_high";
-      }
-
-      function sectorsOverlap(profileSecteur, listingSecteur) {
-        if (!profileSecteur || !profileSecteur.length) return false;
-        if (!listingSecteur || !listingSecteur.length) return false;
-        if (listingSecteur.indexOf("both") !== -1) return true;
-        return profileSecteur.some(function (id) {
-          return id === "both" || listingSecteur.indexOf(id) !== -1;
-        });
-      }
-
-      // Scoring déterministe, sans IA : uniquement sur secteur et budget,
-      // les deux seuls critères réellement présents en base (pas de colonne
-      // "complexité"/"temps de build" dans saas_listings -- on ne l'invente
-      // pas). Seuil minimum = 2 pour compter comme "vraie" correspondance.
-      function matchScore(profile, listing) {
-        var score = 0;
-        var reasons = [];
-
-        if (sectorsOverlap(profile.secteur, listing.secteur)) {
-          score += 2;
-          reasons.push("secteur " + sectorLabel(profile.secteur));
-        }
-
-        var bucket = budgetBucket(listing.asking_price_usd);
-        if (profile.budget && profile.budget !== "undecided") {
-          if (bucket === profile.budget) {
-            score += 2;
-            reasons.push("budget " + BUDGET_LABELS[profile.budget]);
-          }
-        } else if (profile.budget === "undecided") {
-          score += 1;
-        }
-
-        return { score: score, reasons: reasons };
-      }
-
-      function sectorLabel(secteurArr) {
-        var ids = secteurArr || [];
-        return ids.map(function (id) { return SECTOR_LABELS[id] || id; }).join(", ");
-      }
-
-      var SECTOR_LABELS = { b2b: "B2B", b2c: "B2C", both: "B2B et B2C" };
-      var BUDGET_LABELS = {
-        low: "moins de 5 000 €",
-        mid: "5 000 € – 20 000 €",
-        high: "20 000 € – 50 000 €"
-      };
-      var MATCH_THRESHOLD = 2;
-
-      function formatMrr(value) {
-        if (typeof value !== "number") return "MRR non communiqué";
-        return "MRR ~" + Math.round(value).toLocaleString("fr-FR") + " $";
-      }
-
-      function median(sortedNums) {
-        var n = sortedNums.length;
-        var mid = Math.floor(n / 2);
-        return n % 2 !== 0 ? sortedNums[mid] : (sortedNums[mid - 1] + sortedNums[mid]) / 2;
-      }
-
-      // Fourchette de MRR calculée sur les vraies données déjà chargées
-      // (tous les listings actifs sont en mémoire au moment du matching --
-      // pas besoin d'une requête SQL séparée). Seuil de fiabilité : sous 3
-      // SaaS avec un MRR renseigné dans le même secteur, l'échantillon est
-      // trop faible pour être honnête -- on n'affiche aucune fourchette
-      // plutôt que d'en montrer une non représentative.
-      function sectorMrrRange(listing, allListings) {
-        // mrr_usd = 0 exclu : un MRR confirmé à zéro n'est pas un revenu
-        // vérifié utile pour une fourchette de marché -- l'inclure écrase le
-        // minimum et la médiane, rendant la fourchette non crédible.
-        var peers = allListings.filter(function (other) {
-          return sectorsOverlap(listing.secteur, other.secteur) && typeof other.mrr_usd === "number" && other.mrr_usd > 0;
-        });
-        if (peers.length < 3) return null;
-        var values = peers.map(function (p) { return p.mrr_usd; }).sort(function (a, b) { return a - b; });
-        return {
-          min: values[0],
-          max: values[values.length - 1],
-          med: median(values),
-          sampleSize: values.length
-        };
-      }
-
-      function formatUsd(value) {
-        return Math.round(value).toLocaleString("fr-FR") + " $";
-      }
-
-      // Palette de dégradés "envie" -- pas de couleur choisie au hasard à
-      // chaque rendu (déterministe sur le nom, comme seededMatchCount), pour
-      // qu'un même SaaS garde toujours la même identité visuelle générée.
-      var MOCKUP_PALETTES = [
-        ["#0047FF", "#7B2FF7"],
-        ["#00C48C", "#0047FF"],
-        ["#FF6B4A", "#D9A23D"],
-        ["#7B2FF7", "#D9605A"],
-        ["#0EA5E9", "#00C48C"],
-        ["#D9A23D", "#FF6B4A"]
-      ];
-
-      function hashString(str) {
-        var hash = 0;
-        for (var i = 0; i < str.length; i += 1) {
-          hash = (hash * 31 + str.charCodeAt(i)) | 0;
-        }
-        return Math.abs(hash);
-      }
-
-      function initials(name) {
-        var words = (name || "SaaS").trim().split(/\s+/).slice(0, 2);
-        return words.map(function (w) { return w.charAt(0).toUpperCase(); }).join("") || "S";
-      }
-
-      // Identité visuelle générée (initiales + dégradé), jamais présentée
-      // comme le vrai logo du SaaS -- juste un concept, clairement labellisé
-      // dans le HTML ("Aperçu concept"), séparé du bloc de données vérifiées
-      // en dessous. Le titre de l'aperçu réutilise le vrai nom/la vraie
-      // description en base (jamais un texte généré ou un chiffre inventé).
-      function renderConceptMockup(listing) {
-        var palette = MOCKUP_PALETTES[hashString(listing.name || "") % MOCKUP_PALETTES.length];
-        var gradient = "linear-gradient(135deg, " + palette[0] + ", " + palette[1] + ")";
-        var headline = listing.description
-          ? escapeHtml(listing.description).slice(0, 90)
-          : "Un SaaS " + escapeHtml(sectorLabel(listing.secteur)) + " prêt à reprendre";
-
-        var conceptHref = listing.slug ? "/concept?slug=" + encodeURIComponent(listing.slug) : "#";
-
-        var el = document.createElement("div");
-        el.className = "concept-mockup";
-        el.innerHTML =
-          '<div class="concept-mockup__chrome"><span></span><span></span><span></span></div>' +
-          '<div class="concept-mockup__hero" style="background:' + gradient + '">' +
-            '<div class="concept-mockup__logo">' + escapeHtml(initials(listing.name)) + "</div>" +
-            '<p class="concept-mockup__brand">' + escapeHtml(listing.name || "SaaS") + "</p>" +
-            '<p class="concept-mockup__headline">' + headline + "</p>" +
-            '<a class="concept-mockup__cta" href="' + escapeAttr(conceptHref) + '">Je teste mon idée &rarr;</a>' +
-          "</div>" +
-          '<p class="concept-mockup__label">Aperçu concept — pas le vrai site, généré pour visualiser le potentiel</p>';
-        return el;
-      }
-
-      function renderListing(listing, isPartial, allListings) {
-        var badgeClass = listing.source_level === "verified" ? "badge--verified" : "badge--platform";
-        var badgeLabel = listing.source_level === "verified" ? "Vérifié · TrustMRR" : "Revue par l'équipe";
-        var reasonText = listing._reasons && listing._reasons.length
-          ? "Correspond à ton " + listing._reasons.join(" et ton ")
-          : "Sélection parmi les SaaS les plus solides du catalogue";
-
-        var range = sectorMrrRange(listing, allListings);
-        var rangeHtml = range
-          ? '<p class="listing-card__range">SaaS ' + escapeHtml(sectorLabel(listing.secteur)) +
-            " similaires : MRR entre " + formatUsd(range.min) + " et " + formatUsd(range.max) +
-            " (médiane " + formatUsd(range.med) + ", sur " + range.sampleSize + " SaaS vérifiés)</p>"
-          : "";
-
-        var el = document.createElement("div");
-        el.className = "listing-card";
-        el.appendChild(renderConceptMockup(listing));
-
-        var verifiedBlock = document.createElement("div");
-        verifiedBlock.className = "listing-card__verified";
-        verifiedBlock.innerHTML =
-          '<div class="listing-card__top">' +
-            '<p class="listing-card__name">' + escapeHtml(listing.name || "SaaS vérifié") + "</p>" +
-            '<span class="badge ' + badgeClass + '">' + badgeLabel + "</span>" +
-          "</div>" +
-          '<p class="listing-card__meta">' + escapeHtml(sectorLabel(listing.secteur)) + " · " + formatMrr(listing.mrr_usd) + "</p>" +
-          rangeHtml +
-          (listing.website ? '<a class="listing-card__link listing-card__cta" href="' + escapeAttr(listing.website) + '" target="_blank" rel="noopener">Voir le site &rarr;</a>' : "") +
-          '<div><span class="listing-card__reason">' + escapeHtml(reasonText) + (isPartial ? " · correspondance partielle" : "") + "</span></div>";
-        el.appendChild(verifiedBlock);
-
-        return el;
-      }
-
-      function escapeHtml(str) {
-        var div = document.createElement("div");
-        div.textContent = String(str == null ? "" : str);
-        return div.innerHTML;
-      }
-      function escapeAttr(str) {
-        return String(str || "").replace(/"/g, "&quot;");
-      }
-
-      function showResults(profile, listings) {
+      function showConcept(concept) {
         var statusLine = document.getElementById("status-line");
         statusLine.textContent = "Ton accès est actif.";
 
-        if (!listings.length) {
-          document.getElementById("empty-state").className = "is-visible";
-          return;
+        document.getElementById("concept-name").textContent = concept.concept_name;
+        document.getElementById("concept-tagline").textContent = concept.tagline;
+        document.getElementById("concept-description").textContent = concept.description;
+        document.getElementById("concept-persona").textContent = concept.target_persona;
+        document.getElementById("concept-channels").textContent = concept.channels;
+        document.getElementById("concept-palette").textContent = concept.palette;
+        document.getElementById("concept-logo").textContent = concept.logo_style;
+
+        if (concept.confidence_note) {
+          var noteEl = document.getElementById("concept-note");
+          noteEl.textContent = concept.confidence_note;
+          noteEl.style.display = "";
         }
-
-        var hasProfile = (profile.secteur && profile.secteur.length) || profile.budget;
-        var scored = listings.map(function (listing) {
-          var result = hasProfile ? matchScore(profile, listing) : { score: 0, reasons: [] };
-          listing._score = result.score;
-          listing._reasons = result.reasons;
-          return listing;
-        });
-
-        var ranked;
-        var subtitle;
-        if (hasProfile) {
-          ranked = scored.slice().sort(function (a, b) { return b._score - a._score; });
-        } else {
-          // Profil incomplet (quiz jamais terminé) : fallback honnête sur le
-          // MRR réel plutôt que de fabriquer une personnalisation qui
-          // n'existe pas.
-          ranked = scored.slice().sort(function (a, b) { return (b.mrr_usd || 0) - (a.mrr_usd || 0); });
-          subtitle = "Ton profil n'a pas assez de détails pour un tri personnalisé -- voici les SaaS les plus solides du catalogue.";
-        }
-
-        var top3 = ranked.slice(0, 3);
-        document.getElementById("results-subtitle").textContent = subtitle || "";
-
-        var listEl = document.getElementById("results-list");
-        listEl.innerHTML = "";
-        top3.forEach(function (listing) {
-          var isPartial = hasProfile && listing._score < MATCH_THRESHOLD;
-          listEl.appendChild(renderListing(listing, isPartial, listings));
-        });
 
         document.getElementById("results-zone").className = "is-visible";
+      }
+
+      // Le concept est déjà généré et mis en cache (user_concepts) depuis
+      // l'écran résultat du quiz -- on le relit ici plutôt que de rappeler le
+      // LLM. Filet de secours si le cache est vide (ex : paiement complété
+      // avant la fin de l'appel generate-user-concept côté quiz) : un appel
+      // direct à la fonction, qui renvoie alors le même contenu mis en cache.
+      async function fetchConceptFromEdge(supabase) {
+        var sessionRes = await supabase.auth.getSession();
+        var token = sessionRes.data.session ? sessionRes.data.session.access_token : null;
+        if (!token) return null;
+        var res = await fetch(supabase.supabaseUrl + "/functions/v1/generate-user-concept", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            apikey: supabase.supabaseKey,
+            Authorization: "Bearer " + token
+          },
+          body: JSON.stringify({})
+        });
+        var body = await res.json();
+        return body && body.concept ? body.concept : null;
       }
 
       async function loadResults(supabase, userId) {
         var statusLine = document.getElementById("status-line");
         try {
-          var profileRes = await supabase.from("profiles").select("secteur, budget, temps").eq("id", userId).single();
-          if (profileRes.error) throw profileRes.error;
-
-          var listingsRes = await supabase
-            .from("saas_listings")
-            .select("slug, name, website, description, secteur, mrr_usd, asking_price_usd, source_level")
-            .eq("active", true);
-          if (listingsRes.error) throw listingsRes.error;
-
-          showResults(profileRes.data || {}, listingsRes.data || []);
+          var cacheRes = await supabase.from("user_concepts").select("*").eq("user_id", userId).maybeSingle();
+          var concept = cacheRes.data || (await fetchConceptFromEdge(supabase));
+          if (!concept) {
+            statusLine.textContent = "Ton accès est actif.";
+            document.getElementById("empty-state").className = "is-visible";
+            return;
+          }
+          showConcept(concept);
         } catch (err) {
-          console.error("[succes] échec du chargement des résultats :", err);
+          console.error("[succes] échec du chargement du concept :", err);
           statusLine.textContent = "Ton accès est actif.";
           document.getElementById("error-state").className = "is-visible";
         }
@@ -9362,21 +9210,20 @@ function comptePage() {
       <ol class="timeline" id="dossier-timeline"></ol>
 
       <div class="dossier__project" id="dossier-project" style="display:none">
-        <h2 class="dossier__project-title">Mon projet</h2>
+        <h2 class="dossier__project-title">Mon concept</h2>
         <div class="dossier-project-card">
           <div class="dossier-project-card__top">
             <p class="dossier-project-card__concept" id="project-concept-name"></p>
-            <span class="dossier-project-card__badge" id="project-badge">Vérifié · TrustMRR</span>
+            <span class="dossier-project-card__badge" id="project-badge">Concept généré</span>
           </div>
           <p class="dossier-project-card__meta" id="project-meta"></p>
-          <a class="dossier-project-card__link" id="project-link" href="#" target="_blank" rel="noopener">Voir le site source &rarr;</a>
-          <a class="dossier-project-card__concept-link" id="project-concept-link" href="#">Revoir le concept complet &rarr;</a>
+          <a class="dossier-project-card__concept-link" id="project-concept-link" href="/succes">Revoir le concept complet &rarr;</a>
         </div>
       </div>
 
       <div class="dossier__project" id="dossier-project-empty" style="display:none">
-        <h2 class="dossier__project-title">Mon projet</h2>
-        <p class="dossier-project-empty__text">Tu n'as pas encore choisi de projet à lancer.</p>
+        <h2 class="dossier__project-title">Mon concept</h2>
+        <p class="dossier-project-empty__text">Ton concept n'est pas encore généré.</p>
         <a class="dossier-project-empty__cta" href="/succes">Voir mes résultats &rarr;</a>
       </div>
 
@@ -9717,59 +9564,32 @@ function comptePage() {
           document.getElementById("resend-access-btn").style.display = "block";
         }
 
-        loadSelectedProject(supabase, user.id, profile.paid_at);
+        loadGeneratedConcept(supabase, user.id, profile.paid_at);
       }
 
-      // Refait les memes requetes que /concept/{slug} a l'affichage --
-      // selected_projects ne stocke qu'une reference (listing_slug), jamais
-      // une copie du contenu genere/verifie, pour ne jamais devenir obsolete.
-      async function loadSelectedProject(supabase, userId, paidAt) {
+      // Pivot : /compte n'affiche plus une fiche réelle sélectionnée
+      // (selected_projects, retiré ici -- table encore en base mais plus
+      // lue côté client) mais le concept généré par utilisateur, mis en
+      // cache dans user_concepts (RLS : lecture limitée à son propre id).
+      async function loadGeneratedConcept(supabase, userId, paidAt) {
         if (!paidAt) {
           document.getElementById("dossier-project-empty").style.display = "";
           return;
         }
         try {
-          var selRes = await supabase.from("selected_projects").select("listing_slug").eq("user_id", userId).maybeSingle();
-          if (!selRes.data) {
+          var conceptRes = await supabase.from("user_concepts").select("concept_name, tagline").eq("user_id", userId).maybeSingle();
+          if (!conceptRes.data) {
             document.getElementById("dossier-project-empty").style.display = "";
             return;
           }
-          var slug = selRes.data.listing_slug;
+          var concept = conceptRes.data;
 
-          var listingRes = await supabase
-            .from("saas_listings")
-            .select("name, website, mrr_usd, source_level")
-            .eq("slug", slug)
-            .eq("active", true)
-            .single();
-          if (listingRes.error || !listingRes.data) {
-            document.getElementById("dossier-project-empty").style.display = "";
-            return;
-          }
-          var listing = listingRes.data;
-
-          var conceptRes = await supabase.from("saas_concepts").select("concept_name").eq("slug", slug).maybeSingle();
-
-          document.getElementById("project-concept-name").textContent =
-            conceptRes.data && conceptRes.data.concept_name ? conceptRes.data.concept_name : listing.name || "SaaS vérifié";
-          document.getElementById("project-badge").textContent =
-            listing.source_level === "verified" ? "Vérifié · TrustMRR" : "Revue par l'équipe";
-          document.getElementById("project-meta").textContent =
-            (listing.name || "SaaS") +
-            " · MRR " +
-            (typeof listing.mrr_usd === "number" ? Math.round(listing.mrr_usd).toLocaleString("fr-FR") + " $" : "non communiqué");
-
-          var linkEl = document.getElementById("project-link");
-          if (listing.website) {
-            linkEl.href = listing.website;
-          } else {
-            linkEl.style.display = "none";
-          }
-          document.getElementById("project-concept-link").href = "/concept?slug=" + encodeURIComponent(slug);
+          document.getElementById("project-concept-name").textContent = concept.concept_name;
+          document.getElementById("project-meta").textContent = concept.tagline;
 
           document.getElementById("dossier-project").style.display = "";
         } catch (err) {
-          console.error("[compte] échec du chargement du projet sélectionné :", err);
+          console.error("[compte] échec du chargement du concept généré :", err);
           document.getElementById("dossier-project-empty").style.display = "";
         }
       }
