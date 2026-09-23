@@ -216,6 +216,21 @@ const faq = {
   ]
 };
 
+// Sous-ensemble de faq.items réutilisé tel quel sur l'écran de paiement du
+// quiz -- mêmes questions/réponses que la homepage (jamais reformulées en
+// double), juste les 5 qui adressent une hésitation au moment de payer
+// (légitimité, méthode, réversibilité, après-paiement, modèle de prix).
+// Sélection par texte plutôt que par index -- résiste à un réordonnancement
+// futur de faq.items.
+const PAYMENT_FAQ_QUESTIONS = [
+  "C'est pas juste un générateur d'idées IA de plus ?",
+  "Comment le concept est-il généré ?",
+  "Et si le concept généré ne me convainc pas ?",
+  "Je paie, et après ? J'attends un email ?",
+  "Pourquoi payer une fois et pas un abonnement comme tout le monde ?"
+];
+const paymentFaqItems = PAYMENT_FAQ_QUESTIONS.map((q) => faq.items.find((item) => item.q === q)).filter(Boolean);
+
 // =============================================================================
 // PHASE 0 — Plan du funnel-quiz (écrit avant le code, cf. brief)
 // =============================================================================
@@ -1897,6 +1912,7 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
   .quiz-screen .payment-card,
   .quiz-screen .included-list__title,
   .quiz-screen .included-list li,
+  .quiz-screen .payment-faq__title,
   .quiz-screen .quiz-footer {
     opacity: 0;
     transform: translateY(10px);
@@ -1913,10 +1929,20 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
   .quiz-screen.is-active .payment-card,
   .quiz-screen.is-active .included-list__title,
   .quiz-screen.is-active .included-list li,
+  .quiz-screen.is-active .payment-faq__title,
   .quiz-screen.is-active .quiz-footer {
     opacity: 1;
     transform: none;
     transition: opacity 380ms cubic-bezier(0.16, 1, 0.3, 1), transform 380ms cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
+  /* .faq__item gère déjà sa propre opacity/transform par défaut (voir plus
+     haut, réutilisé tel quel) -- ici on override juste l'état "actif" de
+     cet écran, le stagger inter-questions vient du transition-delay déjà
+     posé en inline par renderFaqItems(), pas d'un nouveau calcul ici. */
+  .quiz-screen.is-active .faq__item {
+    opacity: 1;
+    transform: translateY(0);
   }
 
   .quiz-screen.is-active .quiz-chapter-icon { transition-delay: 0ms; }
@@ -1933,6 +1959,7 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
   .quiz-screen.is-active .included-list li:nth-child(3) { transition-delay: 440ms; }
   .quiz-screen.is-active .included-list li:nth-child(4) { transition-delay: 500ms; }
   .quiz-screen.is-active .included-list li:nth-child(5) { transition-delay: 560ms; }
+  .quiz-screen.is-active .payment-faq__title { transition-delay: 620ms; }
   .quiz-screen.is-active .quiz-option:nth-child(1) { transition-delay: 220ms; }
   .quiz-screen.is-active .quiz-option:nth-child(2) { transition-delay: 290ms; }
   .quiz-screen.is-active .quiz-option:nth-child(3) { transition-delay: 360ms; }
@@ -1960,6 +1987,7 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
     .quiz-screen .payment-card,
     .quiz-screen .included-list__title,
     .quiz-screen .included-list li,
+    .quiz-screen .payment-faq__title,
     .quiz-screen .quiz-footer {
       opacity: 1;
       transform: none;
@@ -3624,6 +3652,26 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
     letter-spacing: 0.04em;
     color: var(--steel);
     margin: 0 0 14px;
+  }
+
+  /* FAQ de l'écran de paiement -- même accordéon que la homepage
+     (.faq__item/.faq__question/.faq__chevron, styles déjà définis plus
+     haut, gestionnaire de clic déjà délégué sur document au chargement de
+     la page -- rien de neuf à câbler ici), juste un sous-ensemble de
+     questions et un titre de section propre à ce contexte. */
+  .payment-faq {
+    margin-top: 28px;
+    padding-top: 20px;
+    border-top: 1px solid rgba(255, 255, 255, 0.08);
+  }
+
+  .payment-faq__title {
+    font-size: 13px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--steel);
+    margin: 0 0 4px;
   }
 
   /* Icône check en cercle -- même SVG (ICON_CHECK_SMALL) que le reste du
@@ -6447,6 +6495,11 @@ function renderQuizOverlay({ quiz, pricing, stripeLink }) {
           <li>${ICON_CHECK_SMALL} Accès à vie, paiement unique — jamais d'abonnement</li>
           <li>${ICON_CHECK_SMALL} Générés à partir de ton secteur, ton budget et ton temps disponible</li>
         </ul>
+
+        <div class="payment-faq">
+          <p class="payment-faq__title">Questions fréquentes</p>
+          ${renderFaqItems(paymentFaqItems)}
+        </div>
       </div>
 
       <div class="quiz-screen quiz-resume" data-screen="resume-transition" data-step-name="reprise" id="quiz-resume-transition">
