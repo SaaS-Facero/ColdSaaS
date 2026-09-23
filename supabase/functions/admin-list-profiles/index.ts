@@ -64,7 +64,7 @@ Deno.serve(async (req) => {
     return json({ error: "Accès refusé." }, 403);
   }
 
-  const [profilesRes, entrepreneurRes, selectedRes, usersRes] = await Promise.all([
+  const [profilesRes, entrepreneurRes, conceptsRes, usersRes] = await Promise.all([
     supabaseAdmin
       .from("profiles")
       .select(
@@ -72,7 +72,10 @@ Deno.serve(async (req) => {
       )
       .order("created_at", { ascending: false }),
     supabaseAdmin.from("entrepreneur_profile_answers").select("user_id, frein, frein_autre, revenu_vise"),
-    supabaseAdmin.from("selected_projects").select("user_id, listing_slug, selected_at"),
+    // Pivot : selected_projects (fiche réelle choisie sur /concept) n'est
+    // plus ce que /admin doit montrer -- user_concepts (concept généré par
+    // profil) reflète l'état réel du nouveau funnel.
+    supabaseAdmin.from("user_concepts").select("user_id, concept_name"),
     supabaseAdmin.auth.admin.listUsers({ perPage: 1000 })
   ]);
 
@@ -82,12 +85,12 @@ Deno.serve(async (req) => {
   }
 
   const entrepreneurByUser = new Map((entrepreneurRes.data ?? []).map((row) => [row.user_id, row]));
-  const selectedByUser = new Map((selectedRes.data ?? []).map((row) => [row.user_id, row]));
+  const conceptByUser = new Map((conceptsRes.data ?? []).map((row) => [row.user_id, row]));
   const emailByUser = new Map((usersRes.data?.users ?? []).map((u) => [u.id, u.email]));
 
   const rows = profilesRes.data.map((profile) => {
     const entrepreneur = entrepreneurByUser.get(profile.id);
-    const selected = selectedByUser.get(profile.id);
+    const concept = conceptByUser.get(profile.id);
     return {
       id: profile.id,
       email: emailByUser.get(profile.id) ?? null,
@@ -100,7 +103,7 @@ Deno.serve(async (req) => {
       frein_autre: entrepreneur?.frein_autre ?? null,
       revenu_vise: entrepreneur?.revenu_vise ?? null,
       paid_at: profile.paid_at,
-      projet_selectionne: selected?.listing_slug ?? null,
+      concept_genere: concept?.concept_name ?? null,
       created_at: profile.created_at,
       funnel_last_step: profile.funnel_last_step,
       match_count: profile.match_count,

@@ -9286,7 +9286,7 @@ function comptePage() {
           temps.charAt(0).toUpperCase() + temps.slice(1) + " par semaine, direction " + secteur + " — objectif " + intention + " un SaaS" + budgetPart + ".",
           "Profil qualifié : " + intention + " un SaaS " + secteur + budgetPart + ", dans la limite de " + temps + " par semaine.",
           profile.deja_cherche
-            ? "Tu avais déjà cherché avant ColdTrend — cette fois avec des chiffres vérifiés : " + secteur + ", " + temps + " par semaine" + budgetPart + "."
+            ? "Tu avais déjà cherché avant ColdTrend — cette fois avec un concept pensé pour ton profil : " + secteur + ", " + temps + " par semaine" + budgetPart + "."
             : "Première recherche, bien cadrée : SaaS " + secteur + ", " + temps + " par semaine" + budgetPart + "."
         ];
 
@@ -9736,7 +9736,7 @@ function adminPage() {
             <th>Frein</th>
             <th>Revenu visé</th>
             <th>Paiement</th>
-            <th>Projet</th>
+            <th>Concept</th>
             <th>Inscrit le</th>
             <th>Étape funnel</th>
           </tr>
@@ -9788,13 +9788,13 @@ function adminPage() {
       var TEMPLATES = {
         quiz_abandonne: {
           segment: "quiz_abandonne",
-          subject: "Tu avais commencé à chercher un SaaS vérifié",
-          body: "<p>Salut {{prenom}},</p><p>Tu avais commencé à chercher un SaaS vérifié dans le secteur {{secteur}} sans aller jusqu'au bout.</p><p><a href=\\"https://coldtrend.com/?resume=quiz\\">Reprends exactement où tu t'étais arrêté</a> — tes réponses précédentes sont toujours là.</p><p>— ColdTrend</p>"
+          subject: "Tu avais commencé à générer ton concept de SaaS",
+          body: "<p>Salut {{prenom}},</p><p>Tu avais commencé à générer un concept de SaaS dans le secteur {{secteur}} sans aller jusqu'au bout.</p><p><a href=\\"https://coldtrend.com/?resume=quiz\\">Reprends exactement où tu t'étais arrêté</a> — tes réponses précédentes sont toujours là.</p><p>— ColdTrend</p>"
         },
         resultat_non_paye: {
           segment: "resultat_non_paye",
-          subject: "Tes SaaS vérifiés t'attendent toujours",
-          body: "<p>Salut {{prenom}},</p><p>On avait trouvé des SaaS vérifiés qui correspondent à ton profil ({{secteur}}) — {{frein}} t'a peut-être arrêté avant le dernier pas.</p><p><a href=\\"https://coldtrend.com/?resume=result\\">Voir mes résultats</a></p><p>— ColdTrend</p>"
+          subject: "Ton concept de SaaS t'attend toujours",
+          body: "<p>Salut {{prenom}},</p><p>On avait généré un concept de SaaS pour ton profil ({{secteur}}) — {{frein}} t'a peut-être arrêté avant le dernier pas.</p><p><a href=\\"https://coldtrend.com/?resume=result\\">Voir mon concept</a></p><p>— ColdTrend</p>"
         }
       };
 
@@ -9830,7 +9830,7 @@ function adminPage() {
           "<td>" + (FREIN_LABELS[row.frein] || row.frein_autre || "—") + "</td>" +
           "<td>" + (row.revenu_vise != null ? row.revenu_vise + " €" : "—") + "</td>" +
           "<td>" + (row.paid_at ? "Payé le " + formatDateFr(row.paid_at) : "Non payé") + "</td>" +
-          "<td>" + (row.projet_selectionne || "—") + "</td>" +
+          "<td>" + (row.concept_genere || "—") + "</td>" +
           "<td>" + formatDateFr(row.created_at) + "</td>" +
           "<td>" + (row.funnel_last_step != null ? row.funnel_last_step : "—") + "</td>";
         return tr;
