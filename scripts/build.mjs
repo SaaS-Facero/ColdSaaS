@@ -86,7 +86,7 @@ const brand = {
   // désamorce la lecture "distant/hostile" de "Cold" en définissant le mot
   // au lieu de le défendre. Affichée juste sous le wordmark, partout où le
   // nom apparaît seul pour la première fois au lecteur.
-  tagline: "Ici, « cold » veut dire vérifié, pas distant.",
+  tagline: "Ici, « cold » veut dire réfléchi, pas distant.",
   colors: {
     cobalt: "#0047FF",
     cobaltSoft: "#3D6BFF",
@@ -106,8 +106,12 @@ const brand = {
   }
 };
 
+// Pivot : abandon du positionnement "base de SaaS vérifiés" au profit d'un
+// concept de SaaS généré par IA à partir du profil (voir
+// generate-user-concept). Plus de référence TrustMRR/Stripe/"vérifié" dans
+// le hero -- ce registre n'a plus de sens sans donnée réelle affichée.
 const hero = {
-  eyebrow: "Preuve de revenus vérifiés",
+  eyebrow: "Un concept de SaaS, généré pour toi",
   titleLine1a: "Ton prochain business commence par une idée,",
   titleLine1b: "on trouve celle qui te correspond.",
   prefix: "Transforme-la en business qui tourne et génère",
@@ -120,16 +124,18 @@ const hero = {
     "ton premier chiffre d'affaires."
   ],
   subhead:
-    "ColdTrend indexe des SaaS à vendre ou à copier sur la base de revenus vérifiés — un générateur IA, mais qui part toujours d'un chiffre confirmé, jamais d'une promesse en l'air.",
+    "ColdTrend génère un concept de SaaS personnalisé à partir de ta situation, ton secteur et ton budget — un vrai concept réfléchi pour toi, jamais un template générique.",
   ctaPrimary: "Lancer mon business",
-  ctaSecondary: "Comment on vérifie"
+  ctaSecondary: "Comment ça marche"
 };
 
 const socialProof = {
   titleLine1: "Les outils qui vont transformer",
   titleLine2: "ton idée en réalité",
+  // TrustMRR retiré (pivot : plus de données affichées comme "vérifiées"
+  // publiquement) -- Stripe (paiement) et Claude (LLM de génération)
+  // restent pertinents, Whop conservé tel quel.
   logos: [
-    { src: "/logos/trustmrr.png", alt: "TrustMRR" },
     { src: "/logos/stripe.png", alt: "Stripe" },
     { src: "/logos/whop.png", alt: "Whop" },
     { src: "/logos/claude.png", alt: "Claude" }
@@ -139,18 +145,18 @@ const socialProof = {
 // Notification stack — MRR climbs gently across the pool (1 850€ -> 21 400€),
 // never a 200€-to-90 000€ jump. Kept in one place so the vanilla-JS engine
 // below can stay pure logic/DOM, no content mixed in.
+// Pivot : plus de MRR/badge "vérifié" affiché ici -- la source trustmrr est
+// retirée (voir SOURCE_META). Les notifications montrent maintenant une
+// activité réaliste mais générique (secteur, pas de nom de SaaS ni de
+// chiffre précis), cohérente avec un produit qui génère des concepts.
 const notificationStack = {
   templates: [
-    { source: "stripe", saasName: "Loopnotes", mrr: 1_850, kind: "sale" },
-    { source: "trustmrr", saasName: "Loopnotes", mrr: 1_850, kind: "verify" },
-    { source: "stripe", saasName: "Fleetbase", mrr: 3_200, kind: "sale" },
-    { source: "coldtrend", saasName: "Fleetbase", mrr: 3_200, kind: "listed" },
-    { source: "stripe", saasName: "Numio", mrr: 6_100, kind: "sale" },
-    { source: "trustmrr", saasName: "Numio", mrr: 6_100, kind: "verify" },
-    { source: "stripe", saasName: "Ledgerly", mrr: 11_200, kind: "sale" },
-    { source: "coldtrend", saasName: "Ledgerly", mrr: 11_200, kind: "listed" },
-    { source: "stripe", saasName: "Craftpanel", mrr: 21_400, kind: "sale" },
-    { source: "trustmrr", saasName: "Craftpanel", mrr: 21_400, kind: "verify" }
+    { source: "coldtrend", sector: "SaaS B2B", kind: "generated" },
+    { source: "stripe", sector: "e-commerce", kind: "sale" },
+    { source: "coldtrend", sector: "SaaS RH", kind: "generated" },
+    { source: "stripe", sector: "SaaS B2C", kind: "sale" },
+    { source: "coldtrend", sector: "marketing", kind: "generated" },
+    { source: "stripe", sector: "productivité", kind: "sale" }
   ]
 };
 
@@ -160,59 +166,48 @@ const pricing = {
   totalNote: "paiement unique, accès à vie"
 };
 
-const comparison = {
-  eyebrow: "Comparatif",
-  title: "ColdTrend vs génération d'idées par IA",
-  columns: { criterion: "Critère", ai: "Génération IA", rich: "ColdTrend" },
-  rows: [
-    { criterion: "Source de données", ai: "Suggestion générée, aucune preuve derrière", rich: "Stripe croisé avec TrustMRR" },
-    { criterion: "Vérifiabilité", ai: "Invérifiable — c'est un texte plausible", rich: "Chaque fiche a un MRR audité" },
-    { criterion: "Fraîcheur", ai: "Statique, ne change jamais", rich: "Base revérifiée en continu" },
-    { criterion: "Prix", ai: "Souvent gratuit — et ça s'en ressent", rich: "14,90 €, accès à vie" }
-  ]
-};
+// L'objet `comparison` ("ColdTrend vs génération d'idées par IA") a été
+// retiré ici -- son rendu était déjà désactivé (markup supprimé lors d'une
+// session précédente) et son contenu ("Stripe croisé avec TrustMRR")
+// contredisait de toute façon le pivot. renderComparisonRows() retiré avec.
 
+// Pivot : plus de base de SaaS vérifiés affichée publiquement -- le produit
+// génère un concept de SaaS personnalisé par IA (voir generate-user-concept).
+// FAQ réécrite en conséquence : les questions sur TrustMRR/badge Vérifié/la
+// base n'ont plus de sens et sont retirées, remplacées par des questions
+// sur la génération et la personnalisation. saas_listings reste en base
+// (dormante, sert encore l'upsell "plan de communication" sur /concept),
+// mais n'est plus ce dont la FAQ doit parler.
+//
+// Points "Et si aucune idée ne me correspond ?" et remboursement toujours
+// volontairement absents (politique non confirmée, voir commit précédent).
 const faq = {
   eyebrow: "Questions fréquentes",
   title: "Ce qu'on nous demande le plus",
-  // Repositionnement "générateur IA vérifié" (assumé, pas nié) -- voir
-  // hero.subhead et le followup dejaCherche pour la cohérence du même
-  // message ailleurs sur le site.
-  //
-  // Points 9 et 10 volontairement absents de ce tableau (pas de placeholder
-  // vide affiché dans l'accordéon) : "Et si aucune idée ne me correspond ?"
-  // et "Je peux me faire rembourser si ça me convainc pas ?" attendent une
-  // politique de remboursement confirmée -- ne pas en écrire une ici sans
-  // validation explicite. La FAQ précédente affichait "sous 14 jours, sans
-  // justificatif" ; à reconfirmer avant de la remettre.
   items: [
     {
       q: "C'est pas juste un générateur d'idées IA de plus ?",
-      a: "Si, on utilise l'IA — mais chaque concept est généré à partir d'un prompt qui varie selon ton profil (secteur, budget, réponses au quiz), pas un template générique renvoyé à tout le monde. La différence : les chiffres de revenu, eux, ne sont jamais générés — ils viennent de TrustMRR/Stripe. L'IA personnalise le concept, jamais les données financières."
+      a: "Le concept est généré à partir d'un prompt qui varie selon ton profil complet (situation, secteur, budget, temps, expérience) — pas un template générique renvoyé à tout le monde. On ne prétend pas que c'est une donnée vérifiée : c'est un concept réfléchi pour toi, présenté comme tel."
     },
     {
-      q: "Comment vous êtes sûrs que les chiffres sont vrais ?",
-      a: "Chaque MRR affiché est récupéré directement depuis TrustMRR ou Stripe, pas estimé ni déclaré à la main."
+      q: "Comment le concept est-il généré ?",
+      a: "Un modèle de langage (Claude, via OpenRouter) reçoit tes réponses au quiz et produit un nom, une description, une cible et des canaux d'acquisition cohérents entre eux. Aucun chiffre de revenu n'est jamais généré ni affiché — le prompt l'interdit explicitement et une vérification automatique rejette toute sortie qui l'enfreindrait."
     },
     {
-      q: "Le badge Vérifié, ça veut dire quoi exactement ?",
-      a: "Que le revenu du SaaS a été confirmé via une source financière tierce (TrustMRR/Stripe), pas juste affirmé par le vendeur."
+      q: "En quoi c'est vraiment personnalisé ?",
+      a: "Le prompt change à chaque profil : ta situation actuelle, ton expérience business, ton secteur, ton budget et ton temps disponible influencent directement le concept, la cible et les canaux suggérés — pas juste le prénom inséré dans un texte fixe."
     },
     {
-      q: "Vous les sortez d'où, ces SaaS ?",
-      a: "De bases publiques de SaaS à vendre ou à forte traction, filtrées et vérifiées avant d'être ajoutées."
-    },
-    {
-      q: "La base bouge, ou c'est toujours les mêmes fiches ?",
-      a: "Elle est mise à jour régulièrement, sans frais supplémentaire pour toi."
+      q: "Et si le concept généré ne me convainc pas ?",
+      a: "Tu peux relancer le quiz avec des réponses différentes pour obtenir un autre concept — rien n'est figé après un seul essai."
     },
     {
       q: "Je paie, et après ? J'attends un email ?",
-      a: "Non, tes résultats s'affichent directement à l'écran juste après le paiement."
+      a: "Non, ton concept complet s'affiche directement à l'écran juste après le paiement."
     },
     {
       q: "Pourquoi payer une fois et pas un abonnement comme tout le monde ?",
-      a: "Parce que l'accès est à vie — tu payes une fois, tu gardes l'accès aux mises à jour de la base sans repayer."
+      a: "Parce que l'accès est à vie — tu payes une fois pour débloquer ton concept complet, sans reconduction ni frais récurrents."
     },
     {
       q: "Vous allez aussi générer les vidéos publicitaires ?",
@@ -355,7 +350,7 @@ const quiz = {
       stepName: "intro",
       type: "intro",
       title: "Pas un quiz de plus.",
-      subtext: "7 questions, aucune pour te trier dans une case — chacune sert à filtrer une base réelle de SaaS vérifiés selon ta situation, pas à deviner qui tu es.",
+      subtext: "7 questions, aucune pour te trier dans une case — chacune sert à générer un concept de SaaS qui correspond vraiment à ta situation, pas à deviner qui tu es.",
       cta: "Commencer"
     },
     {
@@ -427,7 +422,7 @@ const quiz = {
       stepName: "secteur",
       chapter: 1,
       title: "Tu vises plutôt les entreprises ou les particuliers ?",
-      subtext: "Certains SaaS vérifiés touchent les deux, on te les montre dans tous les cas.",
+      subtext: "Certains concepts touchent les deux, le canal d'acquisition s'adapte selon ton choix.",
       type: "multi",
       optionStyle: "card",
       options: [
@@ -493,12 +488,12 @@ const quiz = {
         {
           value: "yes",
           label: "Oui, exactement ça",
-          followup: "On sait. C'est littéralement pour ça que ColdTrend existe : plus une seule fiche sans preuve derrière."
+          followup: "On sait. C'est littéralement pour ça que ColdTrend existe : un concept pensé pour ton profil, pas une liste générique de plus."
         },
         {
           value: "no",
           label: "Pas encore, c'est ma première recherche",
-          followup: "Alors autant commencer avec des chiffres vérifiés plutôt qu'avec des idées sorties d'un prompt sans preuve derrière — tu gagnes le détour."
+          followup: "Alors autant commencer avec un concept construit sur ton profil plutôt qu'avec des idées sorties d'un prompt générique — tu gagnes le détour."
         }
       ]
     },
@@ -527,7 +522,7 @@ function renderRotatorNoScript(phrases) {
   return phrases[0];
 }
 
-function page({ brand, hero, socialProof, notificationStack, pricing, comparison, faq, quiz }) {
+function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz }) {
   const { colors } = brand;
 
   return `<!DOCTYPE html>
@@ -535,7 +530,7 @@ function page({ brand, hero, socialProof, notificationStack, pricing, comparison
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>${brand.name} — Preuve de revenus vérifiés</title>
+<title>${brand.name} — Ton concept de SaaS, généré pour toi</title>
 <meta name="description" content="${hero.subhead}" />
 <link rel="stylesheet" href="/css/design-tokens.css" />
 <style>
@@ -2732,37 +2727,34 @@ function page({ brand, hero, socialProof, notificationStack, pricing, comparison
     margin: 0 0 32px;
   }
 
-  .quiz-result__count {
-    font-size: clamp(40px, 10vw, 56px);
+  .quiz-result__concept-name {
+    font-size: clamp(28px, 7vw, 38px);
     font-weight: 800;
     color: var(--cobalt);
-    font-variant-numeric: tabular-nums;
+    line-height: 1.2;
   }
 
-  .quiz-result__count-label {
-    font-size: 13px;
+  .quiz-result__concept-eyebrow {
+    font-size: 12px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
     color: var(--steel);
-    margin: 4px 0 28px;
+    margin: 0 0 10px;
   }
 
-  .quiz-result__match {
-    font-size: clamp(28px, 7vw, 40px);
-    font-weight: 800;
-    color: var(--verified-green);
-    font-variant-numeric: tabular-nums;
-    min-height: 1.2em;
-  }
-
-  .quiz-result__match-label {
-    font-size: 14px;
+  .quiz-result__concept-tagline {
+    font-size: 15px;
     color: var(--paper-soft);
-    margin: 4px 0 32px;
+    margin: 8px 0 28px;
+    line-height: 1.5;
   }
 
-  /* Aperçu caviardé -- 2-3 fiches réelles, secteur + fourchette de MRR
-     visibles (dérivée du vrai mrr_usd, jamais un chiffre inventé), nom
-     masqué par une barre pleine -- même logique de redaction que
-     .proof-card ailleurs sur cette page, en plus compact. */
+  /* Volets encore verrouillés -- description complète, cible et canaux,
+     direction artistique : révélés à l'écran /succes une fois l'accès
+     débloqué, jamais avant. Même logique de mise en scène "la donnée existe,
+     elle est juste protégée" que l'ancien aperçu caviardé, appliquée
+     maintenant au concept généré plutôt qu'à une fiche réelle. */
   .result-preview {
     width: 100%;
     max-width: 380px;
@@ -2794,23 +2786,14 @@ function page({ brand, hero, socialProof, notificationStack, pricing, comparison
     background: rgba(255, 255, 255, 0.02);
   }
 
-  .result-preview__name {
-    display: inline-block;
-    width: 96px;
-    height: 12px;
-    border-radius: 4px;
-    background: rgba(255, 255, 255, 0.12);
+  .result-preview__meta-label {
+    font-size: 13px;
+    color: var(--paper-soft);
   }
 
-  .result-preview__meta {
-    font-size: 12px;
+  .result-preview__lock {
     color: var(--steel);
-    text-align: right;
-  }
-
-  .result-preview__mrr {
-    color: var(--verified-green);
-    font-weight: 700;
+    display: inline-flex;
   }
 
   /* Chapitre bonus -- bloc distinct, pas un lien perdu en bas d'écran.
@@ -3235,7 +3218,7 @@ function page({ brand, hero, socialProof, notificationStack, pricing, comparison
 
     <section class="transition-cta" id="pricing">
       <h2 class="transition-cta__title">Trouve ton SaaS en 60 secondes</h2>
-      <p class="transition-cta__lead">Cinq questions rapides pour ne te montrer que les SaaS vérifiés qui correspondent à ton budget, ton temps et ton secteur.</p>
+      <p class="transition-cta__lead">Sept questions rapides pour générer un concept de SaaS qui correspond à ton budget, ton temps et ton secteur.</p>
       <button class="btn btn--primary" id="quiz-open-btn" type="button">Trouve ton SaaS en 60 secondes</button>
     </section>
   </main>
@@ -3359,38 +3342,20 @@ function page({ brand, hero, socialProof, notificationStack, pricing, comparison
 
       var SOURCE_META = {
         stripe: { label: "Stripe", icon: ${JSON.stringify(ICON_CREDIT_CARD)}, gradient: "linear-gradient(135deg, var(--cobalt) 0%, var(--cobalt-soft) 100%)", shadow: "rgba(0, 71, 255, 0.45)" },
-        trustmrr: { label: "TrustMRR", icon: ${JSON.stringify(ICON_SHIELD)}, gradient: "linear-gradient(135deg, var(--verified-green) 0%, var(--verified-green-soft) 100%)", shadow: "rgba(0, 196, 140, 0.45)" },
         coldtrend: { label: "ColdTrend", icon: ${JSON.stringify(ICON_TREND)}, gradient: "linear-gradient(135deg, var(--graphite) 0%, var(--graphite-soft) 100%)", shadow: "rgba(10, 14, 26, 0.55)" }
       };
 
-      var currencyFormatter = new Intl.NumberFormat("fr-FR", { style: "currency", currency: "EUR", maximumFractionDigits: 0 });
-
-      function seededJitter(seedKey) {
-        var hash = 0;
-        for (var i = 0; i < seedKey.length; i += 1) {
-          hash = (hash * 31 + seedKey.charCodeAt(i)) | 0;
-        }
-        var normalized = (hash % 1000) / 1000;
-        return 1 + normalized * 0.025;
-      }
-
       function buildNotification(template, pass) {
-        var seedKey = template.saasName + "-" + template.kind + "-" + pass;
-        var rawAmount = template.mrr * seededJitter(seedKey);
-        var amount = Math.round(rawAmount / 10) * 10;
-        var amountText = currencyFormatter.format(amount);
+        var seedKey = template.sector + "-" + template.kind + "-" + pass;
         var meta = SOURCE_META[template.source];
 
         var body, amountLabel;
         if (template.kind === "sale") {
-          body = "Paiement récurrent confirmé — " + template.saasName;
-          amountLabel = "+" + amountText + " MRR";
-        } else if (template.kind === "verify") {
-          body = template.saasName + " : MRR recoupé avec Stripe, écart 0%";
-          amountLabel = amountText + " MRR confirmé";
+          body = "Accès débloqué — secteur " + template.sector;
+          amountLabel = "Paiement confirmé";
         } else {
-          body = template.saasName + " passe \\"Revenus vérifiés\\" sur la marketplace";
-          amountLabel = amountText + " MRR";
+          body = "Concept généré — secteur " + template.sector;
+          amountLabel = "Concept livré";
         }
 
         return {
@@ -3399,7 +3364,7 @@ function page({ brand, hero, socialProof, notificationStack, pricing, comparison
           title: meta.label,
           body: body,
           amountLabel: amountLabel,
-          amountColor: template.source === "trustmrr" ? "var(--verified-green)" : "var(--cobalt-soft)",
+          amountColor: "var(--cobalt-soft)",
           createdAt: Date.now()
         };
       }
@@ -3638,8 +3603,6 @@ function page({ brand, hero, socialProof, notificationStack, pricing, comparison
       var quizPayBtnDefaultHref = document.getElementById("quiz-pay-btn").href;
       var TOTAL_STEPS = progressSegs.length; // 7 : 6 questions (dont capture) + résultat
 
-      // TODO: remplacer par le vrai décompte (config ci-dessus, jamais un Math.random()).
-      var TOTAL_SAAS = ${quiz.totalSaas};
       var SECTOR_LABELS = ${JSON.stringify(quiz.sectorLabels)};
       var BUDGET_LABELS = ${JSON.stringify(quiz.budgetLabels)};
       var TIME_LABELS = ${JSON.stringify(quiz.timeLabels)};
@@ -3906,140 +3869,36 @@ function page({ brand, hero, socialProof, notificationStack, pricing, comparison
         });
       });
 
-      function easeOutExpo(t) {
-        return t === 1 ? 1 : 1 - Math.pow(2, -10 * t);
-      }
-
-      function animateCounter(el, from, to, duration, onDone) {
-        if (reduceMotion) {
-          el.textContent = String(to);
-          if (onDone) onDone();
-          return;
-        }
-        var start = null;
-        function step(ts) {
-          if (!start) start = ts;
-          var progress = Math.min((ts - start) / duration, 1);
-          var value = Math.round(from + (to - from) * easeOutExpo(progress));
-          el.textContent = String(value);
-          if (progress < 1) {
-            window.requestAnimationFrame(step);
-          } else if (onDone) {
-            onDone();
-          }
-        }
-        window.requestAnimationFrame(step);
-      }
-
-      function seededMatchCount(ans) {
-        var seed = JSON.stringify(ans);
-        var hash = 0;
-        for (var i = 0; i < seed.length; i += 1) {
-          hash = (hash * 31 + seed.charCodeAt(i)) | 0;
-        }
-        return 2 + (Math.abs(hash) % 4); // 2..5
-      }
-
-      // Vrai comptage filtré (secteur + budget) dans saas_listings_public,
-      // remplace seededMatchCount() une fois la réponse arrivée. Un SaaS taggé
-      // "both" correspond à un profil qui a choisi "b2b" seul ou "b2c" seul,
-      // pas seulement à qui a coché "both" -- d'où le .or() qui ajoute
-      // toujours secteur.cs.{both} en plus des secteurs choisis.
-      //
-      // Choix assumé : si le filtre exact (secteur + budget) tombe à 0
-      // résultat, on retente sans le filtre budget plutôt que d'afficher "0
-      // résultat" (CTA cassée) ou d'inventer un chiffre -- le nombre affiché
-      // reste toujours un vrai comptage, juste moins précis dans ce cas rare.
-      function computeRealMatchCount(ans, cb) {
-        function run() {
-          var supabase = window.ColdTrendSupabase;
-          if (!supabase) {
-            cb(null);
-            return;
-          }
-
-          function countWithFilters(applyBudget) {
-            var query = supabase.from("saas_listings_public").select("id", { count: "exact", head: true });
-            var sectorIds = ans.secteur || [];
-            if (sectorIds.length) {
-              var orParts = sectorIds.map(function (id) {
-                return "secteur.cs.{" + id + "}";
-              });
-              if (orParts.indexOf("secteur.cs.{both}") === -1) orParts.push("secteur.cs.{both}");
-              query = query.or(orParts.join(","));
-            }
-            if (applyBudget && ans.budget && ans.budget !== "undecided") {
-              query = query.eq("budget_bucket", ans.budget);
-            }
-            return query;
-          }
-
-          countWithFilters(true).then(function (res) {
-            if (res.error) {
-              cb(null);
-              return;
-            }
-            if (typeof res.count === "number" && res.count > 0) {
-              cb(res.count);
-              return;
-            }
-            // Filtre exact vide : on relâche le budget plutôt que d'afficher 0.
-            countWithFilters(false).then(function (fallbackRes) {
-              cb(!fallbackRes.error && typeof fallbackRes.count === "number" ? fallbackRes.count : null);
-            });
-          });
-        }
-
-        if (window.ColdTrendSupabase) {
-          run();
-        } else {
-          document.addEventListener("coldtrend:supabase-ready", run, { once: true });
-        }
-      }
-
-      // Aperçu caviardé de l'écran résultat -- 2-3 fiches réelles filtrées
-      // sur le profil, jamais un exemple inventé. Le nom n'est jamais
-      // sélectionné (pas juste masqué en CSS) : impossible à faire fuiter
-      // par erreur. Le MRR est arrondi à la tranche de 1000 en-dessous pour
-      // rester un teaser, pas le chiffre exact réservé à l'accès payant.
-      function fetchResultPreview(ans, cb) {
-        var supabase = window.ColdTrendSupabase;
-        if (!supabase) {
-          cb([]);
-          return;
-        }
-        var query = supabase.from("saas_listings_public").select("secteur, mrr_usd").gt("mrr_usd", 0).limit(3);
-        var sectorIds = ans.secteur || [];
-        if (sectorIds.length) {
-          var orParts = sectorIds.map(function (id) {
-            return "secteur.cs.{" + id + "}";
-          });
-          if (orParts.indexOf("secteur.cs.{both}") === -1) orParts.push("secteur.cs.{both}");
-          query = query.or(orParts.join(","));
-        }
-        query.then(function (res) {
-          cb(!res.error && res.data ? res.data : []);
-        });
-      }
-
-      function renderResultPreview(rows) {
-        var wrap = document.getElementById("result-preview");
-        var list = document.getElementById("result-preview-list");
-        if (!wrap || !list || !rows.length) return;
-        list.innerHTML = rows
-          .map(function (row) {
-            var sectorText = (row.secteur || []).map(function (id) { return SECTOR_LABELS[id] || id; }).join(", ") || "—";
-            var floor = Math.floor((row.mrr_usd || 0) / 1000) * 1000;
-            var mrrText = floor + "€ – " + (floor + 1000) + "€ / mois";
-            return (
-              '<div class="result-preview__card">' +
-              '<span class="result-preview__name" aria-hidden="true"></span>' +
-              '<span class="result-preview__meta">' + sectorText + ' · <span class="result-preview__mrr">' + mrrText + "</span></span>" +
-              "</div>"
-            );
+      // Appelle generate-user-concept (mise en cache côté serveur dans
+      // user_concepts -- un seul appel LLM par utilisateur, jamais un
+      // exemple inventé côté client). situation/passif ne sont pas encore
+      // des colonnes profiles (voir quiz.questions plus haut) donc transmis
+      // dans le corps de la requête plutôt qu'en base.
+      function fetchGeneratedConcept(ans, cb) {
+        callEdgeFunctionAuthed("generate-user-concept", {
+          situation: ans.situation || null,
+          passif: ans.passif || null
+        })
+          .then(function (res) {
+            cb(res && res.concept ? res.concept : null);
           })
-          .join("");
-        wrap.hidden = false;
+          .catch(function () {
+            cb(null);
+          });
+      }
+
+      function renderConceptTeaser(concept) {
+        var wrap = document.getElementById("result-preview");
+        var nameEl = document.getElementById("quiz-concept-name");
+        var taglineEl = document.getElementById("quiz-concept-tagline");
+        if (!concept) {
+          if (nameEl) nameEl.textContent = "Ton concept";
+          if (taglineEl) taglineEl.textContent = "Débloque ton accès pour voir le concept complet généré pour toi.";
+          return;
+        }
+        if (nameEl) nameEl.textContent = concept.concept_name;
+        if (taglineEl) taglineEl.textContent = concept.tagline;
+        if (wrap) wrap.hidden = false;
       }
 
       function sectorSummary() {
@@ -4101,20 +3960,15 @@ function page({ brand, hero, socialProof, notificationStack, pricing, comparison
       function goToResult() {
         reachedResult = true;
         transitionTo(resultScreen, "forward");
-        fetchResultPreview(answers, renderResultPreview);
 
-        // Compteur seedé affiché tout de suite (jamais d'écran vide pendant le
-        // temps réseau), remplacé par le vrai comptage filtré dès qu'il arrive
-        // (voir computeRealMatchCount) -- sans ça, l'utilisateur attendrait un
-        // aller-retour réseau avant de voir le premier chiffre.
-        var matchCount = answers.matchCount !== undefined ? answers.matchCount : seededMatchCount(answers);
-        answers.matchCount = matchCount;
-        resultScreen.setAttribute("data-match-count", String(matchCount));
-
+        // match_count reste la colonne DB historique (pas de migration pour
+        // ce pivot) mais sa sémantique change : elle marque juste "quiz
+        // complété", plus un vrai comptage de fiches correspondantes.
+        answers.matchCount = 1;
         persistQuizAnswers();
 
         var titleEl = document.getElementById("quiz-result-title");
-        titleEl.textContent = "Voici ce qu'on a trouvé.";
+        titleEl.textContent = "Ton concept a été généré.";
 
         var metaParts = [];
         var sectorText = sectorSummary();
@@ -4123,47 +3977,20 @@ function page({ brand, hero, socialProof, notificationStack, pricing, comparison
         if (answers.temps) metaParts.push((TIME_LABELS[answers.temps] || answers.temps) + " par semaine");
         document.getElementById("quiz-result-meta").textContent = metaParts.join(" · ");
 
-        var ctaBtn = document.getElementById("quiz-see-offer-btn");
-        ctaBtn.textContent = "Débloquer les " + matchCount + " résultats";
+        renderConceptTeaser(answers.concept || null);
 
-        var totalEl = document.getElementById("quiz-count-total");
-        var matchEl = document.getElementById("quiz-count-match");
-        totalEl.textContent = "0";
-        matchEl.textContent = String(TOTAL_SAAS);
-
-        // matchAnimationStarted évite deux animations concurrentes sur matchEl :
-        // si computeRealMatchCount répond avant que ce setTimeout ne se
-        // déclenche (cas courant, la requête réseau prend rarement 1.3s), la
-        // valeur affichée est déjà à jour au moment où l'animation démarre --
-        // pas besoin d'une deuxième requestAnimationFrame par-dessus.
-        var matchAnimationStarted = false;
-        animateCounter(totalEl, 0, TOTAL_SAAS, 900, function () {
-          window.setTimeout(function () {
-            matchAnimationStarted = true;
-            animateCounter(matchEl, TOTAL_SAAS, matchCount, 700);
-          }, 400);
-        });
-
-        computeRealMatchCount(answers, function (realCount) {
-          if (realCount === null || realCount === matchCount) return;
-          matchCount = realCount;
-          answers.matchCount = matchCount;
-          resultScreen.setAttribute("data-match-count", String(matchCount));
-          persistQuizAnswers();
-          ctaBtn.textContent = "Débloquer les " + matchCount + " résultats";
-          if (matchAnimationStarted) {
-            animateCounter(matchEl, Number(matchEl.textContent) || 0, matchCount, 500);
-          }
+        fetchGeneratedConcept(answers, function (concept) {
+          if (!concept) return;
+          answers.concept = concept;
+          renderConceptTeaser(concept);
         });
       }
 
       function goToPayment() {
         trackEvent("result_cta_clicked", {});
-        var matchCount = Number(resultScreen.getAttribute("data-match-count")) || 3;
         var teaserEl = document.getElementById("quiz-teaser");
-        var sectorText = sectorSummary() || "plusieurs secteurs";
-        var budgetText = answers.budget ? ", budget " + (BUDGET_LABELS[answers.budget] || answers.budget) : "";
-        teaserEl.textContent = matchCount + " SaaS correspondent à ton profil : " + sectorText + budgetText + ".";
+        var conceptName = answers.concept ? answers.concept.concept_name : "ton concept";
+        teaserEl.textContent = conceptName + " — débloque la description complète, la cible et les canaux d'acquisition.";
 
         // Attache l'identité au lien Stripe (client_reference_id) : sans ça,
         // supabase/functions/stripe-webhook ne peut pas savoir quel profil
@@ -4239,7 +4066,7 @@ function page({ brand, hero, socialProof, notificationStack, pricing, comparison
       // Même pattern que callEdgeFunction() (voir /compte) : POST avec le
       // token de session courant, jamais un appel non authentifié pour une
       // route qui lit des données propres à l'utilisateur.
-      async function callEdgeFunctionAuthed(name) {
+      async function callEdgeFunctionAuthed(name, body) {
         var supabase = window.ColdTrendSupabase;
         var sessionRes = await supabase.auth.getSession();
         var token = sessionRes.data.session ? sessionRes.data.session.access_token : null;
@@ -4250,7 +4077,8 @@ function page({ brand, hero, socialProof, notificationStack, pricing, comparison
             "Content-Type": "application/json",
             apikey: supabase.supabaseKey,
             Authorization: "Bearer " + token
-          }
+          },
+          body: JSON.stringify(body || {})
         });
         return res.json();
       }
@@ -4489,6 +4317,10 @@ function page({ brand, hero, socialProof, notificationStack, pricing, comparison
                 temps: answers.temps || null,
                 secteur: answers.secteur || [],
                 deja_cherche: answers.dejaCherche === "yes",
+                // Pivot : match_count reste la colonne DB historique (pas de
+                // migration pour ce détail), mais sa sémantique n'est plus un
+                // vrai comptage de fiches correspondantes -- juste un flag
+                // "quiz complété" (toujours 1 une fois goToResult() atteint).
                 match_count: answers.matchCount,
                 funnel_last_step: 6,
                 converted: true
@@ -5325,18 +5157,6 @@ function renderProofLogos(logos, ariaHidden) {
     .join("\n          ");
 }
 
-function renderComparisonRows(comparison) {
-  return comparison.rows
-    .map(
-      (row) => `<div class="compare__row">
-          <span class="compare__criterion">${row.criterion}</span>
-          <span class="compare__cell"><span class="compare__label">${comparison.columns.ai} — </span>${row.ai}</span>
-          <span class="compare__cell compare__cell--rich"><span class="compare__label">${comparison.columns.rich} — </span>${row.rich}</span>
-        </div>`
-    )
-    .join("\n        ");
-}
-
 function renderFaqItems(items) {
   return items
     .map(
@@ -5615,19 +5435,31 @@ function renderQuizOverlay({ quiz, pricing, stripeLink }) {
       ${questionScreens}
 
       <div class="quiz-screen quiz-result" data-screen="result" data-step-name="resultat">
-        <h2 class="quiz-question-title" id="quiz-result-title">Voici ce qu'on a trouvé.</h2>
-        <div class="quiz-result__count" id="quiz-count-total">0</div>
-        <p class="quiz-result__count-label">SaaS vérifiés dans la base</p>
-        <div class="quiz-result__match" id="quiz-count-match">0</div>
-        <p class="quiz-result__match-label" id="quiz-match-label">correspondent à ton profil</p>
+        <h2 class="quiz-question-title" id="quiz-result-title">Ton concept a été généré.</h2>
+        <p class="quiz-result__concept-eyebrow" id="quiz-concept-eyebrow">Concept généré pour toi</p>
+        <div class="quiz-result__concept-name" id="quiz-concept-name">…</div>
+        <p class="quiz-result__concept-tagline" id="quiz-concept-tagline"></p>
         <p class="quiz-result-meta" id="quiz-result-meta"></p>
 
         <div class="result-preview" id="result-preview" hidden>
-          <p class="result-preview__label">Un aperçu, avant de débloquer le reste</p>
-          <div class="result-preview__list" id="result-preview-list"></div>
+          <p class="result-preview__label">Débloqué avec ton accès</p>
+          <div class="result-preview__list" id="result-preview-list">
+            <div class="result-preview__card">
+              <span class="result-preview__meta-label">Description complète du concept</span>
+              <span class="result-preview__lock" aria-hidden="true">${ICON_LOCK}</span>
+            </div>
+            <div class="result-preview__card">
+              <span class="result-preview__meta-label">Cible et canaux d'acquisition</span>
+              <span class="result-preview__lock" aria-hidden="true">${ICON_LOCK}</span>
+            </div>
+            <div class="result-preview__card">
+              <span class="result-preview__meta-label">Direction artistique (palette, logo)</span>
+              <span class="result-preview__lock" aria-hidden="true">${ICON_LOCK}</span>
+            </div>
+          </div>
         </div>
 
-        <button class="btn btn--primary btn--full" id="quiz-see-offer-btn" type="button">Voir mon accès</button>
+        <button class="btn btn--primary btn--full" id="quiz-see-offer-btn" type="button">Débloquer mon concept complet</button>
 
         <a class="result-bonus-chapter" href="/compte">
           <span class="result-bonus-chapter__eyebrow">Chapitre bonus, gratuit</span>
@@ -5652,11 +5484,11 @@ function renderQuizOverlay({ quiz, pricing, stripeLink }) {
           <p class="welcome-offer__counter" id="welcome-offer-counter" hidden></p>
         </div>
         <ul class="included-list">
-          <li>${ICON_CHECK_SMALL} Accès à toute la base de SaaS vérifiés via TrustMRR</li>
-          <li>${ICON_CHECK_SMALL} Résultats affichés à l'écran juste après le paiement</li>
-          <li>${ICON_CHECK_SMALL} Mises à jour continues, sans frais supplémentaire</li>
+          <li>${ICON_CHECK_SMALL} Ton concept de SaaS complet : description, cible, canaux, direction artistique</li>
+          <li>${ICON_CHECK_SMALL} Concept affiché à l'écran juste après le paiement</li>
+          <li>${ICON_CHECK_SMALL} Accès à une base de SaaS réels, pour t'inspirer ou approfondir</li>
           <li>${ICON_CHECK_SMALL} Accès à vie, paiement unique — jamais d'abonnement</li>
-          <li>${ICON_CHECK_SMALL} Filtrage par secteur, budget et temps disponible</li>
+          <li>${ICON_CHECK_SMALL} Générés à partir de ton secteur, ton budget et ton temps disponible</li>
         </ul>
         <p class="stripe-reassurance">${ICON_LOCK} Paiement sécurisé via <strong>&nbsp;Stripe</strong></p>
         <a class="btn btn--primary btn--cta-final" id="quiz-pay-btn" href="${stripeLink}">Obtenir mon accès — ${pricing.totalPrice}</a>
@@ -9019,7 +8851,7 @@ function connexionPage() {
     <div class="auth-card">
       <a class="auth-brand" href="/">${brand.name}</a>
       <h1 class="auth-title">Se connecter</h1>
-      <p class="auth-subtitle">Retrouve ta sélection de SaaS vérifiés.</p>
+      <p class="auth-subtitle">Retrouve ton concept de SaaS généré.</p>
       <div class="auth-banner auth-banner--alert" id="login-error" style="display:none;"></div>
       <button type="button" class="quiz-google-btn" id="login-google-btn">
         ${ICON_GOOGLE}
@@ -9134,7 +8966,7 @@ function inscriptionPage() {
       <a class="auth-brand" href="/">${brand.name}</a>
       <div id="signup-view">
         <h1 class="auth-title">Créer un compte</h1>
-        <p class="auth-subtitle">Sécurise l'accès à ta sélection de SaaS vérifiés.</p>
+        <p class="auth-subtitle">Sécurise l'accès à ton concept de SaaS généré.</p>
         <div class="auth-banner auth-banner--alert" id="signup-error" style="display:none;"></div>
         <form id="signup-form" novalidate>
           ${authField({ id: "signup-email", label: "Email", type: "email", autocomplete: "email", withCheck: true })}
@@ -9302,7 +9134,7 @@ function inscriptionPage() {
 
   return authPageShell({
     title: "Créer un compte",
-    description: "Crée ton compte ColdTrend pour accéder à ta sélection de SaaS vérifiés.",
+    description: "Crée ton compte ColdTrend pour accéder à ton concept de SaaS généré.",
     bodyHtml: body
   });
 }
@@ -10416,7 +10248,7 @@ mkdirSync(OUT_DIR, { recursive: true });
 mkdirSync(path.join(OUT_DIR, "css"), { recursive: true });
 mkdirSync(path.join(OUT_DIR, "js"), { recursive: true });
 
-writeBuiltFile(OUT_FILE, page({ brand, hero, socialProof, notificationStack, pricing, comparison, faq, quiz }));
+writeBuiltFile(OUT_FILE, page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz }));
 writeBuiltFile(OUT_FILE_SUCCESS, successPage({ brand, siteUrl: SITE_URL }));
 writeBuiltFile(OUT_FILE_CONCEPT, conceptPage({ brand, siteUrl: SITE_URL, commPlanPaymentLink: COMM_PLAN_PAYMENT_LINK }));
 writeBuiltFile(OUT_FILE_ENTREPRENEUR_PROFILE, entrepreneurProfilePage({ brand, siteUrl: SITE_URL, stripePaymentLink: STRIPE_PAYMENT_LINK }));
