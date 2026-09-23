@@ -2998,7 +2998,11 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
     justify-content: center;
     text-align: center;
     border-radius: 20px;
-    position: relative;
+    /* Pas de position: relative ici -- .quiz-screen est déjà position:
+       absolute (voir la règle de base), contexte de positionnement
+       suffisant pour ::before/::after. Le surcharger casserait
+       l'empilement absolu de tous les écrans du quiz (voir le bug déjà
+       rencontré sur situation/budget/objectifRevenu/result). */
   }
 
   .quiz-screen.quiz-mirror::before {
@@ -3034,10 +3038,8 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
   }
 
   /* Chapitre 1 (situation) -- lignes horizontales fines évoquant une
-     structure/organigramme, calque discret derrière le contenu. */
-  .quiz-screen[data-id="situation"] {
-    position: relative;
-  }
+     structure/organigramme, calque discret derrière le contenu. Pas de
+     position: relative -- .quiz-screen est déjà position: absolute. */
   .quiz-screen[data-id="situation"]::before {
     content: "";
     position: absolute;
@@ -3054,11 +3056,7 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
   }
 
   /* Budget / objectif de revenu -- dégradé radial doux centré sur le
-     contenu, Cobalt Blue très dilué. */
-  .quiz-screen[data-id="budget"],
-  .quiz-screen[data-id="objectifRevenu"] {
-    position: relative;
-  }
+     contenu, Cobalt Blue très dilué. Pas de position: relative -- idem. */
   .quiz-screen[data-id="budget"]::before,
   .quiz-screen[data-id="objectifRevenu"]::before {
     content: "";
@@ -3069,10 +3067,8 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
   }
 
   /* Résultat/concept -- fond le plus riche du parcours : dégradé radial
-     plus marqué + grille de points très fine, cohérent avec /concept/{slug}. */
-  .quiz-screen.quiz-result {
-    position: relative;
-  }
+     plus marqué + grille de points très fine, cohérent avec /concept/{slug}.
+     Pas de position: relative -- idem. */
   .quiz-screen.quiz-result::before {
     content: "";
     position: absolute;
