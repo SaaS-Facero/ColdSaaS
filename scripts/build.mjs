@@ -359,11 +359,9 @@ const quiz = {
       // écran dédié. Bascule possible vers "rachat" uniquement via le lien
       // discret sur l'écran résultat (voir #result-intention-toggle), qui
       // retague profiles.intention et régénère le concept en conséquence.
-      // Réponse réutilisée dans buildMirrorText() (fragment situation) --
-      // jamais une question posée sans réemploi en aval. "autre" n'ouvre
-      // pas de champ libre (le moteur d'avance auto du quiz ne gère pas de
-      // sous-flux texte sans casser le pattern clic -> avance immédiate) :
-      // elle reste sélectionnable mais reçoit un fragment miroir générique.
+      // "autre" n'ouvre pas de champ libre (le moteur d'avance auto du quiz
+      // ne gère pas de sous-flux texte sans casser le pattern clic ->
+      // avance immédiate) : elle reste sélectionnable telle quelle.
       id: "situation",
       stepName: "situation",
       chapter: 1,
@@ -384,7 +382,6 @@ const quiz = {
       ]
     },
     {
-      // Réponse réutilisée dans buildMirrorText() (fragment passif).
       id: "passif",
       stepName: "passif",
       chapter: 1,
@@ -452,11 +449,8 @@ const quiz = {
     {
       // Objectif transitoire, comme situation/passif : jamais persisté dans
       // profiles (pas de migration), transmis à generate-user-concept dans
-      // le corps de la requête. Placée ici (fin de chapitre 1, avant le
-      // mirror) et pas après temps -- le mirror est calculé et affiché
-      // avant que temps/dejaCherche (chapitre 2) existent, donc c'est le
-      // seul emplacement qui permette de reprendre cet objectif dans
-      // buildMirrorText().
+      // le corps de la requête. Reste en fin de chapitre 1, juste avant
+      // l'écran de pause.
       id: "objectifRevenu",
       stepName: "objectif-revenu",
       chapter: 1,
@@ -469,15 +463,19 @@ const quiz = {
       step: 500
     },
     {
-      // Charnière de fin de chapitre 1 -- climax émotionnel du quiz, pas une
-      // question. Le texte est généré dynamiquement par buildMirrorText()
-      // dans le script client à partir des réponses réelles (intention,
-      // secteur, budget) -- jamais une phrase piochée au hasard dans une
-      // liste fixe façon horoscope.
+      // Charnière de fin de chapitre 1 -- climax émotionnel du quiz, pas
+      // une question. Écran de pause statistique (remplace l'ancien texte
+      // miroir personnalisé) : compte-rendu social générique, pas de
+      // fragment construit à partir des réponses. 2 300 reprend le chiffre
+      // déjà affiché dans le hero ("+2 300 entrepreneurs nous font
+      // confiance") -- cohérence avec une donnée déjà publiée sur le site,
+      // pas un nouveau chiffre inventé pour cet écran.
       id: "mirror",
       stepName: "miroir",
       type: "mirror",
-      eyebrow: "Ce qu'on a compris jusqu'ici"
+      eyebrow: "Tu n'es pas le premier, ni le dernier",
+      subtext: "personnes ont déjà généré leur concept de SaaS avec ColdTrend.",
+      pauseValue: 2300
     },
     {
       id: "temps",
@@ -3084,41 +3082,183 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
     .quiz-screen.quiz-mirror::after { animation: none; opacity: 0.7; }
   }
 
+  /* Écran de pause statistique -- dégradé grisaille (Steel Gray décliné en
+     opacité, jamais une teinte tierce) plutôt que le cobalt-soft utilisé
+     ailleurs pour les eyebrows -- cet écran doit se sentir "en creux",
+     pas comme une nouvelle question. */
   .quiz-mirror__eyebrow {
-    font-size: 12px;
+    font-size: 13px;
     font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-    color: var(--cobalt-soft);
-    margin: 0 0 16px;
+    letter-spacing: 0.02em;
+    margin: 0 0 8px;
+    background: linear-gradient(90deg, var(--paper-soft), var(--steel));
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
   }
 
-  .quiz-mirror__text {
-    font-size: clamp(19px, 4.4vw, 25px);
-    font-weight: 700;
-    line-height: 1.45;
+  .pause-content {
+    position: relative;
+    z-index: 1;
+  }
+
+  /* Le CTA est en flux normal (pas de position ici), mais
+     .pause-avatars-bg est en position:absolute z-index:0 -- sans ceci il
+     peindrait par-dessus le bouton selon l'ordre d'empilement CSS standard
+     (positionné z-index:0 après un bloc statique). */
+  .quiz-mirror .quiz-footer {
+    position: relative;
+    z-index: 2;
+  }
+
+  .pause-number-wrap {
+    position: relative;
+    margin: 12px 0 16px;
+  }
+
+  .pause-glow {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    width: 220px;
+    height: 140px;
+    transform: translate(-50%, -50%);
+    background: radial-gradient(circle, rgba(0, 71, 255, 0.35), transparent 70%);
+    filter: blur(6px);
+    animation: pause-glow-pulse 4.5s ease-in-out infinite;
+  }
+
+  .pause-number {
+    position: relative;
+    font-size: clamp(48px, 13vw, 84px);
+    font-weight: 800;
+    letter-spacing: -0.02em;
     color: var(--paper-soft);
-    margin: 0 0 32px;
+    font-variant-numeric: tabular-nums;
   }
 
-  /* Révélation phrase par phrase (voir transitionTo()) -- chaque <span>
-     reçoit son propre transition-delay inline, la classe .is-visible est
-     ajoutée juste après pour déclencher la transition. */
-  .quiz-mirror__part {
-    display: inline;
-    opacity: 0;
-    transition: opacity 600ms cubic-bezier(0.16, 1, 0.3, 1);
+  .pause-subtext {
+    font-size: 15px;
+    color: var(--steel);
+    line-height: 1.5;
+    max-width: 380px;
+    margin: 0 auto;
   }
 
-  .quiz-mirror__part.is-visible {
-    opacity: 1;
+  @keyframes pause-glow-pulse {
+    0%, 100% { opacity: 0.6; }
+    50% { opacity: 1; }
+  }
+
+  /* Avatars flottants en arrière-plan -- décoratifs, jamais de vraies
+     photos/identités : de simples disques en dégradé Cobalt/Steel. */
+  .pause-avatars-bg {
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+    pointer-events: none;
+    overflow: hidden;
+  }
+
+  .pause-avatar-float {
+    position: absolute;
+    width: 26px;
+    height: 26px;
+    border-radius: 999px;
+    opacity: 0.2;
+    animation-name: pause-avatar-drift;
+    animation-timing-function: ease-in-out;
+    animation-iteration-count: infinite;
+    will-change: transform;
+  }
+
+  .pause-avatar-float--1 { background: linear-gradient(135deg, var(--cobalt), var(--cobalt-soft)); }
+  .pause-avatar-float--2 { background: linear-gradient(135deg, var(--steel), var(--cobalt)); }
+  .pause-avatar-float--3 { background: linear-gradient(135deg, var(--cobalt-dark), var(--cobalt-soft)); }
+  .pause-avatar-float--4 { background: var(--steel); opacity: 0.15; }
+  .pause-avatar-float--5 { background: linear-gradient(135deg, var(--cobalt-soft), var(--steel)); }
+
+  @keyframes pause-avatar-drift {
+    0% { transform: translate(0, 0); }
+    25% { transform: translate(14px, -10px); }
+    50% { transform: translate(-6px, 12px); }
+    75% { transform: translate(-14px, -6px); }
+    100% { transform: translate(0, 0); }
+  }
+
+  /* Orbite autour du chiffre -- même dégradés que les avatars flottants,
+     juste plus visibles (opacity 60-80%) et une trajectoire elliptique
+     avec une légère variation d'échelle (parallaxe : plus grand "devant",
+     plus petit "derrière"). */
+  .pause-orbit {
+    position: absolute;
+    left: 50%;
+    top: 38%;
+    width: 1px;
+    height: 1px;
+  }
+
+  .pause-avatar-orbit {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 22px;
+    height: 22px;
+    margin: -11px 0 0 -11px;
+    border-radius: 999px;
+    animation-timing-function: linear;
+    animation-iteration-count: infinite;
+    will-change: transform;
+  }
+
+  .pause-avatar-orbit--1 { background: linear-gradient(135deg, var(--cobalt), var(--cobalt-soft)); animation: pause-orbit-1 22s linear infinite; }
+  .pause-avatar-orbit--2 { background: linear-gradient(135deg, var(--steel), var(--cobalt)); animation: pause-orbit-2 26s linear infinite; }
+  .pause-avatar-orbit--3 { background: var(--cobalt-soft); animation: pause-orbit-3 30s linear infinite; }
+  .pause-avatar-orbit--4 { background: linear-gradient(135deg, var(--cobalt-dark), var(--cobalt)); animation: pause-orbit-4 24s linear infinite; }
+  .pause-avatar-orbit--5 { background: linear-gradient(135deg, var(--steel), var(--cobalt-soft)); animation: pause-orbit-5 28s linear infinite; }
+
+  @keyframes pause-orbit-1 {
+    0% { transform: translate(-150px, 0) scale(0.75); opacity: 0.5; }
+    25% { transform: translate(0, -60px) scale(1); opacity: 0.85; }
+    50% { transform: translate(150px, 0) scale(0.75); opacity: 0.5; }
+    75% { transform: translate(0, 60px) scale(1); opacity: 0.85; }
+    100% { transform: translate(-150px, 0) scale(0.75); opacity: 0.5; }
+  }
+  @keyframes pause-orbit-2 {
+    0% { transform: translate(120px, 30px) scale(0.8); opacity: 0.55; }
+    25% { transform: translate(20px, -70px) scale(1); opacity: 0.8; }
+    50% { transform: translate(-120px, 30px) scale(0.8); opacity: 0.55; }
+    75% { transform: translate(-20px, 80px) scale(1); opacity: 0.8; }
+    100% { transform: translate(120px, 30px) scale(0.8); opacity: 0.55; }
+  }
+  @keyframes pause-orbit-3 {
+    0% { transform: translate(-100px, -50px) scale(0.7); opacity: 0.5; }
+    50% { transform: translate(100px, 50px) scale(1); opacity: 0.85; }
+    100% { transform: translate(-100px, -50px) scale(0.7); opacity: 0.5; }
+  }
+  @keyframes pause-orbit-4 {
+    0% { transform: translate(90px, -70px) scale(0.85); opacity: 0.6; }
+    50% { transform: translate(-90px, 70px) scale(1); opacity: 0.8; }
+    100% { transform: translate(90px, -70px) scale(0.85); opacity: 0.6; }
+  }
+  @keyframes pause-orbit-5 {
+    0% { transform: translate(-60px, 90px) scale(0.75); opacity: 0.5; }
+    50% { transform: translate(60px, -90px) scale(1); opacity: 0.85; }
+    100% { transform: translate(-60px, 90px) scale(0.75); opacity: 0.5; }
   }
 
   @media (prefers-reduced-motion: reduce) {
-    .quiz-mirror__part {
-      opacity: 1;
-      transition: none;
+    .pause-avatar-float,
+    .pause-avatar-orbit,
+    .pause-glow {
+      animation: none;
     }
+    .pause-avatar-orbit--1 { opacity: 0.7; }
+    .pause-avatar-orbit--2 { opacity: 0.7; }
+    .pause-avatar-orbit--3 { opacity: 0.7; }
+    .pause-avatar-orbit--4 { opacity: 0.7; }
+    .pause-avatar-orbit--5 { opacity: 0.7; }
+    .pause-glow { opacity: 0.7; }
   }
 
   .quiz-result__concept-name {
@@ -4339,24 +4479,7 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
         transitionInProgress = true;
 
         var isMirrorScreen = nextEl.getAttribute("data-id") === "mirror";
-        if (isMirrorScreen) {
-          var mirrorTextEl = document.getElementById("quiz-mirror-text");
-          if (mirrorTextEl) {
-            // Révélation phrase par phrase, rythme lent ("on te lit
-            // vraiment") -- chaque fragment de buildMirrorParts() est déjà
-            // une phrase complète, pas un découpage arbitraire mot à mot.
-            var mirrorParts = buildMirrorParts(answers);
-            mirrorTextEl.innerHTML = mirrorParts
-              .map(function (part, i) {
-                return '<span class="quiz-mirror__part" style="transition-delay:' + i * 380 + 'ms">' + part + " </span>";
-              })
-              .join("");
-            void mirrorTextEl.offsetWidth;
-            Array.prototype.forEach.call(mirrorTextEl.querySelectorAll(".quiz-mirror__part"), function (partEl) {
-              partEl.classList.add("is-visible");
-            });
-          }
-        }
+        if (isMirrorScreen) startPauseCountUp();
 
         var enterFrom = direction === "back" ? -24 : 24;
         var exitTo = direction === "back" ? 24 : -24;
@@ -4555,62 +4678,35 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
         return names.length ? names.join(", ") : "";
       }
 
-      // Écran miroir -- assemblage déterministe de fragments réels liés aux
-      // réponses (intention/secteur/budget), jamais un template complet
-      // piochué au hasard dans une liste type horoscope. Chaque fragment
-      // reformule une réponse déjà donnée en trait valorisant, jamais une
-      // généralité qui pourrait s'appliquer à n'importe qui.
-      function buildMirrorParts(a) {
-        var parts = [];
+      var pauseCountUpDone = false;
 
-        // "rachat"/"racheter" couvrent respectivement la nouvelle et
-        // l'ancienne valeur (comptes créés avant le retrait de l'écran
-        // dédié) -- "creation"/"copier" (défaut désormais silencieux) ne
-        // déclenche plus de fragment dédié, le mirror reste focalisé sur ce
-        // qui a été réellement répondu.
-        if (a.intention === "rachat" || a.intention === "racheter") {
-          parts.push("Tu ne pars pas de zéro : tu veux un revenu qui existe déjà.");
+      // Compte-up 0 -> valeur cible, ~1300ms, easing cubic-bezier(0.16,1,0.3,1)
+      // (même courbe "reveal" que le reste du site). Ne joue qu'une fois par
+      // session de quiz -- revenir sur cet écran (Retour) réaffiche direct
+      // la valeur finale plutôt que de rejouer l'animation à chaque fois.
+      function easeOutExpoPause(t) {
+        return t === 1 ? 1 : 1 - Math.pow(2, -10 * t);
+      }
+
+      function startPauseCountUp() {
+        var el = document.getElementById("quiz-pause-number");
+        if (!el) return;
+        var target = Number(el.getAttribute("data-target")) || 0;
+        if (reduceMotion || pauseCountUpDone) {
+          el.textContent = target.toLocaleString("fr-FR");
+          return;
         }
-
-        var SITUATION_FRAGMENTS = {
-          salarie: "Tu as un revenu stable, tu explores en parallèle.",
-          independant: "Tu es déjà seul aux commandes de ton activité.",
-          etudiant: "Tu as du temps mais pas encore de revenu fixe.",
-          activite_en_ligne: "Tu connais déjà les bases, tu cherches ta prochaine idée."
-        };
-        if (SITUATION_FRAGMENTS[a.situation]) parts.push(SITUATION_FRAGMENTS[a.situation]);
-
-        var PASSIF_FRAGMENTS = {
-          jamais_lance: "Premier projet, aucune expérience à corriger.",
-          lance_abandonne: "Tu sais déjà à quoi ressemble le moment où on décroche.",
-          deja_vendu: "Tu as déjà validé que tu peux convertir.",
-          ca_tourne: "Tu cherches à diversifier, pas à repartir de zéro."
-        };
-        if (PASSIF_FRAGMENTS[a.passif]) parts.push(PASSIF_FRAGMENTS[a.passif]);
-
-        var sectors = a.secteur || [];
-        if (sectors.indexOf("both") !== -1) {
-          parts.push("Tu ne t'interdis rien côté clientèle.");
-        } else if (sectors.indexOf("b2b") !== -1) {
-          parts.push("Des clients pros, pas du volume au hasard.");
-        } else if (sectors.indexOf("b2c") !== -1) {
-          parts.push("Du grand public, pas des cycles de vente à rallonge.");
+        pauseCountUpDone = true;
+        var duration = 1300;
+        var start = null;
+        function step(ts) {
+          if (!start) start = ts;
+          var progress = Math.min((ts - start) / duration, 1);
+          var value = Math.round(target * easeOutExpoPause(progress));
+          el.textContent = value.toLocaleString("fr-FR");
+          if (progress < 1) window.requestAnimationFrame(step);
         }
-
-        if (a.budget === "low" || a.budget === "undecided") {
-          parts.push("Et tu avances prudent, sans te mettre en danger financièrement.");
-        } else if (a.budget === "mid" || a.budget === "high") {
-          parts.push("Avec un vrai coussin pour ne pas improviser en cours de route.");
-        }
-
-        // Reprise factuelle du chiffre déclaré, jamais qualifiée
-        // ("ambitieux"/"modeste") -- le mirror reformule ce qui a été dit,
-        // il ne le juge pas (même garde-fou que le slider lui-même).
-        if (typeof a.objectifRevenu === "number" && a.objectifRevenu > 0) {
-          parts.push("Avec un objectif à " + formatRevenueValue(a.objectifRevenu) + ".");
-        }
-
-        return parts;
+        window.requestAnimationFrame(step);
       }
 
       function goToResult() {
@@ -5300,6 +5396,7 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
         currentQuestionIndex = 0;
         currentScreenEl = null;
         reachedResult = false;
+        pauseCountUpDone = false;
         authResolutionPromise = null;
         editContext = null;
         hideEditBar();
@@ -5982,12 +6079,45 @@ function renderQuizQuestionScreen(question, index) {
   }
 
   if (question.type === "mirror") {
-    // Charnière de fin de chapitre 1 -- le texte de #quiz-mirror-text est
-    // rempli dynamiquement par buildMirrorText() dans transitionTo(), pas
-    // ici (les réponses ne sont connues qu'au moment où l'écran s'affiche).
+    // Charnière de fin de chapitre 1 -- écran de pause statistique (voir
+    // commentaire sur la question "mirror" dans quiz.questions). Le
+    // compte-up de #quiz-pause-number est déclenché dans transitionTo(),
+    // pas ici (jamais lancé tant que l'écran n'est pas réellement affiché).
+    // Positions/durées des avatars flottants et orbitaux fixées au build
+    // (pas Math.random() côté client à chaque rendu -- déterministe, donc
+    // stable si l'écran est revisité).
+    const floatSeeds = [
+      { top: 8, left: 6, dur: 14, delay: 0 },
+      { top: 18, left: 82, dur: 17, delay: 1.2 },
+      { top: 30, left: 20, dur: 12, delay: 2.4 },
+      { top: 42, left: 68, dur: 16, delay: 0.6 },
+      { top: 55, left: 12, dur: 13, delay: 3 },
+      { top: 62, left: 90, dur: 15, delay: 1.8 },
+      { top: 74, left: 34, dur: 18, delay: 2.1 },
+      { top: 80, left: 58, dur: 12.5, delay: 0.9 },
+      { top: 15, left: 45, dur: 14.5, delay: 2.7 },
+      { top: 88, left: 78, dur: 16.5, delay: 1.5 }
+    ];
+    const floatAvatars = floatSeeds
+      .map(
+        (s, i) =>
+          `<span class="pause-avatar-float pause-avatar-float--${(i % 5) + 1}" style="top:${s.top}%;left:${s.left}%;animation-duration:${s.dur}s;animation-delay:${s.delay}s"></span>`
+      )
+      .join("");
+    const orbitAvatars = [1, 2, 3, 4, 5]
+      .map((n) => `<span class="pause-avatar-orbit pause-avatar-orbit--${n}"></span>`)
+      .join("");
     return `<div class="quiz-screen quiz-mirror" data-screen="question" data-index="${index}" data-id="${question.id}" data-step-name="${question.stepName}"${skipAttrs}>
-          <p class="quiz-mirror__eyebrow">${question.eyebrow}</p>
-          <p class="quiz-mirror__text" id="quiz-mirror-text"></p>
+          <div class="pause-avatars-bg" aria-hidden="true">${floatAvatars}</div>
+          <div class="pause-content">
+            <div class="pause-orbit" aria-hidden="true">${orbitAvatars}</div>
+            <p class="quiz-mirror__eyebrow">${question.eyebrow}</p>
+            <div class="pause-number-wrap">
+              <div class="pause-glow" aria-hidden="true"></div>
+              <div class="pause-number" id="quiz-pause-number" data-target="${question.pauseValue}">0</div>
+            </div>
+            <p class="pause-subtext">${question.subtext}</p>
+          </div>
           <div class="quiz-footer">
             <button class="btn btn--primary quiz-next" type="button">Continuer — Chapitre 2</button>
           </div>
