@@ -1893,6 +1893,10 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
   .quiz-screen .quiz-option,
   .quiz-screen .revenue-slider,
   .quiz-screen .revenue-slider__note,
+  .quiz-screen .quiz-payment__teaser,
+  .quiz-screen .payment-card,
+  .quiz-screen .included-list__title,
+  .quiz-screen .included-list li,
   .quiz-screen .quiz-footer {
     opacity: 0;
     transform: translateY(10px);
@@ -1905,6 +1909,10 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
   .quiz-screen.is-active .quiz-option,
   .quiz-screen.is-active .revenue-slider,
   .quiz-screen.is-active .revenue-slider__note,
+  .quiz-screen.is-active .quiz-payment__teaser,
+  .quiz-screen.is-active .payment-card,
+  .quiz-screen.is-active .included-list__title,
+  .quiz-screen.is-active .included-list li,
   .quiz-screen.is-active .quiz-footer {
     opacity: 1;
     transform: none;
@@ -1917,6 +1925,14 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
   .quiz-screen.is-active .quiz-subtext { transition-delay: 200ms; }
   .quiz-screen.is-active .revenue-slider { transition-delay: 220ms; }
   .quiz-screen.is-active .revenue-slider__note { transition-delay: 280ms; }
+  .quiz-screen.is-active .quiz-payment__teaser { transition-delay: 0ms; }
+  .quiz-screen.is-active .payment-card { transition-delay: 120ms; }
+  .quiz-screen.is-active .included-list__title { transition-delay: 260ms; }
+  .quiz-screen.is-active .included-list li:nth-child(1) { transition-delay: 320ms; }
+  .quiz-screen.is-active .included-list li:nth-child(2) { transition-delay: 380ms; }
+  .quiz-screen.is-active .included-list li:nth-child(3) { transition-delay: 440ms; }
+  .quiz-screen.is-active .included-list li:nth-child(4) { transition-delay: 500ms; }
+  .quiz-screen.is-active .included-list li:nth-child(5) { transition-delay: 560ms; }
   .quiz-screen.is-active .quiz-option:nth-child(1) { transition-delay: 220ms; }
   .quiz-screen.is-active .quiz-option:nth-child(2) { transition-delay: 290ms; }
   .quiz-screen.is-active .quiz-option:nth-child(3) { transition-delay: 360ms; }
@@ -1940,6 +1956,10 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
     .quiz-screen .quiz-option,
     .quiz-screen .revenue-slider,
     .quiz-screen .revenue-slider__note,
+    .quiz-screen .quiz-payment__teaser,
+    .quiz-screen .payment-card,
+    .quiz-screen .included-list__title,
+    .quiz-screen .included-list li,
     .quiz-screen .quiz-footer {
       opacity: 1;
       transform: none;
@@ -3522,9 +3542,33 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
     margin-bottom: 24px;
   }
 
+  /* Carte de paiement mise en avant -- glow Cobalt Blue (ombre + fond
+     teinté + bordure), jamais une bordure plate. Un seul palier de prix à
+     la fois (price-block par défaut OU welcome-offer, jamais les deux --
+     logique déjà en place, voir applyWelcomeOffer(), non touchée ici). */
+  .payment-card {
+    padding: 28px 20px 24px;
+    border-radius: 20px;
+    background: rgba(0, 71, 255, 0.06);
+    border: 1px solid rgba(0, 71, 255, 0.5);
+    box-shadow: 0 16px 44px -18px rgba(0, 71, 255, 0.45);
+    margin-bottom: 28px;
+    transition: transform 200ms cubic-bezier(0.4, 0, 0.2, 1), background 200ms cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  .payment-card:hover {
+    transform: translateY(-3px);
+    background: rgba(0, 71, 255, 0.09);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .payment-card { transition: none; }
+    .payment-card:hover { transform: none; }
+  }
+
   .price-block {
     text-align: center;
-    margin-bottom: 24px;
+    margin-bottom: 20px;
   }
 
   .price-block__daily {
@@ -3573,10 +3617,26 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
     color: var(--paper-soft);
   }
 
+  .included-list__title {
+    font-size: 13px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--steel);
+    margin: 0 0 14px;
+  }
+
+  /* Icône check en cercle -- même SVG (ICON_CHECK_SMALL) que le reste du
+     site, juste posé sur un disque teinté au lieu d'être nu. */
   .included-list svg {
     flex-shrink: 0;
-    margin-top: 2px;
-    color: var(--verified-green);
+    width: 22px;
+    height: 22px;
+    padding: 5px;
+    border-radius: 999px;
+    background: rgba(0, 71, 255, 0.14);
+    color: var(--cobalt-soft);
+    box-sizing: border-box;
   }
 
   .stripe-reassurance {
@@ -3586,7 +3646,7 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
     gap: 8px;
     font-size: 13px;
     color: var(--steel);
-    margin-bottom: 20px;
+    margin: 16px 0 0;
   }
 
   .btn--cta-final {
@@ -3594,12 +3654,21 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
     max-width: none;
     font-size: 17px;
     padding: 17px;
-    transition: transform 420ms cubic-bezier(0.22, 1.26, 0.36, 1), box-shadow 0.28s ease, background 0.18s ease;
+    transition: transform 180ms cubic-bezier(0.4, 0, 0.2, 1), box-shadow 180ms cubic-bezier(0.4, 0, 0.2, 1), background 0.18s ease;
   }
 
-  .btn--cta-final:hover,
+  .btn--cta-final:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 12px 28px -8px rgba(0, 71, 255, 0.65);
+  }
+
   .btn--cta-final:active {
-    transform: scale(1.02);
+    transform: translateY(0);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .btn--cta-final { transition: none; }
+    .btn--cta-final:hover { transform: none; }
   }
 
   /* Offre de bienvenue -- remplace le price-block par défaut une fois le
@@ -3608,21 +3677,22 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
      à la volée sans source), compteur affiché seulement si le nombre
      réel de places restantes passe sous le seuil de visibilité. */
   .welcome-offer {
-    margin-bottom: 4px;
-    padding: 16px;
-    border-radius: 14px;
-    border: 1px solid rgba(0, 196, 140, 0.3);
-    background: rgba(0, 196, 140, 0.06);
+    margin-bottom: 12px;
     text-align: center;
   }
 
+  /* Pastille pleine Cobalt Blue -- jamais un simple contour. */
   .welcome-offer__eyebrow {
-    margin: 0 0 8px;
+    display: inline-block;
+    margin: 0 0 12px;
+    padding: 5px 14px;
     font-size: 12px;
     font-weight: 700;
     text-transform: uppercase;
     letter-spacing: 0.04em;
-    color: var(--verified-green);
+    color: #fff;
+    background: var(--cobalt);
+    border-radius: 999px;
   }
 
   .welcome-offer__price {
@@ -6350,19 +6420,26 @@ function renderQuizOverlay({ quiz, pricing, stripeLink }) {
 
       <div class="quiz-screen" data-screen="payment" data-step-name="paiement">
         <p class="quiz-payment__teaser" id="quiz-teaser"></p>
-        <div class="price-block" id="price-block-default">
-          <div class="price-block__daily">Moins de <strong>${pricing.dailyPrice}</strong> par jour</div>
-          <div class="price-block__total">${pricing.totalPrice} — ${pricing.totalNote}</div>
-        </div>
-        <p class="quiz-return-banner" id="quiz-return-banner" hidden>Bon retour — reprends exactement là où tu en étais.</p>
-        <div class="welcome-offer" id="welcome-offer-block" hidden>
-          <p class="welcome-offer__eyebrow" id="welcome-offer-eyebrow"></p>
-          <div class="welcome-offer__price">
-            <span class="welcome-offer__price-old" id="welcome-offer-price-old"></span>
-            <span class="welcome-offer__price-new" id="welcome-offer-price-new"></span>
+
+        <div class="payment-card" id="payment-card">
+          <div class="price-block" id="price-block-default">
+            <div class="price-block__daily">Moins de <strong>${pricing.dailyPrice}</strong> par jour</div>
+            <div class="price-block__total">${pricing.totalPrice} — ${pricing.totalNote}</div>
           </div>
-          <p class="welcome-offer__counter" id="welcome-offer-counter" hidden></p>
+          <p class="quiz-return-banner" id="quiz-return-banner" hidden>Bon retour — reprends exactement là où tu en étais.</p>
+          <div class="welcome-offer" id="welcome-offer-block" hidden>
+            <p class="welcome-offer__eyebrow" id="welcome-offer-eyebrow"></p>
+            <div class="welcome-offer__price">
+              <span class="welcome-offer__price-old" id="welcome-offer-price-old"></span>
+              <span class="welcome-offer__price-new" id="welcome-offer-price-new"></span>
+            </div>
+            <p class="welcome-offer__counter" id="welcome-offer-counter" hidden></p>
+          </div>
+          <a class="btn btn--primary btn--cta-final" id="quiz-pay-btn" href="${stripeLink}">Obtenir mon accès — ${pricing.totalPrice}</a>
+          <p class="stripe-reassurance">${ICON_LOCK} Paiement sécurisé via <strong>&nbsp;Stripe</strong></p>
         </div>
+
+        <p class="included-list__title">Ce que tu débloques</p>
         <ul class="included-list">
           <li>${ICON_CHECK_SMALL} Ton concept de SaaS complet : description, cible, canaux, direction artistique</li>
           <li>${ICON_CHECK_SMALL} Concept affiché à l'écran juste après le paiement</li>
@@ -6370,8 +6447,6 @@ function renderQuizOverlay({ quiz, pricing, stripeLink }) {
           <li>${ICON_CHECK_SMALL} Accès à vie, paiement unique — jamais d'abonnement</li>
           <li>${ICON_CHECK_SMALL} Générés à partir de ton secteur, ton budget et ton temps disponible</li>
         </ul>
-        <p class="stripe-reassurance">${ICON_LOCK} Paiement sécurisé via <strong>&nbsp;Stripe</strong></p>
-        <a class="btn btn--primary btn--cta-final" id="quiz-pay-btn" href="${stripeLink}">Obtenir mon accès — ${pricing.totalPrice}</a>
       </div>
 
       <div class="quiz-screen quiz-resume" data-screen="resume-transition" data-step-name="reprise" id="quiz-resume-transition">
