@@ -65,6 +65,13 @@ const PASSIF_LABELS: Record<string, string> = {
   ca_tourne: "A déjà un business en ligne qui tourne",
 };
 
+function formatObjectifRevenu(v: number | null): string {
+  if (typeof v !== "number") return "non communiqué";
+  if (v <= 0) return "pas d'objectif chiffré (exploration)";
+  if (v >= 20000) return "20 000 € / mois et plus";
+  return `${v.toLocaleString("fr-FR")} € / mois`;
+}
+
 function buildPrompt(a: {
   intention: string | null;
   situation: string | null;
@@ -72,11 +79,12 @@ function buildPrompt(a: {
   secteur: string[];
   budget: string | null;
   temps: string | null;
+  objectifRevenu: number | null;
 }) {
-  const system = `Tu es un consultant produit senior spécialisé en création de concepts SaaS pour des porteurs de projet français. Ton rôle : à partir du profil d'une personne (situation, expérience, secteur visé, budget, temps disponible), proposer UN concept de SaaS cohérent et actionnable.
+  const system = `Tu es un consultant produit senior spécialisé en création de concepts SaaS pour des porteurs de projet français. Ton rôle : à partir du profil d'une personne (situation, expérience, secteur visé, budget, temps disponible, objectif de revenu), proposer UN concept de SaaS cohérent et actionnable.
 
 Règles strictes :
-- INTERDICTION ABSOLUE de mentionner un chiffre de revenu, un MRR, une projection de gain, ou toute promesse de résultat financier.
+- INTERDICTION ABSOLUE de mentionner un chiffre de revenu, un MRR, une projection de gain, ou toute promesse de résultat financier -- y compris l'objectif de revenu fourni dans le profil : il sert uniquement à orienter le modèle économique suggéré (ex. micro-SaaS de niche vs produit visant un marché plus large), il ne doit jamais être répété ni reformulé dans ta sortie.
 - Ne jamais écrire "prouvé" ou "garanti" -- ce concept est une proposition générée, pas une donnée vérifiée. Le ton doit rester factuel et mesuré, jamais vendeur.
 - La cible (persona) doit être dérivée logiquement du secteur et de l'intention -- générale et crédible, jamais un persona avec des détails inventés (prénom, âge précis, etc.).
 - Les canaux d'acquisition doivent être réalistes compte tenu du budget et du temps disponible -- pas de liste générique copiée-collée, adapte au profil.
@@ -92,6 +100,7 @@ Format de sortie : JSON strict, aucun texte hors JSON.`;
 - Secteur visé : ${sectorText}
 - Budget de démarrage : ${a.budget ? BUDGET_LABELS[a.budget] || a.budget : "non communiqué"}
 - Temps disponible/semaine : ${a.temps ? TEMPS_LABELS[a.temps] || a.temps : "non communiqué"}
+- Objectif de revenu à terme (pour orienter le modèle économique, jamais à répéter en sortie) : ${formatObjectifRevenu(a.objectifRevenu)}
 
 Génère un concept de SaaS pour cette personne. Réponds au format JSON :
 
@@ -153,14 +162,14 @@ Deno.serve(async (req) => {
     return json({ error: "Configuration manquante." }, 500);
   }
 
-  // situation/passif ne sont pas encore des colonnes profiles (voir
-  // commentaire dans scripts/build.mjs, quiz.questions) -- récupérées côté
-  // client et transmises dans le corps de la requête plutôt qu'en base.
-  let body: { situation?: string; passif?: string } = {};
+  // situation/passif/objectifRevenu ne sont pas encore des colonnes profiles
+  // (voir commentaire dans scripts/build.mjs, quiz.questions) -- récupérées
+  // côté client et transmises dans le corps de la requête plutôt qu'en base.
+  let body: { situation?: string; passif?: string; objectifRevenu?: number } = {};
   try {
     body = await req.json();
   } catch {
-    /* corps vide accepté -- situation/passif restent "non communiqué" */
+    /* corps vide accepté -- champs manquants restent "non communiqué" */
   }
 
   const { system, user } = buildPrompt({
@@ -170,6 +179,7 @@ Deno.serve(async (req) => {
     secteur: profileRow.secteur ?? [],
     budget: profileRow.budget,
     temps: profileRow.temps,
+    objectifRevenu: typeof body.objectifRevenu === "number" ? body.objectifRevenu : null,
   });
 
   let llmRes: Response;

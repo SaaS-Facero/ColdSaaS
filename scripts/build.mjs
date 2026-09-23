@@ -350,7 +350,7 @@ const quiz = {
       stepName: "intro",
       type: "intro",
       title: "Pas un quiz de plus.",
-      subtext: "7 questions, aucune pour te trier dans une case — chacune sert à générer un concept de SaaS qui correspond vraiment à ta situation, pas à deviner qui tu es.",
+      subtext: "8 questions, aucune pour te trier dans une case — chacune sert à générer un concept de SaaS qui correspond vraiment à ta situation, pas à deviner qui tu es.",
       cta: "Commencer"
     },
     {
@@ -452,6 +452,23 @@ const quiz = {
           followup: "La plupart démarrent avec moins que prévu — ça affine le tri, ça n'exclut de rien."
         }
       ]
+    },
+    {
+      // Objectif transitoire, comme situation/passif : jamais persisté dans
+      // profiles (pas de migration), transmis à generate-user-concept dans
+      // le corps de la requête. Placée ici (fin de chapitre 1, avant le
+      // mirror) et pas après temps -- le mirror est calculé et affiché
+      // avant que temps/dejaCherche (chapitre 2) existent, donc c'est le
+      // seul emplacement qui permette de reprendre cet objectif dans
+      // buildMirrorText().
+      id: "objectifRevenu",
+      stepName: "objectif-revenu",
+      chapter: 1,
+      title: "Combien de revenu tu vises, à terme ?",
+      type: "slider",
+      min: 0,
+      max: 20000,
+      step: 500
     },
     {
       // Charnière de fin de chapitre 1 -- climax émotionnel du quiz, pas une
@@ -1859,6 +1876,111 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
     }
   }
 
+  /* Slider objectif de revenu -- track/fill custom (pas juste accent-color
+     comme sur /profil-entrepreneur) : le natif input[type=range] est rendu
+     transparent (piste + pouce natifs invisibles), seul son pouce personnalisé
+     reste visible pour l'affordance de drag ; la barre de remplissage est un
+     calque séparé animé en transform pour un mouvement fluide (voir
+     updateRevenueSlider() côté client), jamais en saut brutal. */
+  .revenue-slider { text-align: center; }
+  .revenue-slider__badge {
+    display: inline-block;
+    font-size: 12px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--cobalt-soft);
+    background: rgba(0, 71, 255, 0.12);
+    border-radius: 999px;
+    padding: 4px 12px;
+    margin: 0 0 12px;
+  }
+  .revenue-slider__value {
+    font-size: clamp(32px, 8vw, 44px);
+    font-weight: 800;
+    letter-spacing: -0.02em;
+    color: var(--paper-soft);
+    margin: 0 0 20px;
+    font-variant-numeric: tabular-nums;
+  }
+  .revenue-slider__control {
+    position: relative;
+    height: 28px;
+    display: flex;
+    align-items: center;
+  }
+  .revenue-slider__track {
+    position: absolute;
+    left: 0;
+    right: 0;
+    height: 6px;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.1);
+    overflow: hidden;
+  }
+  .revenue-slider__fill {
+    position: absolute;
+    top: 0;
+    left: 0;
+    height: 100%;
+    width: 100%;
+    transform-origin: left center;
+    transform: scaleX(0);
+    background: linear-gradient(90deg, var(--cobalt-dark), var(--cobalt));
+    transition: transform 150ms ease-out, background 150ms ease-out;
+  }
+  .revenue-slider__input {
+    position: relative;
+    z-index: 1;
+    width: 100%;
+    height: 28px;
+    margin: 0;
+    background: transparent;
+    appearance: none;
+    -webkit-appearance: none;
+    cursor: pointer;
+  }
+  .revenue-slider__input::-webkit-slider-runnable-track { background: transparent; height: 28px; }
+  .revenue-slider__input::-moz-range-track { background: transparent; height: 28px; border: none; }
+  .revenue-slider__input::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 22px;
+    height: 22px;
+    border-radius: 999px;
+    background: #fff;
+    border: 3px solid var(--cobalt);
+    margin-top: 3px;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.35);
+  }
+  .revenue-slider__input::-moz-range-thumb {
+    width: 22px;
+    height: 22px;
+    border-radius: 999px;
+    background: #fff;
+    border: 3px solid var(--cobalt);
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.35);
+  }
+  .revenue-slider__scale {
+    display: flex;
+    justify-content: space-between;
+    font-size: 12px;
+    color: var(--steel);
+    margin-top: 8px;
+  }
+  .revenue-slider__math {
+    font-size: 13px;
+    color: var(--steel);
+    margin: 20px 0 0;
+  }
+  .revenue-slider__note {
+    font-size: 12px;
+    color: var(--steel);
+    margin: 16px 0 0;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .revenue-slider__fill { transition: none; }
+  }
+
   .quiz-chips {
     display: flex;
     flex-wrap: wrap;
@@ -3218,7 +3340,7 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
 
     <section class="transition-cta" id="pricing">
       <h2 class="transition-cta__title">Trouve ton SaaS en 60 secondes</h2>
-      <p class="transition-cta__lead">Sept questions rapides pour générer un concept de SaaS qui correspond à ton budget, ton temps et ton secteur.</p>
+      <p class="transition-cta__lead">Huit questions rapides pour générer un concept de SaaS qui correspond à ton budget, ton temps et ton secteur.</p>
       <button class="btn btn--primary" id="quiz-open-btn" type="button">Trouve ton SaaS en 60 secondes</button>
     </section>
   </main>
@@ -3601,12 +3723,65 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
       var allScreens = questionScreens.concat([resultScreen, paymentScreen]);
       var quizPayBtnDefaultText = document.getElementById("quiz-pay-btn").textContent;
       var quizPayBtnDefaultHref = document.getElementById("quiz-pay-btn").href;
-      var TOTAL_STEPS = progressSegs.length; // 7 : 6 questions (dont capture) + résultat
+      var TOTAL_STEPS = progressSegs.length; // dynamique : un segment par question taguée chapter (voir quiz.questions)
 
       var SECTOR_LABELS = ${JSON.stringify(quiz.sectorLabels)};
       var BUDGET_LABELS = ${JSON.stringify(quiz.budgetLabels)};
       var TIME_LABELS = ${JSON.stringify(quiz.timeLabels)};
       var EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+      // Prix moyen par client explicite et fixe -- jamais un chiffre déduit
+      // ou variable, juste une illustration transparente déclarée dans le
+      // texte lui-même (voir revenue-slider__math), pas une donnée mesurée.
+      var REVENUE_PER_CLIENT = 20;
+      var REVENUE_BADGES = [
+        { max: 3000, label: "Complément" },
+        { max: 10000, label: "Revenu principal" },
+        { max: Infinity, label: "Ambitieux" }
+      ];
+
+      function formatRevenueValue(v) {
+        return v >= 20000 ? "20 000 € et plus / mois" : Number(v).toLocaleString("fr-FR") + " € / mois";
+      }
+
+      function revenueBadgeLabel(v) {
+        for (var i = 0; i < REVENUE_BADGES.length; i += 1) {
+          if (v <= REVENUE_BADGES[i].max) return REVENUE_BADGES[i].label;
+        }
+        return "Ambitieux";
+      }
+
+      // Appelée à l'init (valeur par défaut) et à chaque "input" sur le
+      // slider (voir le handler délégué sur #stage) -- jamais seulement au
+      // relâchement, pour un affichage en direct pendant le drag.
+      function updateRevenueSlider() {
+        var input = document.getElementById("revenue-slider-input");
+        if (!input) return;
+        var v = Number(input.value);
+        answers.objectifRevenu = v;
+
+        var min = Number(input.min);
+        var max = Number(input.max);
+        var pct = (v - min) / (max - min);
+
+        document.getElementById("revenue-slider-value").textContent = formatRevenueValue(v);
+        document.getElementById("revenue-slider-badge").textContent = revenueBadgeLabel(v);
+
+        var fillEl = document.getElementById("revenue-slider-fill");
+        fillEl.style.transform = "scaleX(" + pct + ")";
+        // L'intensité du dégradé croît avec la position -- jamais une
+        // couleur différente, juste le même cobalt qui se densifie.
+        fillEl.style.opacity = String(0.7 + pct * 0.3);
+
+        var mathEl = document.getElementById("revenue-slider-math");
+        if (v > 0) {
+          var clientCount = Math.ceil(v / REVENUE_PER_CLIENT);
+          mathEl.textContent =
+            "À " + REVENUE_PER_CLIENT + " € par client en moyenne, ça fait " + clientCount + " client" + (clientCount !== 1 ? "s" : "") + " à trouver.";
+        } else {
+          mathEl.textContent = "";
+        }
+      }
 
       // ---- Accumulateur de tags — libellés d'affichage ----------------
       var INTENTION_LABELS = { racheter: "Racheter", copier: "Copier" };
@@ -3728,6 +3903,14 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
           // désactive TOUS les boutons .quiz-next à l'ouverture (y compris
           // celui-ci), donc il faut le réactiver explicitement ici, pas
           // juste "ne pas y toucher".
+          nextBtn.disabled = false;
+          return;
+        }
+
+        if (id === "objectifRevenu") {
+          // Le slider a toujours une valeur (position par défaut au milieu
+          // de la plage) -- contrairement aux écrans à options, rien à
+          // cocher pour que ce soit "répondu" : toujours activé.
           nextBtn.disabled = false;
           return;
         }
@@ -3877,7 +4060,8 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
       function fetchGeneratedConcept(ans, cb) {
         callEdgeFunctionAuthed("generate-user-concept", {
           situation: ans.situation || null,
-          passif: ans.passif || null
+          passif: ans.passif || null,
+          objectifRevenu: typeof ans.objectifRevenu === "number" ? ans.objectifRevenu : null
         })
           .then(function (res) {
             cb(res && res.concept ? res.concept : null);
@@ -3952,6 +4136,13 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
           parts.push("Et tu avances prudent, sans te mettre en danger financièrement.");
         } else if (a.budget === "mid" || a.budget === "high") {
           parts.push("Avec un vrai coussin pour ne pas improviser en cours de route.");
+        }
+
+        // Reprise factuelle du chiffre déclaré, jamais qualifiée
+        // ("ambitieux"/"modeste") -- le mirror reformule ce qui a été dit,
+        // il ne le juge pas (même garde-fou que le slider lui-même).
+        if (typeof a.objectifRevenu === "number" && a.objectifRevenu > 0) {
+          parts.push("Avec un objectif à " + formatRevenueValue(a.objectifRevenu) + ".");
         }
 
         return parts.join(" ");
@@ -4382,6 +4573,14 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
         questionScreens.forEach(function (screenEl) {
           var id = screenEl.getAttribute("data-id");
           if (id === "auth" || answers[id] === undefined) return;
+          if (id === "objectifRevenu") {
+            var sliderInput = document.getElementById("revenue-slider-input");
+            if (sliderInput) {
+              sliderInput.value = String(answers.objectifRevenu);
+              updateRevenueSlider();
+            }
+            return;
+          }
           var optionsWrap = screenEl.querySelector("[data-quiz-options]");
           if (!optionsWrap) return;
           var type = optionsWrap.getAttribute("data-type");
@@ -4810,7 +5009,16 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
         if (e.target.id === "quiz-auth-email" || e.target.id === "quiz-auth-password") {
           updateNextEnabled(e.target.closest(".quiz-screen"));
         }
+        if (e.target.id === "revenue-slider-input") {
+          updateRevenueSlider();
+        }
       });
+
+      // Valeur/badge/barre affichés dès l'ouverture du quiz, avant toute
+      // interaction -- le slider a déjà une valeur par défaut au rendu
+      // serveur (voir renderQuizQuestionScreen), l'écran ne doit jamais
+      // s'afficher vide en attendant un premier drag.
+      updateRevenueSlider();
 
       stage.addEventListener("keydown", function (e) {
         if (e.key !== "Enter") return;
@@ -5360,6 +5568,33 @@ function renderQuizQuestionScreen(question, index) {
               <feDisplacementMap in="SourceGraphic" in2="noise" scale="3" xChannelSelector="R" yChannelSelector="G"></feDisplacementMap>
             </filter>
           </svg>
+          <div class="quiz-footer">
+            <button class="btn btn--primary quiz-next" type="button">Continuer</button>
+          </div>
+        </div>`;
+  }
+
+  if (question.type === "slider") {
+    // Valeur de départ au milieu de la plage, jamais 0 -- un slider qui
+    // démarre à zéro laisse croire à une réponse déjà donnée ("aucun
+    // objectif"), alors qu'aucune interaction n'a encore eu lieu.
+    const initial = Math.round((question.min + question.max) / 2 / question.step) * question.step;
+    return `<div class="quiz-screen" data-screen="question" data-index="${index}" data-id="${question.id}" data-step-name="${question.stepName}"${skipAttrs}${question.chapter ? ` data-chapter="${question.chapter}"` : ""}>
+          <h2 class="quiz-question-title">${question.title}</h2>
+          ${question.subtext ? `<p class="quiz-subtext">${question.subtext}</p>` : ""}
+          <div class="revenue-slider">
+            <p class="revenue-slider__badge" id="revenue-slider-badge"></p>
+            <p class="revenue-slider__value" id="revenue-slider-value"></p>
+            <div class="revenue-slider__control">
+              <div class="revenue-slider__track">
+                <div class="revenue-slider__fill" id="revenue-slider-fill"></div>
+              </div>
+              <input type="range" class="revenue-slider__input" id="revenue-slider-input" min="${question.min}" max="${question.max}" step="${question.step}" value="${initial}" aria-label="${question.title}" />
+            </div>
+            <div class="revenue-slider__scale"><span>0 €</span><span>20 000 € et plus</span></div>
+            <p class="revenue-slider__math" id="revenue-slider-math"></p>
+          </div>
+          <p class="revenue-slider__note">Ça nous aide à orienter le concept vers un modèle économique cohérent avec ton objectif.</p>
           <div class="quiz-footer">
             <button class="btn btn--primary quiz-next" type="button">Continuer</button>
           </div>
