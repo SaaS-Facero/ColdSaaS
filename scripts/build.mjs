@@ -2024,7 +2024,11 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
      .is-released la confirmation au relâchement -- deux pulses distincts,
      jamais à chaque pixel de drag. */
   .revenue-slider__value {
-    font-size: clamp(3rem, 8vw, 5rem);
+    /* "3rem-5rem" du brief wrappait sur deux lignes avec le suffixe
+       "/ mois" inclus dans le même texte -- réduit pour rester sur une
+       ligne au format le plus long ("20 000 € et plus / mois") tout en
+       restant très largement le plus grand texte de l'écran. */
+    font-size: clamp(1.9rem, 6vw, 3rem);
     font-weight: 800;
     letter-spacing: -0.02em;
     color: var(--paper-soft);
@@ -2032,6 +2036,7 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
     font-variant-numeric: tabular-nums;
     filter: drop-shadow(0 0 0 rgba(0, 71, 255, 0));
     transition: filter 200ms var(--ease-standard, ease);
+    white-space: nowrap;
   }
   .revenue-slider__value.is-pulsing,
   .revenue-slider__value.is-released {
