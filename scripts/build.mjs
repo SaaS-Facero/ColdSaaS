@@ -3835,6 +3835,13 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
     flex-shrink: 0;
   }
 
+  /* Sans ce override, [hidden] (posé/retiré en JS pour choisir cadeau vs
+     main qui salue) perd contre le display:flex ci-dessus -- les deux
+     icônes resteraient visibles en même temps. */
+  .promo-banner__icon[hidden] {
+    display: none;
+  }
+
   /* Seul élément en typo extra-bold de tout l'écran de paiement -- doit
      être capté avant même le prix, cf. brief. */
   .promo-banner__percent {
