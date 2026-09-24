@@ -3849,17 +3849,14 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
     flex-shrink: 0;
   }
 
+  /* Empilées en ligne (une carte = une ligne pleine largeur), jamais 3
+     colonnes côte à côte -- laisse chaque prix respirer plutôt que de
+     tasser 3 blocs étroits. */
   .duration-cards {
     display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 10px;
-    margin-bottom: 12px;
-  }
-
-  @media (max-width: 480px) {
-    .duration-cards {
-      grid-template-columns: 1fr;
-    }
+    grid-template-columns: 1fr;
+    gap: 16px;
+    margin-bottom: 16px;
   }
 
   .duration-card {
@@ -3867,9 +3864,9 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 4px;
-    padding: 16px 10px 12px;
-    border-radius: 14px;
+    gap: 6px;
+    padding: 24px 20px 20px;
+    border-radius: 16px;
     border: 1.5px solid rgba(255, 255, 255, 0.12);
     background: rgba(255, 255, 255, 0.03);
     color: var(--paper-soft);
@@ -3926,7 +3923,7 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
     display: flex;
     flex-direction: column;
     align-items: center;
-    margin-top: 6px;
+    margin-top: 10px;
     transition: transform 220ms cubic-bezier(0.4, 0, 0.2, 1);
   }
 
