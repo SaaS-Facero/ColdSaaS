@@ -7872,6 +7872,119 @@ function conceptPage({ brand, siteUrl, commPlanPaymentLink }) {
 }
 
 // ---------------------------------------------------------------------------
+// Page conditions de remboursement — /conditions-remboursement, publiée
+// telle quelle (garde-fou non négociable : ne pas durcir ni assouplir le
+// texte de la politique sans validation explicite). Page statique, pas de
+// script client -- rien n'y dépend d'un état de compte.
+// ---------------------------------------------------------------------------
+function conditionsRemboursementPage({ brand, siteUrl }) {
+  return `<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>${brand.name} — Conditions de remboursement</title>
+<meta name="description" content="La garantie ColdTrend et ses conditions : ce qui ouvre droit au remboursement du premier paiement, et ce qui n'y ouvre pas droit." />
+<style>
+  :root { color-scheme: dark; }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0;
+    min-height: 100dvh;
+    background: #0A0E1A;
+    color: #F5F6F8;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Inter, Arial, sans-serif;
+    line-height: 1.6;
+  }
+  .wrap { max-width: 680px; margin: 0 auto; padding: 40px 20px 80px; }
+  .back-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    color: #8A8F98;
+    text-decoration: none;
+    font-size: 14px;
+    margin-bottom: 32px;
+  }
+  .back-link:hover { color: #F5F6F8; }
+  h1 { font-size: clamp(24px, 5vw, 32px); font-weight: 800; margin: 0 0 8px; }
+  .updated-at { font-size: 13px; color: #8A8F98; margin: 0 0 40px; }
+  h2 { font-size: 19px; font-weight: 700; margin: 40px 0 12px; }
+  p { font-size: 15px; color: #E4E6EB; margin: 0 0 14px; }
+  ul { margin: 0 0 14px; padding-left: 20px; }
+  li { font-size: 15px; color: #E4E6EB; margin-bottom: 8px; }
+  .guarantee-box {
+    background: rgba(0, 196, 140, 0.08);
+    border: 1px solid rgba(0, 196, 140, 0.3);
+    border-radius: 14px;
+    padding: 20px;
+    margin-bottom: 8px;
+  }
+  .guarantee-box p { color: #F5F6F8; margin: 0; font-weight: 600; }
+  .no-refund-box {
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 14px;
+    padding: 18px 20px;
+  }
+  .no-refund-box ul { margin: 0; }
+  .note {
+    font-size: 13px;
+    color: #8A8F98;
+    font-style: italic;
+    margin-top: 40px;
+    padding-top: 20px;
+    border-top: 1px solid rgba(255, 255, 255, 0.08);
+  }
+  a { color: #3D6BFF; }
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <a class="back-link" href="${siteUrl}">&larr; Retour à l'accueil</a>
+
+    <h1>Conditions de remboursement</h1>
+    <p class="updated-at">Politique applicable à tout premier paiement ColdTrend.</p>
+
+    <div class="guarantee-box">
+      <p>ColdTrend rembourse l'intégralité de ton premier paiement si, après avoir publié au moins 2 vidéos par jour sur TikTok pendant les 7 jours consécutifs suivant ton achat, tu n'as généré aucune vente du produit issu de ton concept.</p>
+    </div>
+
+    <h2>Conditions cumulatives</h2>
+    <p>Ces trois conditions doivent toutes être remplies pour ouvrir droit au remboursement :</p>
+    <ul>
+      <li><strong>Publication</strong> — au moins 2 vidéos par jour sur TikTok, chacun des 7 jours suivant l'achat, faisant la promotion du produit issu du concept généré.</li>
+      <li><strong>Délai de demande</strong> — la demande doit être faite dans les 14 jours suivant l'achat.</li>
+      <li><strong>Abonnement actif au moment de la demande</strong> — une résiliation avant la demande vaut renoncement à la garantie.</li>
+    </ul>
+
+    <h2>Comment faire la demande</h2>
+    <p>Envoie un email depuis l'adresse associée à ton compte ColdTrend, avec les liens des vidéos publiées. Réponse sous 72h.</p>
+
+    <h2>Ce qui n'ouvre pas droit au remboursement</h2>
+    <div class="no-refund-box">
+      <ul>
+        <li>Demande faite hors délai (plus de 14 jours après l'achat).</li>
+        <li>Abonnement résilié avant la demande.</li>
+        <li>Publication incomplète (moins de 2 vidéos un jour donné parmi les 7).</li>
+        <li>Échéances de renouvellement — la garantie porte uniquement sur le premier paiement.</li>
+      </ul>
+    </div>
+
+    <h2>Droit de rétractation</h2>
+    <p>Le délai légal de rétractation de 14 jours applicable au contenu numérique ne s'applique pas ici : l'accès est immédiat dès le paiement (art. L221-28 13° du Code de la consommation). La garantie décrite ci-dessus est l'engagement propre de ColdTrend qui s'y substitue.</p>
+
+    <h2>Résiliation et renouvellements</h2>
+    <p>Tu peux résilier ton abonnement à tout moment depuis ton compte. La résiliation prend effet à la fin de la période en cours — aucun remboursement au prorata d'une période déjà entamée.</p>
+
+    <p class="note">Les Conditions Générales de Vente complètes sont en cours de publication.</p>
+  </div>
+</body>
+</html>
+`;
+}
+
+// ---------------------------------------------------------------------------
 // Page profil entrepreneur — /profil-entrepreneur, module optionnel proposé
 // APRÈS l'écran de résultat gratuit du quiz existant (jamais avant, jamais
 // une fusion) -- decision produit explicite. Reutilise
@@ -11397,6 +11510,7 @@ writeBuiltFile(OUT_FILE, page({ brand, hero, socialProof, notificationStack, pri
 writeBuiltFile(OUT_FILE_SUCCESS, successPage({ brand, siteUrl: SITE_URL }));
 writeBuiltFile(OUT_FILE_CONCEPT, conceptPage({ brand, siteUrl: SITE_URL, commPlanPaymentLink: COMM_PLAN_PAYMENT_LINK }));
 writeBuiltFile(OUT_FILE_ENTREPRENEUR_PROFILE, entrepreneurProfilePage({ brand, siteUrl: SITE_URL, stripePaymentLink: STRIPE_PAYMENT_LINK }));
+writeBuiltFile(path.join(OUT_DIR, "conditions-remboursement.html"), conditionsRemboursementPage({ brand, siteUrl: SITE_URL }));
 
 writeBuiltFile(path.join(OUT_DIR, "css", "design-tokens.css"), designTokensCss());
 writeBuiltFile(path.join(OUT_DIR, "css", "auth.css"), authCss());
