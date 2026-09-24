@@ -3942,6 +3942,18 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
     vertical-align: middle;
   }
 
+  .payment-error {
+    text-align: center;
+    font-size: 13px;
+    font-weight: 600;
+    color: #ff6b6b;
+    background: rgba(255, 107, 107, 0.08);
+    border: 1px solid rgba(255, 107, 107, 0.25);
+    border-radius: 10px;
+    padding: 10px 14px;
+    margin: 0 0 12px;
+  }
+
   .stripe-reassurance--secondary {
     margin-top: -8px;
     margin-bottom: 24px;
@@ -5259,9 +5271,21 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
         if (isFinalizingPayment) return;
         var payBtn = document.getElementById("quiz-pay-btn");
         if (!payBtn) return;
+        var errorEl = document.getElementById("payment-error");
+
+        function showPaymentError(message) {
+          if (errorEl) {
+            errorEl.textContent = message;
+            errorEl.hidden = false;
+          }
+          payBtn.disabled = false;
+          payBtn.textContent = originalText;
+          isFinalizingPayment = false;
+        }
 
         isFinalizingPayment = true;
         var originalText = payBtn.textContent;
+        if (errorEl) errorEl.hidden = true;
         payBtn.disabled = true;
         payBtn.textContent = "Redirection vers le paiement…";
 
@@ -5271,16 +5295,20 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
               window.location.href = result.url;
               return;
             }
+            // result === null signifie "pas de session valide" (voir
+            // callEdgeFunctionAuthed) -- distinct d'une erreur Stripe renvoyée
+            // par create-checkout-session (result.error), jamais confondus
+            // dans le message affiché.
             console.warn("[ColdTrend] create-checkout-session n'a pas renvoyé d'URL exploitable :", result);
-            payBtn.disabled = false;
-            payBtn.textContent = originalText;
-            isFinalizingPayment = false;
+            showPaymentError(
+              result === null
+                ? "Ta session a expiré, reconnecte-toi puis réessaie."
+                : (result && result.error) || "Impossible de démarrer le paiement, réessaie dans un instant."
+            );
           })
           .catch(function (err) {
             console.warn("[ColdTrend] échec de l'appel create-checkout-session :", err);
-            payBtn.disabled = false;
-            payBtn.textContent = originalText;
-            isFinalizingPayment = false;
+            showPaymentError("Impossible de démarrer le paiement, réessaie dans un instant.");
           });
       }
 
@@ -5951,6 +5979,8 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
           quizPayBtnReset.textContent = quizPayBtnDefaultText;
           quizPayBtnReset.disabled = false;
         }
+        var paymentErrorReset = document.getElementById("payment-error");
+        if (paymentErrorReset) paymentErrorReset.hidden = true;
         isFinalizingPayment = false;
 
         overlay.classList.add("is-open");
@@ -6927,6 +6957,7 @@ function renderQuizOverlay({ quiz, pricing, stripeLink }) {
           <p class="duration-cards__note">Même tarif pour les 3 — résiliable à tout moment depuis ton compte, quelle que soit la durée choisie au départ.</p>
 
           <button class="btn btn--primary btn--cta-final" id="quiz-pay-btn" type="button">Finaliser — ${pricing.monthlyPrice}/mois</button>
+          <p class="payment-error" id="payment-error" hidden></p>
           <p class="stripe-reassurance">${ICON_LOCK} Paiement sécurisé via <strong>&nbsp;Stripe</strong></p>
         </div>
 
