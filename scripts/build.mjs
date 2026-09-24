@@ -3441,9 +3441,10 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
   .result-intention-toggle {
     display: block;
     width: 100%;
+    margin-top: 24px;
     background: none;
     border: none;
-    padding: 14px 0 0;
+    padding: 0;
     font-family: inherit;
     font-size: 13px;
     color: var(--steel);
@@ -3474,7 +3475,7 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
      accessible qu'une fois l'accès débloqué (voir comptePage()). */
   .result-bonus-chapter {
     display: block;
-    margin-top: 20px;
+    margin-top: 24px;
     padding: 16px;
     border-radius: 14px;
     border: 1px solid rgba(0, 71, 255, 0.25);
@@ -3756,6 +3757,7 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
      un écran plus tôt dans le parcours (le résultat, avant même d'arriver
      à l'écran de paiement). */
   #quiz-see-offer-btn {
+    margin-top: 24px;
     animation: cta-final-breathe 3.6s ease-in-out infinite;
     transition: transform 180ms cubic-bezier(0.4, 0, 0.2, 1), box-shadow 180ms cubic-bezier(0.4, 0, 0.2, 1);
   }
