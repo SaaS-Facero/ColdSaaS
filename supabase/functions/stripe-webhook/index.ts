@@ -34,7 +34,12 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 const PROMO_CODE_BY_STRIPE_ID: Record<string, string> = {
   promo_1UIFFqKs6wCNxRh3Pr2CaWeF: "welcome5",
   promo_1UIFFEKs6wCNxRh3UDJuG9DK: "welcome10",
-  promo_1UIFGWKs6wCNxRh32o3i65UQ: "welcome15"
+  promo_1UIFGWKs6wCNxRh32o3i65UQ: "welcome15",
+  // Bandeau bienvenue/retour de l'écran de paiement abonnement (migration
+  // 0026) -- appliqués par create-checkout-session, jamais par un Payment
+  // Link, mais comptés de la même façon une fois le paiement confirmé.
+  promo_1UJBSpKs6wCNxRh3VqYLvQJl: "welcome34",
+  promo_1UJBTjKs6wCNxRh3dnl70Dpf: "comeback23"
 };
 
 async function verifyStripeSignature(payload: string, signatureHeader: string | null, secret: string): Promise<boolean> {
@@ -127,6 +132,24 @@ async function handleSubscriptionEvent(event: { id: string; type: string; data: 
   console.log(
     `[stripe-webhook] évènement d'abonnement journalisé : ${event.type} (${event.id}), user_id=${userId ?? "inconnu"}, status=${status ?? "n/a"}, subscription_access_updates_enabled=${SUBSCRIPTION_ACCESS_UPDATES_ENABLED}`
   );
+
+  // Compteur promo_codes.redemptions -- indépendant du gate
+  // SUBSCRIPTION_ACCESS_UPDATES_ENABLED (un simple compteur, aucun octroi
+  // d'accès), sur un paiement réellement confirmé uniquement. Même
+  // traduction ID Stripe -> code que la branche paiement unique plus bas.
+  if (event.type === "checkout.session.completed") {
+    const discounts = Array.isArray(object["discounts"]) ? (object["discounts"] as Array<Record<string, unknown>>) : [];
+    for (const discount of discounts) {
+      const promoStripeId = discount["promotion_code"];
+      if (typeof promoStripeId !== "string") continue;
+      const code = PROMO_CODE_BY_STRIPE_ID[promoStripeId];
+      if (!code) continue;
+      const { error: incrementError } = await supabaseAdmin.rpc("increment_promo_redemption", { p_code: code });
+      if (incrementError) {
+        console.error("[stripe-webhook] échec incrément promo_codes (abonnement) :", incrementError.message);
+      }
+    }
+  }
 
   if (!SUBSCRIPTION_ACCESS_UPDATES_ENABLED) return;
   if (!userId) {

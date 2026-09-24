@@ -14,6 +14,14 @@
 //
 // API Stripe appelée en REST brut (form-urlencoded), sans SDK, même
 // convention que le reste de ce projet (voir stripe-webhook).
+//
+// Réduction bienvenue/retour (welcome34/comeback23, migration 0026) :
+// re-dérivée ICI, côté serveur, à partir du même signal réel que
+// get-welcome-offer (profiles.last_recovery_email_sent_at) -- jamais un
+// code de réduction accepté depuis le corps de la requête client. Le
+// client (voir écran de paiement) n'affiche qu'un aperçu via
+// get-welcome-offer ; seule cette fonction décide réellement de ce qui est
+// appliqué à la facturation.
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
@@ -81,6 +89,30 @@ Deno.serve(async (req) => {
   const durationMonths = ALLOWED_DURATIONS.has(body.durationMonths as number) ? (body.durationMonths as number) : 1;
   const priceId = PRICE_ID_BY_DURATION[durationMonths];
 
+  const supabaseAdmin = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
+
+  let stripePromotionCodeId: string | null = null;
+  try {
+    const { data: profile } = await supabaseAdmin
+      .from("profiles")
+      .select("last_recovery_email_sent_at")
+      .eq("id", user.id)
+      .single();
+    const promoCode = profile?.last_recovery_email_sent_at ? "comeback23" : "welcome34";
+    const { data: promo } = await supabaseAdmin
+      .from("promo_codes")
+      .select("stripe_promotion_code_id, redemptions, max_redemptions")
+      .eq("code", promoCode)
+      .single();
+    if (promo && promo.redemptions < promo.max_redemptions) {
+      stripePromotionCodeId = promo.stripe_promotion_code_id;
+    }
+  } catch (err) {
+    // Une réduction manquée n'est jamais un motif de bloquer un paiement --
+    // on continue sans réduction plutôt que de faire échouer le checkout.
+    console.warn("[create-checkout-session] résolution de la réduction échouée, poursuite sans réduction :", err);
+  }
+
   // form-urlencoded, pas JSON -- format attendu par l'API Stripe. URLSearchParams
   // gère l'échappement, jamais de concaténation manuelle de chaîne ici.
   const params = new URLSearchParams();
@@ -89,6 +121,7 @@ Deno.serve(async (req) => {
   params.set("line_items[0][quantity]", "1");
   params.set("client_reference_id", user.id);
   if (user.email) params.set("customer_email", user.email);
+  if (stripePromotionCodeId) params.set("discounts[0][promotion_code]", stripePromotionCodeId);
   params.set("metadata[user_id]", user.id);
   params.set("metadata[duration_months]", String(durationMonths));
   params.set("subscription_data[metadata][user_id]", user.id);

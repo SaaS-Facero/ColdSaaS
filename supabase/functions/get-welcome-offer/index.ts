@@ -1,24 +1,17 @@
-// Supabase Edge Function — assignation déterministe du code promo affiché
-// sur l'écran de paiement du quiz, à partir d'un signal réel déjà en base
-// (nombre de relances déjà envoyées à ce profil), jamais un tirage
-// aléatoire à chaque chargement.
+// Supabase Edge Function — résout, en LECTURE SEULE, quel palier de
+// réduction afficher sur l'écran de paiement de l'abonnement (bandeau
+// bienvenue/retour). Sert uniquement à l'affichage : create-checkout-session
+// re-dérive indépendamment le même palier côté serveur avant d'appliquer
+// une réduction Stripe réelle -- cette fonction ne fournit jamais le code à
+// appliquer, jamais un choix côté client, jamais un tirage.
 //
-// Palier = (relance automatique déjà envoyée ? 1 : 0)
-//        + (nombre de relances manuelles envoyées depuis /admin)
-//   0 relance -> welcome5
-//   1 relance -> welcome10
-//   2+ relances -> welcome15
-//
-// Le comptage lit profiles.last_recovery_email_sent_at (relance automatique,
-// send-abandon-emails) ET admin_email_sends (relances manuelles, /admin) --
-// les deux sont des faits réels, jamais combinés arbitrairement pour
-// gonfler un palier.
-//
-// Le prix final barré est calculé depuis promo_codes.discount_percent
-// (réel, configuré en base -- voir migration 0023), jamais un chiffre
-// affiché à la volée sans source. Le compteur de places n'est renvoyé que
-// s'il reste moins de COUNTER_VISIBILITY_THRESHOLD utilisations, pour ne
-// jamais afficher un chiffre qui neutraliserait l'urgence réelle.
+// Palier = un seul signal réel (profiles.last_recovery_email_sent_at) :
+//   null      -> welcome34  (-34%, première visite)
+//   non nul   -> comeback23 (-23%, retour après relance automatique)
+// Contrairement à l'ancien mécanisme welcome5/10/15 (toujours utilisé par
+// l'upsell "plan de communication" sur /concept, voir stripe-webhook), le
+// nombre de relances manuelles envoyées depuis /admin n'entre plus en jeu
+// ici -- décision explicite, 2 paliers seulement.
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
@@ -27,12 +20,6 @@ const ALLOWED_ORIGINS = new Set([
   "https://www.coldtrend.com",
   "http://localhost:3000"
 ]);
-
-// Doit rester synchronisé avec pricing.totalPrice dans scripts/build.mjs.
-const BASE_PRICE_CENTS = 1490;
-const COUNTER_VISIBILITY_THRESHOLD = 20;
-
-const RELANCE_TEMPLATE_IDS = ["quiz_abandonne", "resultat_non_paye"];
 
 function corsHeaders(origin: string | null) {
   const allowOrigin = origin && ALLOWED_ORIGINS.has(origin) ? origin : "https://coldtrend.com";
@@ -64,54 +51,43 @@ Deno.serve(async (req) => {
   const { data: userRes, error: userErr } = await supabaseAsUser.auth.getUser();
   if (userErr || !userRes.user) return json({ error: "Session invalide." }, 401);
 
-  const supabaseAdmin = createClient(
-    Deno.env.get("SUPABASE_URL")!,
-    Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
-  );
+  const supabaseAdmin = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
 
-  const [profileRes, sendsRes] = await Promise.all([
-    supabaseAdmin.from("profiles").select("last_recovery_email_sent_at").eq("id", userRes.user.id).single(),
-    supabaseAdmin
-      .from("admin_email_sends")
-      .select("id", { count: "exact", head: true })
-      .eq("recipient_id", userRes.user.id)
-      .in("template_id", RELANCE_TEMPLATE_IDS)
-  ]);
+  const { data: profile, error: profileErr } = await supabaseAdmin
+    .from("profiles")
+    .select("last_recovery_email_sent_at")
+    .eq("id", userRes.user.id)
+    .single();
+  if (profileErr) {
+    console.error("[get-welcome-offer] échec lecture profil :", profileErr.message);
+    return json({ available: false });
+  }
 
-  const autoRelanceSent = !!profileRes.data?.last_recovery_email_sent_at;
-  const manualRelanceCount = sendsRes.count ?? 0;
-  const relanceCount = (autoRelanceSent ? 1 : 0) + manualRelanceCount;
-
-  const code = relanceCount === 0 ? "welcome5" : relanceCount === 1 ? "welcome10" : "welcome15";
+  const isFirstView = !profile?.last_recovery_email_sent_at;
+  const code = isFirstView ? "welcome34" : "comeback23";
 
   const { data: promo, error: promoErr } = await supabaseAdmin
     .from("promo_codes")
-    .select("code, discount_percent, max_redemptions, redemptions")
+    .select("code, discount_percent, discount_label, max_redemptions, redemptions")
     .eq("code", code)
     .single();
 
   if (promoErr || !promo) {
     console.error("[get-welcome-offer] code introuvable :", code, promoErr?.message);
-    return json({ error: "Offre indisponible." }, 500);
-  }
-
-  const remaining = promo.max_redemptions - promo.redemptions;
-  if (remaining <= 0) {
-    // Code épuisé (Stripe le refuserait de toute façon) -- pas d'offre à
-    // proposer plutôt que d'en afficher une morte.
     return json({ available: false });
   }
 
-  const finalPriceCents = Math.round(BASE_PRICE_CENTS * (1 - promo.discount_percent / 100));
+  if (promo.redemptions >= promo.max_redemptions) {
+    // Code épuisé côté compteur maison (Stripe le refuserait de toute
+    // façon) -- pas d'offre à annoncer plutôt que d'en afficher une morte,
+    // jamais un compteur de places affiché ici (voir garde-fou anti-urgence).
+    return json({ available: false });
+  }
 
   return json({
     available: true,
     code: promo.code,
     discountPercent: promo.discount_percent,
-    basePriceCents: BASE_PRICE_CENTS,
-    finalPriceCents,
-    remaining,
-    showCounter: remaining < COUNTER_VISIBILITY_THRESHOLD,
-    isFirstView: relanceCount === 0
+    isFirstView
   });
 });

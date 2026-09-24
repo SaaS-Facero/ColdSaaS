@@ -3787,6 +3787,107 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
     margin: 0 0 16px;
   }
 
+  /* Bandeau bienvenue/retour (welcome34/comeback23) -- géré en JS via
+     max-height + opacity plutôt qu'un simple fade, pour la sensation de
+     "dépliement" demandée. max-height de repli généreux (220px) : le
+     contenu réel ne l'atteint jamais, seul sert le point de départ/arrivée
+     de la transition. Dégradé diagonal Cobalt Blue -> transparent, jamais
+     plat, et bordure qui respire doucement (cycle long, jamais un
+     clignotement) pour signaler la vie sans anxiété. */
+  .promo-banner {
+    position: relative;
+    overflow: hidden;
+    max-height: 0;
+    opacity: 0;
+    padding: 0 18px;
+    border-radius: 16px;
+    border: 1px solid rgba(0, 71, 255, 0.35);
+    background: linear-gradient(135deg, rgba(0, 71, 255, 0.32), rgba(0, 71, 255, 0));
+    margin-bottom: 0;
+    transition: max-height 480ms cubic-bezier(0.16, 1, 0.3, 1), opacity 420ms cubic-bezier(0.16, 1, 0.3, 1),
+      padding 480ms cubic-bezier(0.16, 1, 0.3, 1), margin 480ms cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
+  .promo-banner.is-visible {
+    max-height: 220px;
+    opacity: 1;
+    padding: 18px;
+    margin-bottom: 16px;
+    animation: promo-banner-pulse 4500ms ease-in-out infinite;
+  }
+
+  @keyframes promo-banner-pulse {
+    0%, 100% { border-color: rgba(0, 71, 255, 0.3); }
+    50% { border-color: rgba(0, 71, 255, 0.75); }
+  }
+
+  .promo-banner__top {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .promo-banner__icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--paper-soft);
+    flex-shrink: 0;
+  }
+
+  /* Seul élément en typo extra-bold de tout l'écran de paiement -- doit
+     être capté avant même le prix, cf. brief. */
+  .promo-banner__percent {
+    font-size: clamp(3rem, 8vw, 4.5rem);
+    font-weight: 900;
+    line-height: 1;
+    color: #fff;
+  }
+
+  .promo-banner__message {
+    font-size: 14px;
+    color: var(--paper-soft);
+    margin: 8px 0 0;
+    line-height: 1.4;
+  }
+
+  .promo-banner__note {
+    text-align: center;
+    font-size: 11px;
+    color: var(--steel);
+    margin: -8px 0 16px;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .promo-banner {
+      transition: none;
+      animation: none;
+    }
+    .promo-banner.is-visible {
+      animation: none;
+    }
+  }
+
+  /* Prix barré -- Steel Gray discret avec un trait fin, jamais masqué ni
+     supprimé (garde-fou transparence). Le nouveau prix (.duration-card__monthly,
+     déjà défini plus bas) reste en blanc pur et plus grand : le contraste
+     entre les deux rend l'économie lisible sans calcul mental. */
+  .duration-card__billing-row {
+    display: flex;
+    align-items: baseline;
+    justify-content: center;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin-top: 6px;
+  }
+
+  .duration-card__original {
+    font-size: 13px;
+    color: var(--steel);
+    text-decoration: line-through;
+    text-decoration-thickness: 1px;
+  }
+
   /* Bandeau garantie -- accent verified-green (déjà associé à la confiance
      dans cette palette, jamais une nouvelle couleur inventée), jamais le
      texte complet de la politique ici : juste l'accroche + le lien vers
@@ -3973,7 +4074,6 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
     font-size: 14px;
     font-weight: 600;
     color: var(--paper-soft);
-    margin-top: 6px;
   }
 
   /* Équivalent mensuel -- purement indicatif ("~"), permet de comparer les
@@ -4776,12 +4876,29 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
       var quizPayBtnDefaultText = document.getElementById("quiz-pay-btn").textContent;
       var TOTAL_STEPS = progressSegs.length; // dynamique : un segment par question taguée chapter (voir quiz.questions)
 
-      // Prix/jour propre à chaque durée (3 Price ID distincts côté Stripe,
-      // voir create-checkout-session) -- le CTA reflète la carte
-      // sélectionnée, jamais un chiffre générique.
-      var DAILY_PRICE_BY_DURATION = ${JSON.stringify(
-        Object.fromEntries(DURATION_PLANS.map((plan) => [plan.months, plan.dailyPrice]))
+      // Montant réel + cadence par durée (3 Price ID distincts côté Stripe,
+      // voir create-checkout-session) -- recalculé côté client uniquement
+      // pour l'affichage (prix/jour, réduction bienvenue/retour) ; le
+      // montant réellement facturé est toujours re-dérivé côté serveur,
+      // jamais transmis par le client.
+      var DURATION_PLAN_DATA = ${JSON.stringify(
+        Object.fromEntries(DURATION_PLANS.map((plan) => [plan.months, { totalAmount: plan.totalAmount, cadenceShort: plan.cadenceShort }]))
       )};
+
+      function formatEuroClient(amount) {
+        return amount.toFixed(2).replace(".", ",") + " €";
+      }
+
+      // 0 tant qu'aucune réduction bienvenue/retour n'a été résolue (voir
+      // initPromoBanner()) -- jamais deviné, jamais appliqué par défaut.
+      var activeDiscountPercent = 0;
+
+      function getDailyPriceLabel(months) {
+        var plan = DURATION_PLAN_DATA[months];
+        if (!plan) return null;
+        var amount = plan.totalAmount * (1 - activeDiscountPercent / 100);
+        return formatEuroClient(amount / (months * 30));
+      }
 
       var SECTOR_LABELS = ${JSON.stringify(quiz.sectorLabels)};
       var BUDGET_LABELS = ${JSON.stringify(quiz.budgetLabels)};
@@ -5324,14 +5441,17 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
         teaserEl.textContent = conceptName + " — débloque la description complète, la cible et les canaux d'acquisition.";
 
         initDurationCards();
+        initPromoBanner();
         startLoadingTransition();
       }
 
-      // "Reprends là où tu en étais" -- la durée n'a aucun impact sur le prix
-      // (même Price ID récurrent mensuel pour les 3, voir
-      // create-checkout-session), donc un simple rappel localStorage suffit :
-      // pas besoin de DB pour ça. Absence de valeur stockée = première visite
-      // -> défaut sur la carte "3 mois" mise en avant, bandeau de retour caché.
+      // "Reprends là où tu en étais" -- juste un rappel de la carte
+      // précédemment sélectionnée (chaque durée a son propre prix réel
+      // depuis le passage à 3 Price ID distincts, voir
+      // create-checkout-session, mais rien n'empêche de se souvenir du
+      // choix via localStorage plutôt qu'une écriture en base). Absence de
+      // valeur stockée = première visite -> défaut sur la carte "3 mois"
+      // mise en avant, bandeau de retour caché.
       var DURATION_STORAGE_KEY = "coldtrend_selected_duration";
       var selectedDuration = 3;
 
@@ -5358,17 +5478,97 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
           card.setAttribute("aria-checked", months === selectedDuration ? "true" : "false");
         });
         var payBtn = document.getElementById("quiz-pay-btn");
-        var dailyPrice = DAILY_PRICE_BY_DURATION[selectedDuration];
+        var dailyPrice = getDailyPriceLabel(selectedDuration);
         if (payBtn && !isFinalizingPayment && dailyPrice) {
           payBtn.textContent = "Finaliser — " + dailyPrice + "/jour";
         }
       }
 
-      // Un seul Price ID récurrent mensuel côté Stripe (voir
-      // create-checkout-session) : la durée choisie ici est envoyée en
-      // metadata pour affichage/statistiques, jamais pour calculer un prix
-      // différent. Jamais de soumission de vrai paiement depuis ce code --
-      // cette fonction ne fait que demander une Checkout Session et rediriger
+      // Bandeau bienvenue/retour -- purement informatif côté client :
+      // get-welcome-offer ne fait que résoudre quel palier AFFICHER
+      // (première visite -> welcome34, retour après relance -> comeback23).
+      // create-checkout-session re-dérive indépendamment le même palier
+      // côté serveur avant d'appliquer une vraie réduction Stripe -- ce qui
+      // s'affiche ici n'est jamais transmis ni utilisé pour décider quoi que
+      // ce soit côté paiement.
+      function initPromoBanner() {
+        callEdgeFunctionAuthed("get-welcome-offer")
+          .then(function (offer) {
+            if (!offer || offer.error || !offer.available) return;
+            activeDiscountPercent = offer.discountPercent;
+            applyDiscountToCards();
+            showPromoBanner(offer);
+          })
+          .catch(function (err) {
+            console.warn("[ColdTrend] échec récupération de l'offre bienvenue/retour :", err);
+          });
+      }
+
+      function applyDiscountToCards() {
+        Object.keys(DURATION_PLAN_DATA).forEach(function (monthsKey) {
+          var months = parseInt(monthsKey, 10);
+          var plan = DURATION_PLAN_DATA[months];
+          var discountedTotal = plan.totalAmount * (1 - activeDiscountPercent / 100);
+          var discountedEquivalent = discountedTotal / months;
+
+          var dailyEl = document.getElementById("duration-daily-" + months);
+          if (dailyEl) dailyEl.textContent = getDailyPriceLabel(months);
+
+          var originalEl = document.getElementById("duration-original-" + months);
+          var monthlyEl = document.getElementById("duration-monthly-" + months);
+          if (originalEl && monthlyEl && activeDiscountPercent > 0) {
+            originalEl.textContent = "Facturé " + formatEuroClient(plan.totalAmount) + " " + plan.cadenceShort;
+            originalEl.hidden = false;
+            monthlyEl.textContent = "Facturé " + formatEuroClient(discountedTotal) + " " + plan.cadenceShort;
+          }
+
+          var equivalentEl = document.getElementById("duration-equivalent-" + months);
+          if (equivalentEl) equivalentEl.textContent = "soit ~" + formatEuroClient(discountedEquivalent) + "/mois";
+        });
+        updateDurationCardsUI();
+      }
+
+      function showPromoBanner(offer) {
+        var banner = document.getElementById("promo-banner");
+        var note = document.getElementById("promo-banner-note");
+        var giftIcon = document.getElementById("promo-banner-icon-gift");
+        var waveIcon = document.getElementById("promo-banner-icon-wave");
+        var message = document.getElementById("promo-banner-message");
+        var percentValueEl = document.getElementById("promo-banner-percent-value");
+        if (!banner || !message || !percentValueEl) return;
+
+        if (giftIcon) giftIcon.hidden = !offer.isFirstView;
+        if (waveIcon) waveIcon.hidden = offer.isFirstView;
+        message.textContent = offer.isFirstView
+          ? "C'est ta première visite ici — on t'offre -" + offer.discountPercent + "% pour démarrer."
+          : "Tu es revenu(e) — voici -" + offer.discountPercent + "% pour te remercier d'être là.";
+
+        banner.hidden = false;
+        // Force un reflow avant d'ajouter is-visible : sans ça le navigateur
+        // peut fusionner l'ajout de classe avec le retrait de [hidden] et
+        // sauter la transition de "dépliement" au premier rendu.
+        void banner.offsetHeight;
+        banner.classList.add("is-visible");
+        if (note) note.hidden = false;
+
+        if (reduceMotion) {
+          percentValueEl.textContent = String(offer.discountPercent);
+          return;
+        }
+
+        var startTime = null;
+        var countUpDurationMs = 600;
+        function step(timestamp) {
+          if (startTime === null) startTime = timestamp;
+          var progress = Math.min((timestamp - startTime) / countUpDurationMs, 1);
+          percentValueEl.textContent = String(Math.round(progress * offer.discountPercent));
+          if (progress < 1) window.requestAnimationFrame(step);
+        }
+        window.requestAnimationFrame(step);
+      }
+
+      // Jamais de soumission de vrai paiement depuis ce code -- cette
+      // fonction ne fait que demander une Checkout Session et rediriger
       // vers l'URL que Stripe renvoie, aucune carte n'est manipulée ici.
       var isFinalizingPayment = false;
 
@@ -6087,6 +6287,14 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
         var paymentErrorReset = document.getElementById("payment-error");
         if (paymentErrorReset) paymentErrorReset.hidden = true;
         isFinalizingPayment = false;
+        activeDiscountPercent = 0;
+        var promoBannerReset = document.getElementById("promo-banner");
+        if (promoBannerReset) {
+          promoBannerReset.classList.remove("is-visible");
+          promoBannerReset.hidden = true;
+        }
+        var promoBannerNoteReset = document.getElementById("promo-banner-note");
+        if (promoBannerNoteReset) promoBannerNoteReset.hidden = true;
 
         overlay.classList.add("is-open");
         document.body.style.overflow = "hidden";
@@ -7047,6 +7255,16 @@ function renderQuizOverlay({ quiz, pricing, stripeLink }) {
         <div class="payment-card" id="payment-card">
           <p class="quiz-return-banner" id="quiz-return-banner" hidden>Bon retour — reprends exactement là où tu en étais.</p>
 
+          <div class="promo-banner" id="promo-banner" hidden>
+            <div class="promo-banner__top">
+              <span class="promo-banner__icon" id="promo-banner-icon-gift" aria-hidden="true">${ICON_GIFT}</span>
+              <span class="promo-banner__icon" id="promo-banner-icon-wave" aria-hidden="true" hidden>${ICON_WAVE}</span>
+              <span class="promo-banner__percent">-<span id="promo-banner-percent-value">0</span>%</span>
+            </div>
+            <p class="promo-banner__message" id="promo-banner-message"></p>
+          </div>
+          <p class="promo-banner__note" id="promo-banner-note" hidden>Réduction appliquée automatiquement, aucun code à saisir.</p>
+
           <div class="duration-cards" id="duration-cards" role="radiogroup" aria-label="Durée choisie">
             ${DURATION_PLANS.map(
               (plan) => `
@@ -7054,10 +7272,13 @@ function renderQuizOverlay({ quiz, pricing, stripeLink }) {
               ${plan.highlight ? '<span class="duration-card__badge">Le plus choisi</span>' : ""}
               <span class="duration-card__label">${plan.label}</span>
               <span class="duration-card__price-wrap">
-                <span class="duration-card__daily-price">${plan.dailyPrice}<span class="duration-card__daily-unit">/jour</span></span>
+                <span class="duration-card__daily-price"><span class="duration-card__daily-amount" id="duration-daily-${plan.months}">${plan.dailyPrice}</span><span class="duration-card__daily-unit">/jour</span></span>
                 <span class="duration-card__anchor">${pricing.dailyAnchor}</span>
-                <span class="duration-card__monthly">${plan.billingLine}</span>
-                <span class="duration-card__equivalent">soit ~${plan.monthlyEquivalentPrice}/mois</span>
+                <span class="duration-card__billing-row">
+                  <span class="duration-card__original" id="duration-original-${plan.months}" hidden></span>
+                  <span class="duration-card__monthly" id="duration-monthly-${plan.months}">${plan.billingLine}</span>
+                </span>
+                <span class="duration-card__equivalent" id="duration-equivalent-${plan.months}">soit ~${plan.monthlyEquivalentPrice}/mois</span>
               </span>
               <span class="duration-card__note">${plan.note}</span>
             </button>`
@@ -7129,6 +7350,10 @@ const ICON_CHECK_SMALL =
   '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M20 6L9 17l-5-5" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>';
 const ICON_LOCK =
   '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="5" y="11" width="14" height="9" rx="2" stroke="currentColor" stroke-width="2"/><path d="M8 11V7a4 4 0 018 0v4" stroke="currentColor" stroke-width="2"/></svg>';
+const ICON_GIFT =
+  '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="3" y="9" width="18" height="4" rx="1" stroke="currentColor" stroke-width="2"/><rect x="5" y="13" width="14" height="8" rx="1" stroke="currentColor" stroke-width="2"/><path d="M12 9v12M12 9c-1.5-4-6-4.5-6-1.5S9 9 12 9zM12 9c1.5-4 6-4.5 6-1.5S15 9 12 9z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+const ICON_WAVE =
+  '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M9 12.5V6a1.5 1.5 0 013 0v5M12 11V4.5a1.5 1.5 0 013 0V11M15 11V6a1.5 1.5 0 013 0v9c0 3.3-2.7 6-6 6h-1c-2 0-3-.5-4.3-2L4 15.5c-.6-.7-.5-1.7.2-2.2.6-.5 1.4-.4 2 .1L9 15.5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
 const ICON_GOOGLE =
   '<svg width="18" height="18" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M23.52 12.27c0-.85-.08-1.66-.22-2.44H12v4.62h6.47a5.53 5.53 0 01-2.4 3.63v3h3.88c2.27-2.09 3.57-5.17 3.57-8.81z" fill="#4285F4"/><path d="M12 24c3.24 0 5.96-1.07 7.95-2.92l-3.88-3c-1.08.72-2.45 1.15-4.07 1.15-3.13 0-5.78-2.11-6.73-4.96H1.27v3.1A12 12 0 0012 24z" fill="#34A853"/><path d="M5.27 14.27a7.2 7.2 0 010-4.54v-3.1H1.27a12 12 0 000 10.74l4-3.1z" fill="#FBBC05"/><path d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.44-3.44C17.95 1.19 15.24 0 12 0A12 12 0 001.27 6.63l4 3.1C6.22 6.86 8.87 4.75 12 4.75z" fill="#EA4335"/></svg>';
 
