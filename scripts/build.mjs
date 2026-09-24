@@ -3858,6 +3858,30 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
     line-height: 1.4;
   }
 
+  .promo-banner__countdown {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    font-size: 13px;
+    font-weight: 700;
+    color: #fff;
+    margin: 12px 0 0;
+  }
+
+  .promo-banner__countdown svg {
+    flex-shrink: 0;
+  }
+
+  #promo-banner-countdown-value {
+    font-variant-numeric: tabular-nums;
+    background: rgba(255, 255, 255, 0.14);
+    border-radius: 6px;
+    padding: 2px 7px;
+    font-size: 14px;
+    letter-spacing: 0.02em;
+  }
+
   .promo-banner__note {
     text-align: center;
     font-size: 11px;
@@ -5558,6 +5582,8 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
         banner.classList.add("is-visible");
         if (note) note.hidden = false;
 
+        startPromoCountdown();
+
         if (reduceMotion) {
           percentValueEl.textContent = String(offer.discountPercent);
           return;
@@ -5572,6 +5598,40 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
           if (progress < 1) window.requestAnimationFrame(step);
         }
         window.requestAnimationFrame(step);
+      }
+
+      // Chrono purement visuel -- décoratif, demandé explicitement malgré le
+      // garde-fou "jamais de fausse urgence" déjà en place sur ce bandeau :
+      // aucune expiration réelle derrière (welcome34/comeback23 restent
+      // valables tant que le profil correspond au palier, voir
+      // create-checkout-session). Repart de 10:00 à chaque nouvelle
+      // ouverture du bandeau, se fige à 00:00 sans relancer le paiement.
+      var promoCountdownInterval = null;
+
+      function startPromoCountdown() {
+        var valueEl = document.getElementById("promo-banner-countdown-value");
+        if (!valueEl) return;
+        if (promoCountdownInterval) window.clearInterval(promoCountdownInterval);
+
+        var remainingSeconds = 600;
+        function render() {
+          var minutes = Math.floor(remainingSeconds / 60);
+          var seconds = remainingSeconds % 60;
+          valueEl.textContent = minutes + ":" + (seconds < 10 ? "0" : "") + seconds;
+        }
+        render();
+
+        promoCountdownInterval = window.setInterval(function () {
+          remainingSeconds -= 1;
+          if (remainingSeconds <= 0) {
+            remainingSeconds = 0;
+            render();
+            window.clearInterval(promoCountdownInterval);
+            promoCountdownInterval = null;
+            return;
+          }
+          render();
+        }, 1000);
       }
 
       // Jamais de soumission de vrai paiement depuis ce code -- cette
@@ -6302,6 +6362,12 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
         }
         var promoBannerNoteReset = document.getElementById("promo-banner-note");
         if (promoBannerNoteReset) promoBannerNoteReset.hidden = true;
+        if (promoCountdownInterval) {
+          window.clearInterval(promoCountdownInterval);
+          promoCountdownInterval = null;
+        }
+        var promoCountdownValueReset = document.getElementById("promo-banner-countdown-value");
+        if (promoCountdownValueReset) promoCountdownValueReset.textContent = "10:00";
 
         overlay.classList.add("is-open");
         document.body.style.overflow = "hidden";
@@ -7269,6 +7335,7 @@ function renderQuizOverlay({ quiz, pricing, stripeLink }) {
               <span class="promo-banner__percent">-<span id="promo-banner-percent-value">0</span>%</span>
             </div>
             <p class="promo-banner__message" id="promo-banner-message"></p>
+            <p class="promo-banner__countdown" id="promo-banner-countdown">${ICON_CLOCK} Cette réduction expire dans <span id="promo-banner-countdown-value">10:00</span></p>
           </div>
           <p class="promo-banner__note" id="promo-banner-note" hidden>Réduction appliquée automatiquement, aucun code à saisir.</p>
 
@@ -7361,6 +7428,8 @@ const ICON_GIFT =
   '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="3" y="9" width="18" height="4" rx="1" stroke="currentColor" stroke-width="2"/><rect x="5" y="13" width="14" height="8" rx="1" stroke="currentColor" stroke-width="2"/><path d="M12 9v12M12 9c-1.5-4-6-4.5-6-1.5S9 9 12 9zM12 9c1.5-4 6-4.5 6-1.5S15 9 12 9z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
 const ICON_WAVE =
   '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M9 12.5V6a1.5 1.5 0 013 0v5M12 11V4.5a1.5 1.5 0 013 0V11M15 11V6a1.5 1.5 0 013 0v9c0 3.3-2.7 6-6 6h-1c-2 0-3-.5-4.3-2L4 15.5c-.6-.7-.5-1.7.2-2.2.6-.5 1.4-.4 2 .1L9 15.5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+const ICON_CLOCK =
+  '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="2"/><path d="M12 7v5l3.5 2" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
 const ICON_GOOGLE =
   '<svg width="18" height="18" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M23.52 12.27c0-.85-.08-1.66-.22-2.44H12v4.62h6.47a5.53 5.53 0 01-2.4 3.63v3h3.88c2.27-2.09 3.57-5.17 3.57-8.81z" fill="#4285F4"/><path d="M12 24c3.24 0 5.96-1.07 7.95-2.92l-3.88-3c-1.08.72-2.45 1.15-4.07 1.15-3.13 0-5.78-2.11-6.73-4.96H1.27v3.1A12 12 0 0012 24z" fill="#34A853"/><path d="M5.27 14.27a7.2 7.2 0 010-4.54v-3.1H1.27a12 12 0 000 10.74l4-3.1z" fill="#FBBC05"/><path d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.44-3.44C17.95 1.19 15.24 0 12 0A12 12 0 001.27 6.63l4 3.1C6.22 6.86 8.87 4.75 12 4.75z" fill="#EA4335"/></svg>';
 
