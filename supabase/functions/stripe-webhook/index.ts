@@ -1,27 +1,36 @@
 // Supabase Edge Function — webhook Stripe, seule source de vérité pour le
-// statut de paiement. Écrit profiles.paid_at, jamais posé côté client.
+// statut de paiement/abonnement.
 //
 // Vérification de signature faite à la main (HMAC-SHA256 via Web Crypto),
-// sans le SDK Stripe ni sa clé API secrète : la vérification de webhook ne
-// nécessite que le secret de signature (STRIPE_WEBHOOK_SECRET), pas de
-// clé Stripe supplémentaire à stocker.
+// sans le SDK Stripe : la vérification de webhook ne nécessite que le
+// secret de signature (STRIPE_WEBHOOK_SECRET), indépendant de
+// STRIPE_SECRET_KEY (désormais utilisée ailleurs -- create-checkout-session,
+// create-portal-session -- pour créer de vraies sessions Stripe).
 //
-// Attribution du paiement à un profil : via `client_reference_id` sur la
-// session Checkout, posé côté client juste avant redirection vers Stripe
-// (voir scripts/build.mjs, goToPayment() — ajoute ?client_reference_id=
-// à l'URL du Payment Link). Sans ce paramètre, l'événement est journalisé
-// et ignoré plutôt que de tenter une résolution par email fragile.
+// Deux familles d'évènements gérées ici :
+// 1. checkout.session.completed (mode "payment", historique) -- écrit
+//    profiles.paid_at, via client_reference_id posé côté client avant
+//    redirection vers un Payment Link. Conservé tel quel pour l'upsell
+//    "plan de communication", seul flux qui l'utilise encore.
+// 2. Évènements d'abonnement (checkout.session.completed en mode
+//    "subscription", customer.subscription.updated/deleted,
+//    invoice.payment_failed) -- voir handleSubscriptionEvent() plus bas.
+//    Toujours journalisés dans stripe_webhook_events (migration 0025) ;
+//    la mise à jour réelle de profiles n'est appliquée que si
+//    ENABLE_SUBSCRIPTION_ACCESS_UPDATES=true est posé dans les secrets
+//    Supabase -- volontairement désactivé par défaut le temps de vérifier
+//    manuellement la structure des évènements reçus sur un premier
+//    abonnement réel avant d'activer l'octroi d'accès automatique.
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 // Correspondance ID Stripe -> code affiché en toast sur l'écran de
 // paiement (voir promo_codes en base). Codés en dur plutôt que lus depuis
 // l'API Stripe : ces ID de Promotion Code sont stables et non sensibles
-// (pas une clé secrète), et ce projet n'a explicitement aucune clé API
-// Stripe (voir commentaire en tête de ce fichier). Le payload du webhook
-// `checkout.session.completed` contient déjà `discounts[].promotion_code`
-// par défaut (pas besoin d'expand) mais seulement sous forme d'ID opaque
-// (`promo_xxx`), jamais le texte humain -- d'où cette table de correspondance.
+// (pas une clé secrète). Le payload du webhook `checkout.session.completed`
+// contient déjà `discounts[].promotion_code` par défaut (pas besoin
+// d'expand) mais seulement sous forme d'ID opaque (`promo_xxx`), jamais le
+// texte humain -- d'où cette table de correspondance.
 const PROMO_CODE_BY_STRIPE_ID: Record<string, string> = {
   promo_1UIFFqKs6wCNxRh3Pr2CaWeF: "welcome5",
   promo_1UIFFEKs6wCNxRh3UDJuG9DK: "welcome10",
@@ -62,6 +71,90 @@ async function verifyStripeSignature(payload: string, signatureHeader: string | 
   return diff === 0;
 }
 
+// Interrupteur explicite pour la logique d'abonnement qui modifie
+// réellement l'accès (profiles.subscription_status/stripe_*) -- tant que
+// cette variable n'est pas posée à "true" dans les secrets Supabase, les
+// évènements d'abonnement sont uniquement journalisés dans
+// stripe_webhook_events (voir migration 0025), jamais appliqués à
+// profiles. Étape volontaire avant tout premier abonnement réel : vérifier
+// manuellement la structure des évènements reçus, puis activer.
+const SUBSCRIPTION_ACCESS_UPDATES_ENABLED = Deno.env.get("ENABLE_SUBSCRIPTION_ACCESS_UPDATES") === "true";
+
+// Journalise systématiquement, puis n'applique la mise à jour réelle
+// d'accès que si SUBSCRIPTION_ACCESS_UPDATES_ENABLED. userId est résolu
+// par ordre de préférence : metadata posée à la création (checkout.session
+// .completed, subscription_data.metadata) -- les évènements
+// customer.subscription.* portent aussi metadata.user_id (copiée depuis
+// subscription_data.metadata à la création), donc le même champ suffit
+// pour toute la famille d'évènements, pas besoin de retrouver le profil
+// par stripe_customer_id à chaque fois.
+async function handleSubscriptionEvent(event: { id: string; type: string; data: { object: Record<string, unknown> } }) {
+  const supabaseAdmin = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
+  const object = event.data.object ?? {};
+
+  const metadata = (object["metadata"] ?? {}) as Record<string, unknown>;
+  const userId = typeof metadata["user_id"] === "string" ? metadata["user_id"] : null;
+
+  const stripeCustomerId = typeof object["customer"] === "string" ? object["customer"] : null;
+  // "subscription" est l'ID sur une Checkout Session ; sur les évènements
+  // customer.subscription.*, l'objet EST directement la subscription (son
+  // "id" est déjà l'ID de subscription).
+  const stripeSubscriptionId =
+    typeof object["subscription"] === "string"
+      ? object["subscription"]
+      : event.type.startsWith("customer.subscription.")
+        ? (typeof object["id"] === "string" ? object["id"] : null)
+        : null;
+  const status = typeof object["status"] === "string" ? object["status"] : event.type === "checkout.session.completed" ? "active" : null;
+  const durationMonths = Number(metadata["duration_months"]) || null;
+
+  const { error: logError } = await supabaseAdmin.from("stripe_webhook_events").insert({
+    stripe_event_id: event.id,
+    event_type: event.type,
+    payload: event,
+    profile_id: userId,
+    processed_access_update: false,
+  });
+  if (logError) {
+    // Un conflit sur stripe_event_id (unique) signifie un renvoi du même
+    // évènement par Stripe (retry normal) -- pas une vraie erreur.
+    if (!logError.message.includes("duplicate key")) {
+      console.error("[stripe-webhook] échec journalisation stripe_webhook_events :", logError.message);
+    }
+    return;
+  }
+
+  console.log(
+    `[stripe-webhook] évènement d'abonnement journalisé : ${event.type} (${event.id}), user_id=${userId ?? "inconnu"}, status=${status ?? "n/a"}, subscription_access_updates_enabled=${SUBSCRIPTION_ACCESS_UPDATES_ENABLED}`
+  );
+
+  if (!SUBSCRIPTION_ACCESS_UPDATES_ENABLED) return;
+  if (!userId) {
+    console.warn(`[stripe-webhook] évènement ${event.type} sans metadata.user_id exploitable — accès non mis à jour.`);
+    return;
+  }
+
+  const update: Record<string, unknown> = {};
+  if (stripeCustomerId) update.stripe_customer_id = stripeCustomerId;
+  if (stripeSubscriptionId) update.stripe_subscription_id = stripeSubscriptionId;
+  if (status) update.subscription_status = status;
+  if (durationMonths) update.subscription_duration_months = durationMonths;
+  if (event.type === "checkout.session.completed") update.paid_at = new Date().toISOString();
+
+  if (Object.keys(update).length === 0) return;
+
+  const { error: updateError } = await supabaseAdmin.from("profiles").update(update).eq("id", userId);
+  if (updateError) {
+    console.error(`[stripe-webhook] échec mise à jour profiles pour ${event.type} :`, updateError.message);
+    return;
+  }
+
+  await supabaseAdmin
+    .from("stripe_webhook_events")
+    .update({ processed_access_update: true })
+    .eq("stripe_event_id", event.id);
+}
+
 Deno.serve(async (req) => {
   const webhookSecret = Deno.env.get("STRIPE_WEBHOOK_SECRET");
   if (!webhookSecret) {
@@ -76,14 +169,24 @@ Deno.serve(async (req) => {
     return new Response("Signature invalide.", { status: 400 });
   }
 
-  let event: { type?: string; data?: { object?: Record<string, unknown> } };
+  let event: { id?: string; type?: string; data?: { object?: Record<string, unknown> } };
   try {
     event = JSON.parse(rawBody);
   } catch {
     return new Response("JSON invalide.", { status: 400 });
   }
 
-  if (event.type === "checkout.session.completed") {
+  const SUBSCRIPTION_EVENT_TYPES = new Set([
+    "customer.subscription.updated",
+    "customer.subscription.deleted",
+    "invoice.payment_failed",
+  ]);
+
+  if (event.type === "checkout.session.completed" && (event.data?.object ?? {})["mode"] === "subscription") {
+    await handleSubscriptionEvent(event as { id: string; type: string; data: { object: Record<string, unknown> } });
+  } else if (event.type && SUBSCRIPTION_EVENT_TYPES.has(event.type)) {
+    await handleSubscriptionEvent(event as { id: string; type: string; data: { object: Record<string, unknown> } });
+  } else if (event.type === "checkout.session.completed") {
     const session = event.data?.object ?? {};
     const paymentStatus = session["payment_status"];
     const clientReferenceId = session["client_reference_id"];
@@ -112,13 +215,14 @@ Deno.serve(async (req) => {
         }
       }
 
-      // Deux Payment Links distincts partagent ce webhook : l'accès principal
-      // (15€) encode juste l'UUID utilisateur dans client_reference_id ;
-      // l'upsell "plan de communication" (3,90€, par listing) encode
-      // "<uuid>::<slug>" -- pas d'appel API Stripe supplémentaire pour
-      // récupérer les line_items (ce projet n'utilise jamais la clé secrète
-      // Stripe), donc ce format est le seul signal disponible pour
-      // distinguer les deux paiements.
+      // Deux Payment Links distincts (paiement unique, historiques --
+      // remplacés par l'abonnement Stripe Subscriptions ci-dessus pour
+      // l'accès principal, ce chemin ne reste actif que pour l'upsell)
+      // partagent ce webhook : l'ancien accès principal (15€) encodait
+      // juste l'UUID utilisateur dans client_reference_id ; l'upsell "plan
+      // de communication" (3,90€, par listing) encode "<uuid>::<slug>" --
+      // ce format reste le seul signal disponible pour distinguer les deux,
+      // aucun appel Stripe supplémentaire pour récupérer les line_items.
       if (clientReferenceId.includes("::")) {
         const [userId, slug] = clientReferenceId.split("::");
         if (!userId || !slug) {
