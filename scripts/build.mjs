@@ -365,7 +365,7 @@ const quiz = {
       stepName: "intro",
       type: "intro",
       title: "Pas un quiz de plus.",
-      subtext: "7 questions, aucune pour te trier dans une case — chacune sert à générer un concept de SaaS qui correspond vraiment à ta situation, pas à deviner qui tu es.",
+      subtext: "8 questions, aucune pour te trier dans une case — chacune sert à générer un concept de SaaS qui correspond vraiment à ta situation, pas à deviner qui tu es.",
       cta: "Commencer"
     },
     {
@@ -394,6 +394,28 @@ const quiz = {
           hint: "Tu connais déjà les bases, tu cherches ta prochaine idée."
         },
         { value: "autre", label: "Autre", hint: "Ta situation ne rentre pas dans une case toute faite." }
+      ]
+    },
+    {
+      // Transitoire comme situation/passif/objectifRevenu : jamais persisté
+      // dans profiles, transmis à generate-user-concept dans le corps de la
+      // requête pour orienter les canaux d'acquisition suggérés (ex. social
+      // organique pour les tranches jeunes, réseau pro/email pour les
+      // tranches plus âgées) -- seul usage réel trouvé, buildMirrorText()
+      // n'existe plus depuis le passage à l'écran de pause statistique.
+      id: "age",
+      stepName: "age",
+      chapter: 1,
+      chapterLabel: "Ton âge",
+      chapterIcon: "age",
+      title: "Tu as quel âge ?",
+      type: "single",
+      options: [
+        { value: "moins_25", label: "Moins de 25 ans" },
+        { value: "25_34", label: "25–34 ans" },
+        { value: "35_44", label: "35–44 ans" },
+        { value: "45_54", label: "45–54 ans" },
+        { value: "55_plus", label: "55 ans et plus" }
       ]
     },
     {
@@ -3540,6 +3562,68 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
     margin: 0 0 28px;
   }
 
+  /* Écran de chargement de 5-6s avant paiement -- centré comme les autres
+     écrans "cadre" (intro/résultat), pas une question. */
+  .quiz-loading-transition {
+    justify-content: center;
+    align-items: center;
+    text-align: center;
+  }
+
+  .loading-transition__spinner {
+    width: 40px;
+    height: 40px;
+    margin: 0 auto 24px;
+    border-radius: 999px;
+    border: 3px solid rgba(255, 255, 255, 0.12);
+    border-top-color: var(--cobalt);
+    animation: loading-transition-spin 900ms linear infinite;
+  }
+
+  @keyframes loading-transition-spin {
+    to { transform: rotate(360deg); }
+  }
+
+  .loading-transition__label {
+    font-size: 17px;
+    font-weight: 700;
+    color: var(--paper-soft);
+    max-width: 340px;
+    margin: 0 auto 24px;
+    min-height: 2.6em;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 1;
+    transition: opacity 150ms ease;
+  }
+
+  .loading-transition__label.is-swapping {
+    opacity: 0;
+  }
+
+  .loading-transition__track {
+    width: 100%;
+    max-width: 280px;
+    height: 6px;
+    margin: 0 auto;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.08);
+    overflow: hidden;
+  }
+
+  .loading-transition__fill {
+    height: 100%;
+    width: 0%;
+    background: linear-gradient(90deg, var(--cobalt-dark), var(--cobalt));
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .loading-transition__spinner { animation: none; }
+    .loading-transition__label { transition: none; }
+    .loading-transition__fill { transition: none !important; }
+  }
+
   .quiz-resume__checklist {
     list-style: none;
     margin: 0 0 32px;
@@ -3992,7 +4076,7 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
 
     <section class="transition-cta" id="pricing">
       <h2 class="transition-cta__title">Trouve ton SaaS en 60 secondes</h2>
-      <p class="transition-cta__lead">Sept questions rapides pour générer un concept de SaaS qui correspond à ton budget, ton temps et ton secteur.</p>
+      <p class="transition-cta__lead">Huit questions rapides pour générer un concept de SaaS qui correspond à ton budget, ton temps et ton secteur.</p>
       <button class="btn btn--primary" id="quiz-open-btn" type="button">Trouve ton SaaS en 60 secondes</button>
     </section>
   </main>
@@ -4758,6 +4842,7 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
         callEdgeFunctionAuthed("generate-user-concept", {
           situation: ans.situation || null,
           passif: ans.passif || null,
+          age: ans.age || null,
           objectifRevenu: typeof ans.objectifRevenu === "number" ? ans.objectifRevenu : null,
           forceRegenerate: !!forceRegenerate
         })
@@ -4937,7 +5022,60 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
         }
 
         applyWelcomeOffer();
-        transitionTo(paymentScreen, "forward");
+        startLoadingTransition();
+      }
+
+      // Écran de chargement de 5-6s inséré juste avant l'écran de paiement --
+      // purement dramaturgique (le travail réel -- teaser, lien Stripe,
+      // offre de bienvenue -- est déjà lancé en amont dans goToPayment(),
+      // pas ici). Le texte bascule une fois vers une question rhétorique au
+      // milieu du chargement, jamais une vraie collecte de réponse -- pas
+      // d'entrée dans answers, pas de retour possible dessus via un tag.
+      var LOADING_TRANSITION_MS = 5600;
+      var LOADING_QUESTION_AT_MS = 2800;
+      var LOADING_QUESTION_TEXT = "Es-tu prêt à engager des clippers pour ton SaaS ?";
+
+      function startLoadingTransition() {
+        var loadingScreen = document.getElementById("quiz-loading-transition");
+        var label = document.getElementById("loading-transition-label");
+        var fill = document.getElementById("loading-transition-fill");
+        if (!loadingScreen || !label || !fill) {
+          transitionTo(paymentScreen, "forward");
+          return;
+        }
+
+        label.textContent = "Préparation de ton accès…";
+        label.classList.remove("is-swapped");
+        fill.style.transition = "none";
+        fill.style.width = "0%";
+
+        transitionTo(loadingScreen, "forward");
+
+        var durationMs = reduceMotion ? 0 : LOADING_TRANSITION_MS;
+        var questionAtMs = reduceMotion ? 0 : LOADING_QUESTION_AT_MS;
+
+        window.requestAnimationFrame(function () {
+          fill.style.transition = "width " + durationMs + "ms linear";
+          fill.style.width = "100%";
+        });
+
+        window.setTimeout(function () {
+          // Fondu discret plutôt qu'un remplacement de texte brutal -- même
+          // technique que le badge du slider objectif de revenu.
+          label.classList.add("is-swapping");
+          window.setTimeout(
+            function () {
+              label.textContent = LOADING_QUESTION_TEXT;
+              label.classList.remove("is-swapping");
+              label.classList.add("is-swapped");
+            },
+            reduceMotion ? 0 : 150
+          );
+        }, questionAtMs);
+
+        window.setTimeout(function () {
+          transitionTo(paymentScreen, "forward");
+        }, durationMs);
       }
 
       // Assignation déterministe du code de bienvenue à partir d'un signal
@@ -6212,9 +6350,12 @@ const ICON_QUIZ_OBJECTIF =
   '<svg width="28" height="28" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="12" cy="12" r="8.5" stroke="currentColor" stroke-width="1.75"/><circle cx="12" cy="12" r="4.5" stroke="currentColor" stroke-width="1.75"/><circle cx="12" cy="12" r="1.2" fill="currentColor"/></svg>';
 const ICON_QUIZ_RECHERCHE =
   '<svg width="28" height="28" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="10.5" cy="10.5" r="6.5" stroke="currentColor" stroke-width="1.75"/><path d="M19 19l-4-4" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"/></svg>';
+const ICON_QUIZ_AGE =
+  '<svg width="28" height="28" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="3.5" y="5" width="17" height="15" rx="2" stroke="currentColor" stroke-width="1.75"/><path d="M3.5 9.5h17" stroke="currentColor" stroke-width="1.75"/><path d="M8 3v3.5M16 3v3.5" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"/></svg>';
 
 const QUIZ_CHAPTER_ICONS = {
   situation: ICON_QUIZ_SITUATION,
+  age: ICON_QUIZ_AGE,
   passif: ICON_QUIZ_PASSIF,
   secteur: ICON_QUIZ_SECTEUR,
   budget: ICON_QUIZ_BUDGET,
@@ -6522,6 +6663,14 @@ function renderQuizOverlay({ quiz, pricing, stripeLink }) {
         <div class="payment-faq">
           <p class="payment-faq__title">Questions fréquentes</p>
           ${renderFaqItems(paymentFaqItems)}
+        </div>
+      </div>
+
+      <div class="quiz-screen quiz-loading-transition" data-screen="loading-transition" data-step-name="chargement" id="quiz-loading-transition">
+        <div class="loading-transition__spinner" aria-hidden="true"></div>
+        <p class="loading-transition__label" id="loading-transition-label">Préparation de ton accès…</p>
+        <div class="loading-transition__track" aria-hidden="true">
+          <div class="loading-transition__fill" id="loading-transition-fill"></div>
         </div>
       </div>
 

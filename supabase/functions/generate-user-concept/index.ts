@@ -64,6 +64,13 @@ const PASSIF_LABELS: Record<string, string> = {
   deja_vendu: "A déjà vendu quelque chose en ligne",
   ca_tourne: "A déjà un business en ligne qui tourne",
 };
+const AGE_LABELS: Record<string, string> = {
+  moins_25: "Moins de 25 ans",
+  "25_34": "25-34 ans",
+  "35_44": "35-44 ans",
+  "45_54": "45-54 ans",
+  "55_plus": "55 ans et plus",
+};
 
 function formatObjectifRevenu(v: number | null): string {
   if (typeof v !== "number") return "non communiqué";
@@ -76,18 +83,19 @@ function buildPrompt(a: {
   intention: string | null;
   situation: string | null;
   passif: string | null;
+  age: string | null;
   secteur: string[];
   budget: string | null;
   temps: string | null;
   objectifRevenu: number | null;
 }) {
-  const system = `Tu es un consultant produit senior spécialisé en création de concepts SaaS pour des porteurs de projet français. Ton rôle : à partir du profil d'une personne (situation, expérience, secteur visé, budget, temps disponible, objectif de revenu), proposer UN concept de SaaS cohérent et actionnable.
+  const system = `Tu es un consultant produit senior spécialisé en création de concepts SaaS pour des porteurs de projet français. Ton rôle : à partir du profil d'une personne (situation, expérience, tranche d'âge, secteur visé, budget, temps disponible, objectif de revenu), proposer UN concept de SaaS cohérent et actionnable.
 
 Règles strictes :
 - INTERDICTION ABSOLUE de mentionner un chiffre de revenu, un MRR, une projection de gain, ou toute promesse de résultat financier -- y compris l'objectif de revenu fourni dans le profil : il sert uniquement à orienter le modèle économique suggéré (ex. micro-SaaS de niche vs produit visant un marché plus large), il ne doit jamais être répété ni reformulé dans ta sortie.
 - Ne jamais écrire "prouvé" ou "garanti" -- ce concept est une proposition générée, pas une donnée vérifiée. Le ton doit rester factuel et mesuré, jamais vendeur.
 - La cible (persona) doit être dérivée logiquement du secteur et de l'intention -- générale et crédible, jamais un persona avec des détails inventés (prénom, âge précis, etc.).
-- Les canaux d'acquisition doivent être réalistes compte tenu du budget et du temps disponible -- pas de liste générique copiée-collée, adapte au profil.
+- Les canaux d'acquisition doivent être réalistes compte tenu du budget et du temps disponible, et cohérents avec la tranche d'âge fournie (ex. social organique/court format plausible pour une tranche jeune, réseau professionnel/email/bouche-à-oreille plausible pour une tranche plus âgée) -- jamais une liste générique copiée-collée, jamais un stéréotype réducteur non plus.
 - La direction artistique (palette, style de logo) reste descriptive en mots, jamais une génération d'image.
 
 Format de sortie : JSON strict, aucun texte hors JSON.`;
@@ -103,6 +111,7 @@ Format de sortie : JSON strict, aucun texte hors JSON.`;
   }
 - Situation actuelle : ${a.situation ? SITUATION_LABELS[a.situation] || a.situation : "non communiqué"}
 - Expérience business en ligne : ${a.passif ? PASSIF_LABELS[a.passif] || a.passif : "non communiqué"}
+- Tranche d'âge (pour orienter les canaux d'acquisition, jamais à répéter en sortie) : ${a.age ? AGE_LABELS[a.age] || a.age : "non communiqué"}
 - Secteur visé : ${sectorText}
 - Budget de démarrage : ${a.budget ? BUDGET_LABELS[a.budget] || a.budget : "non communiqué"}
 - Temps disponible/semaine : ${a.temps ? TEMPS_LABELS[a.temps] || a.temps : "non communiqué"}
@@ -158,7 +167,7 @@ Deno.serve(async (req) => {
   // forceRegenerate contourne le cache : utilisé par le lien "tu cherches
   // plutôt à racheter ?" sur l'écran résultat, sans quoi cet endpoint
   // renverrait indéfiniment l'ancien concept généré pour "creation".
-  let body: { situation?: string; passif?: string; objectifRevenu?: number; forceRegenerate?: boolean } = {};
+  let body: { situation?: string; passif?: string; age?: string; objectifRevenu?: number; forceRegenerate?: boolean } = {};
   try {
     body = await req.json();
   } catch {
@@ -187,6 +196,7 @@ Deno.serve(async (req) => {
     intention: profileRow.intention,
     situation: typeof body.situation === "string" ? body.situation : null,
     passif: typeof body.passif === "string" ? body.passif : null,
+    age: typeof body.age === "string" ? body.age : null,
     secteur: profileRow.secteur ?? [],
     budget: profileRow.budget,
     temps: profileRow.temps,
