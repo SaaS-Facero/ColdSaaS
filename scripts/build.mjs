@@ -9466,6 +9466,43 @@ html, body {
   border-color: var(--color-cobalt);
   color: var(--color-cobalt-soft);
 }
+
+.admin-campaign__status {
+  margin-top: 28px;
+  padding-top: 20px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.admin-campaign__status-note {
+  font-size: 12px;
+  color: var(--color-steel);
+  margin: 10px 0 16px;
+}
+
+.admin-status-table {
+  width: 100%;
+  max-width: 560px;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.admin-status-table th,
+.admin-status-table td {
+  padding: 8px 12px;
+  text-align: left;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.admin-status-table th {
+  color: var(--color-steel);
+  font-weight: 600;
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.admin-status--bad {
+  color: #ff6b6b;
+  font-weight: 700;
+}
 `;
 }
 
@@ -10842,6 +10879,22 @@ function adminPage() {
         <button type="button" class="admin-btn admin-btn--primary" id="campaign-send-btn">Envoyer la campagne</button>
         <p class="admin-campaign__result" id="campaign-result"></p>
       </div>
+
+      <div class="admin-campaign__status">
+        <button type="button" class="admin-btn admin-btn--secondary" id="check-status-btn">Vérifier le statut d'envoi</button>
+        <p class="admin-campaign__status-note">Lecture seule -- interroge Resend pour les derniers envois, ne renvoie jamais d'email.</p>
+        <table class="admin-status-table" id="status-table" hidden>
+          <thead>
+            <tr>
+              <th>Destinataire</th>
+              <th>Template</th>
+              <th>Envoyé le</th>
+              <th>Statut Resend</th>
+            </tr>
+          </thead>
+          <tbody id="status-table-body"></tbody>
+        </table>
+      </div>
     </section>
   </div>
   <script>
@@ -11016,6 +11069,58 @@ function adminPage() {
         } else {
           resultEl.textContent = result.sent + " envoyé(s), " + result.failed + " échec(s), sur " + result.eligible + " éligible(s).";
         }
+      });
+
+      // Statuts Resend qui indiquent que l'email n'a pas atteint la boîte de
+      // réception malgré une acceptation initiale -- mis en évidence en
+      // rouge, jamais confondus visuellement avec "delivered".
+      var STATUS_LABELS = {
+        delivered: "Livré",
+        sent: "Envoyé (pas encore confirmé livré)",
+        queued: "En file d'attente",
+        delivery_delayed: "Livraison retardée",
+        bounced: "Rejeté (bounce)",
+        complained: "Marqué comme spam",
+        introuvable_chez_resend: "Introuvable chez Resend",
+        erreur_requete: "Erreur de requête",
+        statut_inconnu: "Statut inconnu"
+      };
+      var STATUS_BAD = ["bounced", "complained", "introuvable_chez_resend", "erreur_requete"];
+
+      document.getElementById("check-status-btn").addEventListener("click", async function () {
+        var btn = this;
+        btn.disabled = true;
+        btn.textContent = "Vérification en cours…";
+
+        var response = await callAdminFunction("admin-check-email-status", {});
+
+        btn.disabled = false;
+        btn.textContent = "Vérifier le statut d'envoi";
+
+        var table = document.getElementById("status-table");
+        var tbody = document.getElementById("status-table-body");
+
+        if (!response || response.error || !response.results) {
+          table.hidden = true;
+          window.alert("Erreur : " + (response && response.error ? response.error : "réponse invalide."));
+          return;
+        }
+
+        tbody.innerHTML = response.results
+          .map(function (row) {
+            var label = STATUS_LABELS[row.status] || row.status;
+            var badClass = STATUS_BAD.indexOf(row.status) !== -1 ? " admin-status--bad" : "";
+            return (
+              "<tr>" +
+              "<td>" + row.recipientId.slice(0, 8) + "…</td>" +
+              "<td>" + row.templateId + "</td>" +
+              "<td>" + formatDateFr(row.sentAt) + "</td>" +
+              '<td class="admin-status' + badClass + '">' + label + "</td>" +
+              "</tr>"
+            );
+          })
+          .join("");
+        table.hidden = response.results.length === 0;
       });
 
       async function init() {
