@@ -160,11 +160,22 @@ const notificationStack = {
   ]
 };
 
+// Abonnement Stripe Subscriptions -- un seul Price ID récurrent mensuel
+// réutilisé pour les 3 cartes de durée (1/3/6 mois), voir
+// supabase/functions/create-checkout-session. Le prix par jour est donc
+// identique quelle que soit la durée choisie -- ce n'est qu'un cadrage
+// déclaratif de "combien de temps tu comptes rester", jamais un tarif ou
+// un engagement technique différent.
 const pricing = {
-  dailyPrice: "0,50 €",
-  totalPrice: "14,90 €",
-  totalNote: "paiement unique, accès à vie"
+  dailyPrice: "0,83 €",
+  monthlyPrice: "24,90 €"
 };
+
+const DURATION_PLANS = [
+  { months: 1, label: "1 mois", note: "Sans engagement" },
+  { months: 3, label: "3 mois", note: "Le plus choisi", highlight: true },
+  { months: 6, label: "6 mois", note: "Pour viser loin" }
+];
 
 // L'objet `comparison` ("ColdTrend vs génération d'idées par IA") a été
 // retiré ici -- son rendu était déjà désactivé (markup supprimé lors d'une
@@ -206,8 +217,16 @@ const faq = {
       a: "Non, ton concept complet s'affiche directement à l'écran juste après le paiement."
     },
     {
-      q: "Pourquoi payer une fois et pas un abonnement comme tout le monde ?",
-      a: "Parce que l'accès est à vie — tu payes une fois pour débloquer ton concept complet, sans reconduction ni frais récurrents."
+      q: "Pourquoi 3 durées au même tarif mensuel ?",
+      a: "Le prix est le même — 24,90 €/mois — quelle que soit la durée choisie. Aucune des 3 ne t'engage plus qu'une autre techniquement : tu résilies quand tu veux, depuis ton compte, quelle que soit la carte sélectionnée au départ."
+    },
+    {
+      q: "Je peux annuler quand je veux ?",
+      a: "Oui, à tout moment, depuis ton compte (gestion de l'abonnement via Stripe). La résiliation prend effet à la fin de la période en cours — pas de remboursement au prorata, pas de justification à donner."
+    },
+    {
+      q: "Et si ça ne marche pas pour moi ?",
+      a: "Tu es remboursé intégralement si, après avoir publié comme prévu pendant 7 jours, tu n'as généré aucune vente — voir les conditions complètes."
     },
     {
       q: "Vous allez aussi générer les vidéos publicitaires ?",
@@ -224,10 +243,10 @@ const faq = {
 // futur de faq.items.
 const PAYMENT_FAQ_QUESTIONS = [
   "C'est pas juste un générateur d'idées IA de plus ?",
-  "Comment le concept est-il généré ?",
-  "Et si le concept généré ne me convainc pas ?",
   "Je paie, et après ? J'attends un email ?",
-  "Pourquoi payer une fois et pas un abonnement comme tout le monde ?"
+  "Pourquoi 3 durées au même tarif mensuel ?",
+  "Je peux annuler quand je veux ?",
+  "Et si ça ne marche pas pour moi ?"
 ];
 const paymentFaqItems = PAYMENT_FAQ_QUESTIONS.map((q) => faq.items.find((item) => item.q === q)).filter(Boolean);
 
@@ -1931,7 +1950,9 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
   .quiz-screen .revenue-slider,
   .quiz-screen .revenue-slider__note,
   .quiz-screen .quiz-payment__teaser,
+  .quiz-screen .guarantee-banner,
   .quiz-screen .payment-card,
+  .quiz-screen .guarantee-floating,
   .quiz-screen .included-list__title,
   .quiz-screen .included-list li,
   .quiz-screen .payment-faq__title,
@@ -1948,7 +1969,9 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
   .quiz-screen.is-active .revenue-slider,
   .quiz-screen.is-active .revenue-slider__note,
   .quiz-screen.is-active .quiz-payment__teaser,
+  .quiz-screen.is-active .guarantee-banner,
   .quiz-screen.is-active .payment-card,
+  .quiz-screen.is-active .guarantee-floating,
   .quiz-screen.is-active .included-list__title,
   .quiz-screen.is-active .included-list li,
   .quiz-screen.is-active .payment-faq__title,
@@ -1974,14 +1997,15 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
   .quiz-screen.is-active .revenue-slider { transition-delay: 220ms; }
   .quiz-screen.is-active .revenue-slider__note { transition-delay: 280ms; }
   .quiz-screen.is-active .quiz-payment__teaser { transition-delay: 0ms; }
+  .quiz-screen.is-active .guarantee-banner { transition-delay: 60ms; }
   .quiz-screen.is-active .payment-card { transition-delay: 120ms; }
+  .quiz-screen.is-active .guarantee-floating { transition-delay: 220ms; }
   .quiz-screen.is-active .included-list__title { transition-delay: 260ms; }
   .quiz-screen.is-active .included-list li:nth-child(1) { transition-delay: 320ms; }
   .quiz-screen.is-active .included-list li:nth-child(2) { transition-delay: 380ms; }
   .quiz-screen.is-active .included-list li:nth-child(3) { transition-delay: 440ms; }
   .quiz-screen.is-active .included-list li:nth-child(4) { transition-delay: 500ms; }
-  .quiz-screen.is-active .included-list li:nth-child(5) { transition-delay: 560ms; }
-  .quiz-screen.is-active .payment-faq__title { transition-delay: 620ms; }
+  .quiz-screen.is-active .payment-faq__title { transition-delay: 560ms; }
   .quiz-screen.is-active .quiz-option:nth-child(1) { transition-delay: 220ms; }
   .quiz-screen.is-active .quiz-option:nth-child(2) { transition-delay: 290ms; }
   .quiz-screen.is-active .quiz-option:nth-child(3) { transition-delay: 360ms; }
@@ -2006,7 +2030,9 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
     .quiz-screen .revenue-slider,
     .quiz-screen .revenue-slider__note,
     .quiz-screen .quiz-payment__teaser,
+    .quiz-screen .guarantee-banner,
     .quiz-screen .payment-card,
+    .quiz-screen .guarantee-floating,
     .quiz-screen .included-list__title,
     .quiz-screen .included-list li,
     .quiz-screen .payment-faq__title,
@@ -3736,6 +3762,191 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
     margin: 0 0 16px;
   }
 
+  /* Bandeau garantie -- accent verified-green (déjà associé à la confiance
+     dans cette palette, jamais une nouvelle couleur inventée), jamais le
+     texte complet de la politique ici : juste l'accroche + le lien vers
+     /conditions-remboursement (voir conditionsRemboursementPage). */
+  .guarantee-banner {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 12px 16px;
+    border-radius: 12px;
+    background: rgba(0, 196, 140, 0.08);
+    border: 1px solid rgba(0, 196, 140, 0.3);
+    color: var(--paper-soft);
+    font-size: 13px;
+    line-height: 1.4;
+    text-decoration: none;
+    margin-bottom: 20px;
+    transition: background 200ms cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  .guarantee-banner:hover {
+    background: rgba(0, 196, 140, 0.13);
+  }
+
+  .guarantee-banner svg {
+    flex-shrink: 0;
+    color: var(--verified-green);
+  }
+
+  .guarantee-banner strong {
+    color: var(--paper-soft);
+  }
+
+  .guarantee-banner__link {
+    color: var(--verified-green);
+    text-decoration: underline;
+    text-underline-offset: 2px;
+  }
+
+  /* Encadré flottant répété sous le CTA -- même accroche, jamais le détail
+     de la politique, cf. garde-fou "jamais le texte complet en dehors de
+     /conditions-remboursement". */
+  .guarantee-floating {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    text-align: center;
+    padding: 12px 16px;
+    border-radius: 12px;
+    border: 1px dashed rgba(0, 196, 140, 0.35);
+    color: var(--verified-green);
+    font-size: 13px;
+    font-weight: 600;
+    text-decoration: none;
+    margin-bottom: 24px;
+  }
+
+  .guarantee-floating svg {
+    flex-shrink: 0;
+  }
+
+  .duration-cards {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 10px;
+    margin-bottom: 12px;
+  }
+
+  @media (max-width: 480px) {
+    .duration-cards {
+      grid-template-columns: 1fr;
+    }
+  }
+
+  .duration-card {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    padding: 16px 10px 12px;
+    border-radius: 14px;
+    border: 1.5px solid rgba(255, 255, 255, 0.12);
+    background: rgba(255, 255, 255, 0.03);
+    color: var(--paper-soft);
+    cursor: pointer;
+    font-family: inherit;
+    text-align: center;
+    transition: border-color 160ms cubic-bezier(0.4, 0, 0.2, 1), background 160ms cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  .duration-card:hover {
+    border-color: rgba(0, 71, 255, 0.4);
+  }
+
+  .duration-card[aria-checked="true"] {
+    border-color: var(--cobalt);
+    background: rgba(0, 71, 255, 0.1);
+    box-shadow: 0 0 0 1px var(--cobalt) inset;
+  }
+
+  .duration-card__badge {
+    position: absolute;
+    top: -10px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: var(--cobalt);
+    color: #fff;
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    padding: 3px 8px;
+    border-radius: 999px;
+    white-space: nowrap;
+  }
+
+  .duration-card__label {
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--paper-soft);
+    margin-top: 4px;
+  }
+
+  .duration-card__price {
+    font-size: 18px;
+    font-weight: 800;
+    color: var(--paper-soft);
+  }
+
+  .duration-card__price-unit {
+    font-size: 11px;
+    font-weight: 500;
+    color: var(--steel);
+  }
+
+  .duration-card__daily {
+    font-size: 11px;
+    color: var(--steel);
+  }
+
+  .duration-card__note {
+    font-size: 10px;
+    color: var(--steel);
+    margin-top: 2px;
+  }
+
+  .duration-cards__note {
+    text-align: center;
+    font-size: 12px;
+    color: var(--steel);
+    margin: 0 0 20px;
+    line-height: 1.4;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .duration-card { transition: none; }
+    .guarantee-banner { transition: none; }
+  }
+
+  .included-list__soon {
+    opacity: 0.75;
+  }
+
+  .soon-badge {
+    display: inline-block;
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    color: var(--steel);
+    background: rgba(255, 255, 255, 0.06);
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    border-radius: 999px;
+    padding: 2px 8px;
+    margin-left: 6px;
+    vertical-align: middle;
+  }
+
+  .stripe-reassurance--secondary {
+    margin-top: -8px;
+    margin-bottom: 24px;
+  }
+
   .included-list {
     list-style: none;
     margin: 0 0 24px;
@@ -4458,7 +4669,6 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
       var paymentScreen = stage.querySelector('[data-screen="payment"]');
       var allScreens = questionScreens.concat([resultScreen, paymentScreen]);
       var quizPayBtnDefaultText = document.getElementById("quiz-pay-btn").textContent;
-      var quizPayBtnDefaultHref = document.getElementById("quiz-pay-btn").href;
       var TOTAL_STEPS = progressSegs.length; // dynamique : un segment par question taguée chapter (voir quiz.questions)
 
       var SECTOR_LABELS = ${JSON.stringify(quiz.sectorLabels)};
@@ -5001,28 +5211,77 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
         var conceptName = answers.concept ? answers.concept.concept_name : "ton concept";
         teaserEl.textContent = conceptName + " — débloque la description complète, la cible et les canaux d'acquisition.";
 
-        // Attache l'identité au lien Stripe (client_reference_id) : sans ça,
-        // supabase/functions/stripe-webhook ne peut pas savoir quel profil
-        // vient de payer et ignore l'événement plutôt que de deviner.
-        var supabase = window.ColdTrendSupabase;
-        var payBtn = document.getElementById("quiz-pay-btn");
-        if (supabase && payBtn) {
-          supabase.auth.getUser().then(function (res) {
-            var user = res.data ? res.data.user : null;
-            if (!user) return;
-            try {
-              var url = new URL(payBtn.href);
-              url.searchParams.set("client_reference_id", user.id);
-              if (user.email) url.searchParams.set("prefilled_email", user.email);
-              payBtn.href = url.toString();
-            } catch (err) {
-              console.warn("[ColdTrend] impossible d'attacher client_reference_id au lien Stripe :", err);
-            }
-          });
-        }
-
-        applyWelcomeOffer();
+        initDurationCards();
         startLoadingTransition();
+      }
+
+      // "Reprends là où tu en étais" -- la durée n'a aucun impact sur le prix
+      // (même Price ID récurrent mensuel pour les 3, voir
+      // create-checkout-session), donc un simple rappel localStorage suffit :
+      // pas besoin de DB pour ça. Absence de valeur stockée = première visite
+      // -> défaut sur la carte "3 mois" mise en avant, bandeau de retour caché.
+      var DURATION_STORAGE_KEY = "coldtrend_selected_duration";
+      var selectedDuration = 3;
+
+      function initDurationCards() {
+        var stored = null;
+        try {
+          stored = window.localStorage.getItem(DURATION_STORAGE_KEY);
+        } catch (err) {
+          stored = null;
+        }
+        var storedMonths = stored ? parseInt(stored, 10) : null;
+        var isReturning = [1, 3, 6].indexOf(storedMonths) !== -1;
+
+        var returnBanner = document.getElementById("quiz-return-banner");
+        if (returnBanner) returnBanner.hidden = !isReturning;
+
+        selectedDuration = isReturning ? storedMonths : 3;
+        updateDurationCardsUI();
+      }
+
+      function updateDurationCardsUI() {
+        Array.prototype.forEach.call(document.querySelectorAll(".duration-card"), function (card) {
+          var months = parseInt(card.getAttribute("data-duration"), 10);
+          card.setAttribute("aria-checked", months === selectedDuration ? "true" : "false");
+        });
+      }
+
+      // Un seul Price ID récurrent mensuel côté Stripe (voir
+      // create-checkout-session) : la durée choisie ici est envoyée en
+      // metadata pour affichage/statistiques, jamais pour calculer un prix
+      // différent. Jamais de soumission de vrai paiement depuis ce code --
+      // cette fonction ne fait que demander une Checkout Session et rediriger
+      // vers l'URL que Stripe renvoie, aucune carte n'est manipulée ici.
+      var isFinalizingPayment = false;
+
+      function handleFinalizePayment() {
+        if (isFinalizingPayment) return;
+        var payBtn = document.getElementById("quiz-pay-btn");
+        if (!payBtn) return;
+
+        isFinalizingPayment = true;
+        var originalText = payBtn.textContent;
+        payBtn.disabled = true;
+        payBtn.textContent = "Redirection vers le paiement…";
+
+        callEdgeFunctionAuthed("create-checkout-session", { durationMonths: selectedDuration })
+          .then(function (result) {
+            if (result && typeof result.url === "string") {
+              window.location.href = result.url;
+              return;
+            }
+            console.warn("[ColdTrend] create-checkout-session n'a pas renvoyé d'URL exploitable :", result);
+            payBtn.disabled = false;
+            payBtn.textContent = originalText;
+            isFinalizingPayment = false;
+          })
+          .catch(function (err) {
+            console.warn("[ColdTrend] échec de l'appel create-checkout-session :", err);
+            payBtn.disabled = false;
+            payBtn.textContent = originalText;
+            isFinalizingPayment = false;
+          });
       }
 
       // Écran de chargement de 5-6s inséré juste avant l'écran de paiement --
@@ -5076,53 +5335,6 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
         window.setTimeout(function () {
           transitionTo(paymentScreen, "forward");
         }, durationMs);
-      }
-
-      // Assignation déterministe du code de bienvenue à partir d'un signal
-      // réel déjà en base (voir get-welcome-offer) -- jamais un tirage
-      // aléatoire à chaque chargement, jamais un chiffre affiché sans
-      // source. Si l'appel échoue ou si le code assigné est épuisé, le
-      // price-block par défaut (prix plein, bouton "Obtenir mon accès")
-      // reste affiché tel quel -- pas de dégradation visible.
-      function applyWelcomeOffer() {
-        var supabase = window.ColdTrendSupabase;
-        var payBtn = document.getElementById("quiz-pay-btn");
-        if (!supabase || !payBtn) return;
-
-        callEdgeFunctionAuthed("get-welcome-offer").then(function (offer) {
-          if (!offer || offer.error || !offer.available) return;
-
-          var oldPrice = (offer.basePriceCents / 100).toFixed(2).replace(".", ",") + " €";
-          var newPrice = (offer.finalPriceCents / 100).toFixed(2).replace(".", ",") + " €";
-
-          document.getElementById("price-block-default").hidden = true;
-          var offerBlock = document.getElementById("welcome-offer-block");
-          document.getElementById("welcome-offer-eyebrow").textContent = offer.isFirstView
-            ? "Offre de bienvenue — ta première visite ici"
-            : "Ton offre de reprise";
-          var returnBanner = document.getElementById("quiz-return-banner");
-          if (returnBanner) returnBanner.hidden = offer.isFirstView;
-          document.getElementById("welcome-offer-price-old").textContent = oldPrice;
-          document.getElementById("welcome-offer-price-new").textContent = newPrice;
-
-          var counterEl = document.getElementById("welcome-offer-counter");
-          if (offer.showCounter) {
-            counterEl.textContent = "Plus que " + offer.remaining + " place" + (offer.remaining !== 1 ? "s" : "") + " à ce tarif.";
-            counterEl.hidden = false;
-          } else {
-            counterEl.hidden = true;
-          }
-          offerBlock.hidden = false;
-
-          payBtn.textContent = "Appliquer et payer " + newPrice;
-          try {
-            var url = new URL(payBtn.href);
-            url.searchParams.set("prefilled_promo_code", offer.code);
-            payBtn.href = url.toString();
-          } catch (err) {
-            console.warn("[ColdTrend] impossible d'appliquer le code promo à l'URL Stripe :", err);
-          }
-        });
       }
 
       // Même pattern que callEdgeFunction() (voir /compte) : POST avec le
@@ -5730,19 +5942,16 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
         if (badge) badge.classList.remove("is-visible");
         var followupEl = document.getElementById("quiz-followup");
         if (followupEl) followupEl.classList.remove("is-visible");
-        var welcomeOfferBlock = document.getElementById("welcome-offer-block");
-        if (welcomeOfferBlock) welcomeOfferBlock.hidden = true;
         var resultPreviewBlock = document.getElementById("result-preview");
         if (resultPreviewBlock) resultPreviewBlock.hidden = true;
         var returnBannerReset = document.getElementById("quiz-return-banner");
         if (returnBannerReset) returnBannerReset.hidden = true;
-        var priceBlockDefault = document.getElementById("price-block-default");
-        if (priceBlockDefault) priceBlockDefault.hidden = false;
         var quizPayBtnReset = document.getElementById("quiz-pay-btn");
         if (quizPayBtnReset) {
           quizPayBtnReset.textContent = quizPayBtnDefaultText;
-          quizPayBtnReset.href = quizPayBtnDefaultHref;
+          quizPayBtnReset.disabled = false;
         }
+        isFinalizingPayment = false;
 
         overlay.classList.add("is-open");
         document.body.style.overflow = "hidden";
@@ -5868,6 +6077,24 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
 
         if (e.target.closest("#result-intention-toggle")) {
           handleIntentionToggle();
+          return;
+        }
+
+        var durationCard = e.target.closest(".duration-card");
+        if (durationCard) {
+          selectedDuration = parseInt(durationCard.getAttribute("data-duration"), 10);
+          updateDurationCardsUI();
+          try {
+            window.localStorage.setItem(DURATION_STORAGE_KEY, String(selectedDuration));
+          } catch (err) {
+            /* stockage indisponible (navigation privée, etc.) -- pas bloquant,
+               juste pas de rappel de durée au prochain retour. */
+          }
+          return;
+        }
+
+        if (e.target.closest("#quiz-pay-btn")) {
+          handleFinalizePayment();
           return;
         }
       });
@@ -6677,32 +6904,45 @@ function renderQuizOverlay({ quiz, pricing, stripeLink }) {
       <div class="quiz-screen quiz-payment" data-screen="payment" data-step-name="paiement">
         <p class="quiz-payment__teaser" id="quiz-teaser"></p>
 
+        <a class="guarantee-banner" href="/conditions-remboursement" target="_blank" rel="noopener">
+          ${ICON_SHIELD}
+          <span><strong>Pas de vente en 7 jours&nbsp;?</strong> Remboursé. <span class="guarantee-banner__link">Voir les conditions</span></span>
+        </a>
+
         <div class="payment-card" id="payment-card">
-          <div class="price-block" id="price-block-default">
-            <div class="price-block__daily">Moins de <strong>${pricing.dailyPrice}</strong> par jour</div>
-            <div class="price-block__total">${pricing.totalPrice} — ${pricing.totalNote}</div>
-          </div>
           <p class="quiz-return-banner" id="quiz-return-banner" hidden>Bon retour — reprends exactement là où tu en étais.</p>
-          <div class="welcome-offer" id="welcome-offer-block" hidden>
-            <p class="welcome-offer__eyebrow" id="welcome-offer-eyebrow"></p>
-            <div class="welcome-offer__price">
-              <span class="welcome-offer__price-old" id="welcome-offer-price-old"></span>
-              <span class="welcome-offer__price-new" id="welcome-offer-price-new"></span>
-            </div>
-            <p class="welcome-offer__counter" id="welcome-offer-counter" hidden></p>
+
+          <div class="duration-cards" id="duration-cards" role="radiogroup" aria-label="Durée choisie">
+            ${DURATION_PLANS.map(
+              (plan) => `
+            <button type="button" class="duration-card${plan.highlight ? " is-highlighted" : ""}" data-duration="${plan.months}" role="radio" aria-checked="${plan.highlight ? "true" : "false"}">
+              ${plan.highlight ? '<span class="duration-card__badge">Le plus choisi</span>' : ""}
+              <span class="duration-card__label">${plan.label}</span>
+              <span class="duration-card__price">${pricing.monthlyPrice}<span class="duration-card__price-unit">/mois</span></span>
+              <span class="duration-card__daily">soit ${pricing.dailyPrice}/jour</span>
+              <span class="duration-card__note">${plan.note}</span>
+            </button>`
+            ).join("")}
           </div>
-          <a class="btn btn--primary btn--cta-final" id="quiz-pay-btn" href="${stripeLink}">Obtenir mon accès — ${pricing.totalPrice}</a>
+          <p class="duration-cards__note">Même tarif pour les 3 — résiliable à tout moment depuis ton compte, quelle que soit la durée choisie au départ.</p>
+
+          <button class="btn btn--primary btn--cta-final" id="quiz-pay-btn" type="button">Finaliser — ${pricing.monthlyPrice}/mois</button>
           <p class="stripe-reassurance">${ICON_LOCK} Paiement sécurisé via <strong>&nbsp;Stripe</strong></p>
         </div>
+
+        <a class="guarantee-floating" href="/conditions-remboursement" target="_blank" rel="noopener">
+          ${ICON_SHIELD} Satisfait ou remboursé — voir les conditions
+        </a>
 
         <p class="included-list__title">Ce que tu débloques</p>
         <ul class="included-list">
           <li>${ICON_CHECK_SMALL} Ton concept de SaaS complet : description, cible, canaux, direction artistique</li>
-          <li>${ICON_CHECK_SMALL} Concept affiché à l'écran juste après le paiement</li>
-          <li>${ICON_CHECK_SMALL} Accès à une base de SaaS réels, pour t'inspirer ou approfondir</li>
-          <li>${ICON_CHECK_SMALL} Accès à vie, paiement unique — jamais d'abonnement</li>
-          <li>${ICON_CHECK_SMALL} Générés à partir de ton secteur, ton budget et ton temps disponible</li>
+          <li>${ICON_CHECK_SMALL} Un accès pensé pour durer — ton concept évolue si ton profil change</li>
+          <li class="included-list__soon">${ICON_CHECK_SMALL} Génération de vidéos publicitaires <span class="soon-badge">Bientôt disponible</span></li>
+          <li class="included-list__soon">${ICON_CHECK_SMALL} Guides et ressources <span class="soon-badge">Bientôt disponible</span></li>
         </ul>
+
+        <p class="stripe-reassurance stripe-reassurance--secondary">${ICON_LOCK} Paiement traité et sécurisé par Stripe — aucune donnée bancaire ne transite par ColdTrend</p>
 
         <div class="payment-faq">
           <p class="payment-faq__title">Questions fréquentes</p>
@@ -10560,6 +10800,7 @@ function comptePage() {
           </button>
           <div class="dossier__user-dropdown" id="user-dropdown">
             <a class="dossier__user-dropdown-item" id="admin-link-btn" href="/admin" style="display:none;">Accéder à l'admin</a>
+            <button type="button" class="dossier__user-dropdown-item" id="manage-subscription-btn">Gérer mon abonnement</button>
             <button type="button" class="dossier__user-dropdown-item" id="resend-access-btn" style="display:none;">Renvoyer mon accès par email</button>
             <button type="button" class="dossier__user-dropdown-item" id="signout-btn">Se déconnecter</button>
             <button type="button" class="dossier__user-dropdown-item is-danger" id="delete-account-btn">Supprimer mon compte</button>
@@ -11012,6 +11253,28 @@ function comptePage() {
         var result = await callEdgeFunction("resend-access");
         btn.disabled = false;
         btn.textContent = result && result.success ? "Email envoyé." : "Échec de l'envoi, réessaie plus tard.";
+      });
+
+      // Redirige vers le Stripe Customer Portal -- décision produit
+      // explicite (gestion/résiliation hébergée par Stripe, jamais une UI de
+      // gestion custom). Si l'utilisateur n'a jamais eu d'abonnement,
+      // create-portal-session renvoie une 404 propre (voir son code) --
+      // pas de crash, juste un message clair.
+      document.getElementById("manage-subscription-btn").addEventListener("click", async function () {
+        var btn = this;
+        var originalText = btn.textContent;
+        btn.disabled = true;
+        btn.textContent = "Ouverture…";
+        var result = await callEdgeFunction("create-portal-session");
+        if (result && typeof result.url === "string") {
+          window.location.href = result.url;
+          return;
+        }
+        btn.disabled = false;
+        btn.textContent = result && result.error ? result.error : "Impossible d'ouvrir la gestion d'abonnement.";
+        window.setTimeout(function () {
+          btn.textContent = originalText;
+        }, 3000);
       });
 
       document.getElementById("delete-account-btn").addEventListener("click", async function () {
