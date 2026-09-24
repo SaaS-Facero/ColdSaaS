@@ -1,9 +1,12 @@
 // Supabase Edge Function — crée une vraie Stripe Checkout Session en mode
-// "subscription" pour le Price ID récurrent mensuel unique (24,90€/mois),
-// quelle que soit la durée affichée côté client (1/3/6 mois -- purement
-// déclaratif, voir profiles.subscription_duration_months). Remplace le
-// Payment Link statique pour ce flux : un Payment Link ne permet pas
-// d'attacher client_reference_id/metadata dynamiquement par requête.
+// "subscription". Chaque durée (1/3/6 mois) a son propre Price ID Stripe,
+// avec sa propre cadence de facturation réelle (mensuelle/trimestrielle/
+// semestrielle) et son propre montant -- jamais le même Price réutilisé
+// pour les 3 (voir scripts/build.mjs, DURATION_PLANS, pour les montants
+// affichés côté client, qui doivent rester synchronisés avec cette table).
+// Remplace le Payment Link statique pour ce flux : un Payment Link ne
+// permet pas d'attacher client_reference_id/metadata dynamiquement par
+// requête.
 //
 // Sécurité : aucune carte n'est jamais manipulée ici -- Stripe héberge le
 // formulaire de paiement, cette fonction ne fait que demander une session
@@ -22,10 +25,14 @@ const ALLOWED_ORIGINS = new Set([
 
 const SITE_URL = "https://coldtrend.com";
 
-// Un seul Price ID récurrent mensuel réutilisé pour les 3 cartes de durée
-// -- jamais un Price différent par durée, cohérent avec le garde-fou
-// "aucune contrainte technique différente entre les 3 durées".
-const SUBSCRIPTION_PRICE_ID = "price_1UJ2HoKs6wCNxRh3Nslde9SH";
+// Un Price ID distinct par durée -- vérifié via admin-get-stripe-prices
+// avant intégration (montant + recurring.interval/interval_count réels),
+// jamais saisi à l'aveugle depuis une simple annonce en chat.
+const PRICE_ID_BY_DURATION: Record<number, string> = {
+  1: "price_1UJ2HoKs6wCNxRh3Nslde9SH", // 24,90€, facturé chaque mois
+  3: "price_1UJ7BIKs6wCNxRh3sNSXtQv3", // 49,90€, facturé tous les 3 mois
+  6: "price_1UJ7DlKs6wCNxRh3TXgtr5Cx", // 79,90€, facturé tous les 6 mois
+};
 const ALLOWED_DURATIONS = new Set([1, 3, 6]);
 
 function corsHeaders(origin: string | null) {
@@ -72,12 +79,13 @@ Deno.serve(async (req) => {
     /* corps vide -- durationMonths retombe sur le défaut ci-dessous */
   }
   const durationMonths = ALLOWED_DURATIONS.has(body.durationMonths as number) ? (body.durationMonths as number) : 1;
+  const priceId = PRICE_ID_BY_DURATION[durationMonths];
 
   // form-urlencoded, pas JSON -- format attendu par l'API Stripe. URLSearchParams
   // gère l'échappement, jamais de concaténation manuelle de chaîne ici.
   const params = new URLSearchParams();
   params.set("mode", "subscription");
-  params.set("line_items[0][price]", SUBSCRIPTION_PRICE_ID);
+  params.set("line_items[0][price]", priceId);
   params.set("line_items[0][quantity]", "1");
   params.set("client_reference_id", user.id);
   if (user.email) params.set("customer_email", user.email);

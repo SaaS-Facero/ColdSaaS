@@ -160,22 +160,47 @@ const notificationStack = {
   ]
 };
 
-// Abonnement Stripe Subscriptions -- un seul Price ID récurrent mensuel
-// réutilisé pour les 3 cartes de durée (1/3/6 mois), voir
-// supabase/functions/create-checkout-session. Le prix par jour est donc
-// identique quelle que soit la durée choisie -- ce n'est qu'un cadrage
-// déclaratif de "combien de temps tu comptes rester", jamais un tarif ou
-// un engagement technique différent.
+// Abonnement Stripe Subscriptions -- 3 Price ID distincts, un par durée
+// (voir supabase/functions/create-checkout-session), chacun avec sa propre
+// cadence de facturation et son propre montant réel -- jamais le même
+// Price ID réutilisé pour les 3. Les montants ci-dessous sont ceux
+// communiqués pour chaque Price ID ; le prix/jour et l'équivalent mensuel
+// sont calculés ici, jamais saisis à la main, pour ne jamais désynchroniser
+// l'affichage du vrai montant facturé.
+function formatEuro(amount) {
+  return amount.toFixed(2).replace(".", ",") + " €";
+}
+
 const pricing = {
-  dailyPrice: "0,83 €",
-  monthlyPrice: "24,90 €"
+  // Ancrage concret et sobre -- un fait vérifiable, jamais une emphase
+  // marketing exagérée ("imbattable", etc.).
+  dailyAnchor: "Moins qu'un café"
 };
 
 const DURATION_PLANS = [
-  { months: 1, label: "1 mois", note: "Sans engagement" },
-  { months: 3, label: "3 mois", note: "Le plus choisi", highlight: true },
-  { months: 6, label: "6 mois", note: "Pour viser loin" }
-];
+  { months: 1, label: "1 mois", note: "Sans engagement", totalAmount: 24.9, cadenceShort: "chaque mois" },
+  {
+    months: 3,
+    label: "3 mois",
+    note: "Le plus choisi",
+    highlight: true,
+    totalAmount: 49.9,
+    cadenceShort: "tous les 3 mois"
+  },
+  { months: 6, label: "6 mois", note: "Pour viser loin", totalAmount: 79.9, cadenceShort: "tous les 6 mois" }
+].map((plan) => {
+  const dailyAmount = plan.totalAmount / (plan.months * 30);
+  const monthlyEquivalentAmount = plan.totalAmount / plan.months;
+  return {
+    ...plan,
+    totalPrice: formatEuro(plan.totalAmount),
+    monthlyEquivalentPrice: formatEuro(monthlyEquivalentAmount),
+    dailyPrice: formatEuro(dailyAmount),
+    billingLine: `Facturé ${formatEuro(plan.totalAmount)} ${plan.cadenceShort}`
+  };
+});
+
+const DEFAULT_DURATION_PLAN = DURATION_PLANS.find((plan) => plan.highlight) || DURATION_PLANS[0];
 
 // L'objet `comparison` ("ColdTrend vs génération d'idées par IA") a été
 // retiré ici -- son rendu était déjà désactivé (markup supprimé lors d'une
@@ -217,8 +242,8 @@ const faq = {
       a: "Non, ton concept complet s'affiche directement à l'écran juste après le paiement."
     },
     {
-      q: "Pourquoi 3 durées au même tarif mensuel ?",
-      a: "Le prix est le même — 24,90 €/mois — quelle que soit la durée choisie. Aucune des 3 ne t'engage plus qu'une autre techniquement : tu résilies quand tu veux, depuis ton compte, quelle que soit la carte sélectionnée au départ."
+      q: "Pourquoi les 3 durées n'ont pas le même prix ?",
+      a: "Le prix par jour baisse avec la durée choisie : 24,90 € facturés chaque mois, 49,90 € tous les 3 mois, ou 79,90 € tous les 6 mois. Tu résilies quand tu veux depuis ton compte, mais le montant déjà facturé pour la période en cours n'est jamais remboursé au prorata."
     },
     {
       q: "Je peux annuler quand je veux ?",
@@ -244,7 +269,7 @@ const faq = {
 const PAYMENT_FAQ_QUESTIONS = [
   "C'est pas juste un générateur d'idées IA de plus ?",
   "Je paie, et après ? J'attends un email ?",
-  "Pourquoi 3 durées au même tarif mensuel ?",
+  "Pourquoi les 3 durées n'ont pas le même prix ?",
   "Je peux annuler quand je veux ?",
   "Et si ça ne marche pas pour moi ?"
 ];
@@ -3851,7 +3876,8 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
     cursor: pointer;
     font-family: inherit;
     text-align: center;
-    transition: border-color 160ms cubic-bezier(0.4, 0, 0.2, 1), background 160ms cubic-bezier(0.4, 0, 0.2, 1);
+    transition: border-color 220ms cubic-bezier(0.4, 0, 0.2, 1), background 220ms cubic-bezier(0.4, 0, 0.2, 1),
+      box-shadow 220ms cubic-bezier(0.4, 0, 0.2, 1);
   }
 
   .duration-card:hover {
@@ -3862,6 +3888,10 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
     border-color: var(--cobalt);
     background: rgba(0, 71, 255, 0.1);
     box-shadow: 0 0 0 1px var(--cobalt) inset;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .duration-card { transition: none; }
   }
 
   .duration-card__badge {
@@ -3887,27 +3917,82 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
     margin-top: 4px;
   }
 
-  .duration-card__price {
-    font-size: 18px;
+  /* Prix/jour -- élément visuel dominant de la carte, cf. garde-fou
+     hiérarchie : la taille porte l'emphase, jamais l'occultation du prix
+     réel (le mensuel reste toujours affiché juste en dessous, jamais
+     masqué). Fondu + léger scale à l'apparition -- transform/opacity
+     uniquement, déclenché par .is-active comme le reste du site. */
+  .duration-card__price-wrap {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    margin-top: 6px;
+    transition: transform 220ms cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  .duration-card[aria-checked="true"] .duration-card__price-wrap {
+    transform: scale(1.02);
+  }
+
+  .duration-card__daily-price {
+    display: block;
+    font-size: clamp(2.5rem, 6vw, 3.5rem);
     font-weight: 800;
+    line-height: 1;
     color: var(--paper-soft);
+    opacity: 0;
+    transform: scale(0.85);
+    transition: opacity 420ms cubic-bezier(0.16, 1, 0.3, 1) 200ms, transform 420ms cubic-bezier(0.16, 1, 0.3, 1) 200ms;
   }
 
-  .duration-card__price-unit {
-    font-size: 11px;
-    font-weight: 500;
+  .quiz-screen.is-active .duration-card__daily-price {
+    opacity: 1;
+    transform: scale(1);
+  }
+
+  /* Carte "3 mois" mise en avant -- prix/jour légèrement plus grand pour
+     que l'œil s'y arrête en premier, jamais une disproportion. */
+  .duration-card.is-highlighted .duration-card__daily-price {
+    font-size: clamp(2.7rem, 6.4vw, 3.7rem);
+  }
+
+  .duration-card__daily-unit {
+    font-size: 14px;
+    font-weight: 600;
     color: var(--steel);
   }
 
-  .duration-card__daily {
+  .duration-card__anchor {
+    font-size: 12px;
+    color: var(--steel);
+    margin-top: 2px;
+  }
+
+  /* Montant réellement facturé + cadence -- garde-fou non négociable :
+     toujours visible et lisible (jamais < 14px, jamais un gris qui frôle
+     l'illisibilité, donc --paper-soft ici et pas --steel), jamais masqué
+     derrière le prix/jour qui, lui, ne sert qu'à donner une intuition. */
+  .duration-card__monthly {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--paper-soft);
+    margin-top: 6px;
+  }
+
+  /* Équivalent mensuel -- purement indicatif ("~"), permet de comparer les
+     3 cartes entre elles sans jamais laisser croire que c'est le montant
+     réellement prélevé (voir duration-card__monthly juste au-dessus pour
+     ça). */
+  .duration-card__equivalent {
     font-size: 11px;
     color: var(--steel);
+    margin-top: 2px;
   }
 
   .duration-card__note {
     font-size: 10px;
     color: var(--steel);
-    margin-top: 2px;
+    margin-top: 6px;
   }
 
   .duration-cards__note {
@@ -3918,8 +4003,19 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
     line-height: 1.4;
   }
 
+  .duration-cards__note a {
+    color: var(--verified-green);
+    text-decoration: underline;
+    text-underline-offset: 2px;
+  }
+
   @media (prefers-reduced-motion: reduce) {
-    .duration-card { transition: none; }
+    .duration-card__price-wrap { transition: none; }
+    .duration-card__daily-price {
+      opacity: 1;
+      transform: none;
+      transition: none;
+    }
     .guarantee-banner { transition: none; }
   }
 
@@ -4683,6 +4779,13 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
       var quizPayBtnDefaultText = document.getElementById("quiz-pay-btn").textContent;
       var TOTAL_STEPS = progressSegs.length; // dynamique : un segment par question taguée chapter (voir quiz.questions)
 
+      // Prix/jour propre à chaque durée (3 Price ID distincts côté Stripe,
+      // voir create-checkout-session) -- le CTA reflète la carte
+      // sélectionnée, jamais un chiffre générique.
+      var DAILY_PRICE_BY_DURATION = ${JSON.stringify(
+        Object.fromEntries(DURATION_PLANS.map((plan) => [plan.months, plan.dailyPrice]))
+      )};
+
       var SECTOR_LABELS = ${JSON.stringify(quiz.sectorLabels)};
       var BUDGET_LABELS = ${JSON.stringify(quiz.budgetLabels)};
       var TIME_LABELS = ${JSON.stringify(quiz.timeLabels)};
@@ -5257,6 +5360,11 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
           var months = parseInt(card.getAttribute("data-duration"), 10);
           card.setAttribute("aria-checked", months === selectedDuration ? "true" : "false");
         });
+        var payBtn = document.getElementById("quiz-pay-btn");
+        var dailyPrice = DAILY_PRICE_BY_DURATION[selectedDuration];
+        if (payBtn && !isFinalizingPayment && dailyPrice) {
+          payBtn.textContent = "Finaliser — " + dailyPrice + "/jour";
+        }
       }
 
       // Un seul Price ID récurrent mensuel côté Stripe (voir
@@ -6948,15 +7056,19 @@ function renderQuizOverlay({ quiz, pricing, stripeLink }) {
             <button type="button" class="duration-card${plan.highlight ? " is-highlighted" : ""}" data-duration="${plan.months}" role="radio" aria-checked="${plan.highlight ? "true" : "false"}">
               ${plan.highlight ? '<span class="duration-card__badge">Le plus choisi</span>' : ""}
               <span class="duration-card__label">${plan.label}</span>
-              <span class="duration-card__price">${pricing.monthlyPrice}<span class="duration-card__price-unit">/mois</span></span>
-              <span class="duration-card__daily">soit ${pricing.dailyPrice}/jour</span>
+              <span class="duration-card__price-wrap">
+                <span class="duration-card__daily-price">${plan.dailyPrice}<span class="duration-card__daily-unit">/jour</span></span>
+                <span class="duration-card__anchor">${pricing.dailyAnchor}</span>
+                <span class="duration-card__monthly">${plan.billingLine}</span>
+                <span class="duration-card__equivalent">soit ~${plan.monthlyEquivalentPrice}/mois</span>
+              </span>
               <span class="duration-card__note">${plan.note}</span>
             </button>`
             ).join("")}
           </div>
-          <p class="duration-cards__note">Même tarif pour les 3 — résiliable à tout moment depuis ton compte, quelle que soit la durée choisie au départ.</p>
+          <p class="duration-cards__note">Résiliable à tout moment depuis ton compte — le montant facturé correspond à la durée choisie, sans remboursement au prorata en cas de résiliation en cours de période (<a href="/conditions-remboursement" target="_blank" rel="noopener">voir les conditions</a>).</p>
 
-          <button class="btn btn--primary btn--cta-final" id="quiz-pay-btn" type="button">Finaliser — ${pricing.monthlyPrice}/mois</button>
+          <button class="btn btn--primary btn--cta-final" id="quiz-pay-btn" type="button">Finaliser — ${DEFAULT_DURATION_PLAN.dailyPrice}/jour</button>
           <p class="payment-error" id="payment-error" hidden></p>
           <p class="stripe-reassurance">${ICON_LOCK} Paiement sécurisé via <strong>&nbsp;Stripe</strong></p>
         </div>
