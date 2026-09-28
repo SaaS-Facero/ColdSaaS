@@ -77,16 +77,11 @@ try {
 // sans domaine). `||` traite aussi la chaîne vide comme absente.
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "https://www.coldtrend.com";
 
-// Analytics funnel (trackEvent, voir renderQuizOverlay) — écrit déjà dans
-// Supabase (table funnel_events, first-party, pas de cookie tiers), décision
-// prise et implémentée dans une session précédente, non concernée par le
-// choix ci-dessous.
-//
-// Mesure d'audience générale (pages vues, trafic) — Plausible, choisi pour
-// son absence de cookie et de donnée personnelle (voir cookieConsentBlock()
-// plus bas). Chargé uniquement après consentement explicite (bandeau
-// cookies), jamais par défaut.
-const PLAUSIBLE_DOMAIN = "coldtrend.com";
+// Analytics — un seul mécanisme, déjà en place : funnel_events (Supabase,
+// first-party, RLS ouverte à l'insertion anonyme, voir migration 0003).
+// Décision explicite : pas de service tiers (Plausible/GA4/GoatCounter...)
+// -- les pages vues sont journalisées ici même, jamais de cookie, jamais de
+// compte externe. Voir trackPageView() dans renderQuizOverlay/page().
 
 // ---------------------------------------------------------------------------
 // Data (content only — never mixed with markup logic below)
@@ -4384,79 +4379,9 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
     }
   }
 
-  /* Bandeau cookies -- refuser et accepter ont le même poids visuel
-     (garde-fou : jamais un refus minimisé en petit lien gris pendant que
-     l'acceptation est un gros bouton plein). */
-  .cookie-banner {
-    position: fixed;
-    left: 16px;
-    right: 16px;
-    bottom: 16px;
-    z-index: 60;
-    max-width: 640px;
-    margin: 0 auto;
-    background: var(--ink);
-    border: 1px solid var(--border);
-    border-radius: 14px;
-    padding: 18px 20px;
-    box-shadow: 0 16px 44px -18px rgba(0, 0, 0, 0.6);
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: 16px;
-  }
-
-  .cookie-banner__text {
-    flex: 1 1 320px;
-    margin: 0;
-    font-size: 13px;
-    line-height: 1.5;
-    color: var(--paper-soft);
-  }
-
-  .cookie-banner__actions {
-    display: flex;
-    gap: 10px;
-    flex-shrink: 0;
-  }
-
-  .cookie-banner__btn {
-    font-family: inherit;
-    font-size: 13px;
-    font-weight: 700;
-    padding: 10px 18px;
-    border-radius: 8px;
-    cursor: pointer;
-  }
-
-  .cookie-banner__btn--decline {
-    background: transparent;
-    border: 1px solid var(--border);
-    color: var(--paper-soft);
-  }
-
-  .cookie-banner__btn--accept {
-    background: var(--cobalt);
-    border: 1px solid var(--cobalt);
-    color: #fff;
-  }
-
-  @media (max-width: 480px) {
-    .cookie-banner { flex-direction: column; align-items: stretch; }
-    .cookie-banner__actions { justify-content: stretch; }
-    .cookie-banner__btn { flex: 1; }
-  }
 </style>
 </head>
 <body>
-  <div class="cookie-banner" id="cookie-banner" hidden>
-    <p class="cookie-banner__text">On utilise <strong>Plausible</strong>, un outil de mesure d'audience qui ne pose aucun cookie et ne collecte aucune donnée personnelle — juste pour savoir combien de personnes visitent le site. Rien d'autre n'est utilisé.</p>
-    <div class="cookie-banner__actions">
-      <button type="button" class="cookie-banner__btn cookie-banner__btn--decline" id="cookie-decline">Refuser</button>
-      <button type="button" class="cookie-banner__btn cookie-banner__btn--accept" id="cookie-accept">Accepter</button>
-    </div>
-  </div>
-
   <header class="site-nav" id="site-nav">
     <div class="site-nav__inner wrap">
       <a class="site-nav__brand" href="/">
@@ -4622,68 +4547,48 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
 
   ${renderQuizOverlay({ quiz, pricing, stripeLink: STRIPE_PAYMENT_LINK })}
 
-  <!-- Bandeau cookies -- indépendant de Supabase/auth, chargé en premier.
-       Plausible ne pose aucun cookie ni ne collecte de donnée personnelle,
-       mais reste chargé uniquement après un choix explicite ("Accepter"),
-       jamais par défaut -- le refus est honoré (rien n'est chargé) et
-       mémorisé (le bandeau ne réapparaît pas à chaque visite). -->
-  <script>
-    (function () {
-      var CONSENT_KEY = "coldtrend_analytics_consent";
-      function loadPlausible() {
-        if (document.getElementById("plausible-script")) return;
-        var s = document.createElement("script");
-        s.id = "plausible-script";
-        s.defer = true;
-        s.setAttribute("data-domain", ${JSON.stringify(PLAUSIBLE_DOMAIN)});
-        s.src = "https://plausible.io/js/script.js";
-        document.head.appendChild(s);
-      }
-      var stored = null;
-      try {
-        stored = window.localStorage.getItem(CONSENT_KEY);
-      } catch (err) {
-        stored = null;
-      }
-      var banner = document.getElementById("cookie-banner");
-      if (stored === "accepted") {
-        loadPlausible();
-      } else if (stored !== "declined" && banner) {
-        banner.hidden = false;
-      }
-      var acceptBtn = document.getElementById("cookie-accept");
-      var declineBtn = document.getElementById("cookie-decline");
-      if (acceptBtn) {
-        acceptBtn.addEventListener("click", function () {
-          try {
-            window.localStorage.setItem(CONSENT_KEY, "accepted");
-          } catch (err) {
-            /* stockage indisponible -- le bandeau réapparaîtra au prochain
-               chargement, pas bloquant */
-          }
-          loadPlausible();
-          if (banner) banner.hidden = true;
-        });
-      }
-      if (declineBtn) {
-        declineBtn.addEventListener("click", function () {
-          try {
-            window.localStorage.setItem(CONSENT_KEY, "declined");
-          } catch (err) {
-            /* idem */
-          }
-          if (banner) banner.hidden = true;
-        });
-      }
-    })();
-  </script>
-
   <!-- Le quiz et /inscription résolvent tous les deux l'identité côté
        serveur via supabase/functions/resolve-identity — un seul mécanisme
        d'auth pour toute l'app, quel que soit le point d'entrée. -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="/js/supabase-client.js"></script>
   <script src="/js/auth-state.js"></script>
+
+  <!-- Pages vues -- 100% maison (funnel_events, voir migration 0003), pas
+       de service tiers, pas de cookie de mesure d'audience : aucun bandeau
+       de consentement requis pour ça. Écriture autorisée même sans session
+       (RLS : user_id is null OU auth.uid() = user_id), rattachée au vrai
+       user_id quand une session existe déjà (visite d'un utilisateur
+       connecté hors quiz). -->
+  <script>
+    (function () {
+      function trackPageView() {
+        var supabase = window.ColdTrendSupabase;
+        if (!supabase) return;
+        supabase.auth
+          .getSession()
+          .then(function (res) {
+            var userId = res.data.session ? res.data.session.user.id : null;
+            return supabase.from("funnel_events").insert({
+              user_id: userId,
+              event_name: "page_view",
+              metadata: { path: window.location.pathname, referrer: document.referrer || null }
+            });
+          })
+          .then(function (result) {
+            if (result && result.error) console.warn("[ColdTrend] page_view insert échoué :", result.error.message);
+          })
+          .catch(function (err) {
+            console.warn("[ColdTrend] page_view a échoué :", err);
+          });
+      }
+      if (window.ColdTrendSupabase) {
+        trackPageView();
+      } else {
+        document.addEventListener("coldtrend:supabase-ready", trackPageView, { once: true });
+      }
+    })();
+  </script>
 
   <script>
     (function () {
