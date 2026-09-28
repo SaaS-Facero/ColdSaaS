@@ -17,21 +17,21 @@ const OUT_FILE_ENTREPRENEUR_PROFILE = path.join(OUT_DIR, "profil-entrepreneur.ht
 // affichera silencieusement ces placeholders au lieu des vraies valeurs.
 //
 // Stripe Payment Link — variabilisé ici, jamais construit/géré côté client.
-const STRIPE_PAYMENT_LINK = process.env.STRIPE_PAYMENT_LINK ?? "https://buy.stripe.com/REPLACE_WITH_REAL_LINK";
+const STRIPE_PAYMENT_LINK = process.env.STRIPE_PAYMENT_LINK || "https://buy.stripe.com/REPLACE_WITH_REAL_LINK";
 
 // Payment Link séparé pour l'upsell "plan de communication" (3,90€, par
 // listing) -- produit/prix distinct du Payment Link principal, nécessaire
 // pour que stripe-webhook puisse différencier les deux paiements (voir
 // migration 0014 et supabase/functions/stripe-webhook). À définir dans les
 // variables d'environnement Vercel une fois le produit créé dans Stripe.
-const COMM_PLAN_PAYMENT_LINK = process.env.COMM_PLAN_PAYMENT_LINK ?? "https://buy.stripe.com/REPLACE_WITH_COMM_PLAN_LINK";
+const COMM_PLAN_PAYMENT_LINK = process.env.COMM_PLAN_PAYMENT_LINK || "https://buy.stripe.com/REPLACE_WITH_COMM_PLAN_LINK";
 
 // Supabase — insertion du lead à l'écran 6, avant le prix. L'anon key est
 // publique par conception (protégée par les policies RLS, pas par le secret)
 // mais reste une variable d'environnement pour permettre la rotation et la
 // séparation Production/Preview/Development sans toucher au code.
-const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "https://REPLACE_WITH_PROJECT.supabase.co";
-const SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? "REPLACE_WITH_ANON_KEY";
+const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || "https://REPLACE_WITH_PROJECT.supabase.co";
+const SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "REPLACE_WITH_ANON_KEY";
 
 // Chiffres réels de saas_listings_public, récupérés à chaque build (Vercel
 // rebuild à chaque déploiement -> reste à jour sans job séparé). La table est
@@ -69,7 +69,13 @@ try {
 // construire l'URL de redirection post-paiement affichée à l'écran de succès
 // (la redirection Stripe elle-même se configure côté dashboard Stripe, pas
 // ici : ce n'est qu'un rappel visuel cohérent).
-const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? "https://www.coldtrend.com";
+// `||` et non `??` : NEXT_PUBLIC_SITE_URL est configurée en production sur
+// Vercel avec une valeur vide ("") plutôt qu'absente -- `??` ne se
+// déclenche que sur null/undefined, jamais sur une chaîne vide, donc le
+// repli ne s'appliquait jamais en réalité (bug constaté en prod : og:url,
+// canonical et le Sitemap de robots.txt se résolvaient tous en "/" nu,
+// sans domaine). `||` traite aussi la chaîne vide comme absente.
+const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "https://www.coldtrend.com";
 
 // Analytics — un seul point d'entrée générique, branché plus tard sur
 // PostHog/Plausible. Ne jamais envoyer de PII (email en clair, nom) dans les
