@@ -630,6 +630,15 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>${brand.name} — Ton concept de SaaS, généré pour toi</title>
 <meta name="description" content="${hero.subhead}" />
+<link rel="canonical" href="${SITE_URL}/" />
+<meta property="og:type" content="website" />
+<meta property="og:site_name" content="${brand.name}" />
+<meta property="og:url" content="${SITE_URL}/" />
+<meta property="og:title" content="${brand.name} — Ton concept de SaaS, généré pour toi" />
+<meta property="og:description" content="${hero.subhead}" />
+<meta name="twitter:card" content="summary" />
+<meta name="twitter:title" content="${brand.name} — Ton concept de SaaS, généré pour toi" />
+<meta name="twitter:description" content="${hero.subhead}" />
 <link rel="stylesheet" href="/css/design-tokens.css" />
 <style>
   :root {
@@ -7844,7 +7853,7 @@ function conceptPage({ brand, siteUrl, commPlanPaymentLink }) {
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>${brand.name} — Concept</title>
-<meta name="description" content="Un concept adapté au marché français, à partir d'un SaaS réel à revenus vérifiés." />
+<meta name="description" content="Ton concept de SaaS généré par IA à partir de ton profil : description, cible et canaux d'acquisition." />
 <meta name="robots" content="noindex" />
 <style>
   :root {
