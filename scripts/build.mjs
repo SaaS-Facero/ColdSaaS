@@ -8719,6 +8719,89 @@ function conditionsRemboursementPage({ brand, siteUrl }) {
 }
 
 // ---------------------------------------------------------------------------
+// Page mentions légales — /mentions-legales. Informations fournies
+// explicitement par l'exploitant (jamais devinées). SIRET en cours
+// d'attribution au moment de la rédaction (déclaré par l'exploitant) --
+// affiché tel quel, jamais un numéro inventé en attendant. Hébergeur :
+// Vercel Inc., adresse publique standard de leurs mentions légales/CGU --
+// à revérifier par l'exploitant avant publication finale si besoin.
+// ---------------------------------------------------------------------------
+function mentionsLegalesPage({ brand, siteUrl }) {
+  return `<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>${brand.name} — Mentions légales</title>
+<meta name="description" content="Mentions légales de ColdTrend : éditeur, hébergeur, contact." />
+<style>
+  :root { color-scheme: dark; }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0;
+    min-height: 100dvh;
+    background: #0A0E1A;
+    color: #F5F6F8;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Inter, Arial, sans-serif;
+    line-height: 1.6;
+  }
+  .wrap { max-width: 680px; margin: 0 auto; padding: 40px 20px 80px; }
+  .back-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    color: #8A8F98;
+    text-decoration: none;
+    font-size: 14px;
+    margin-bottom: 32px;
+  }
+  .back-link:hover { color: #F5F6F8; }
+  h1 { font-size: clamp(24px, 5vw, 32px); font-weight: 800; margin: 0 0 8px; }
+  .updated-at { font-size: 13px; color: #8A8F98; margin: 0 0 40px; }
+  h2 { font-size: 19px; font-weight: 700; margin: 40px 0 12px; }
+  p { font-size: 15px; color: #E4E6EB; margin: 0 0 14px; }
+  .pending-box {
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 14px;
+    padding: 18px 20px;
+    margin-bottom: 8px;
+  }
+  .pending-box p { color: #F5F6F8; margin: 0; font-size: 14px; }
+  a { color: #3D6BFF; }
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <a class="back-link" href="${siteUrl}">&larr; Retour à l'accueil</a>
+
+    <h1>Mentions légales</h1>
+    <p class="updated-at">Applicable au site ${siteUrl}.</p>
+
+    <h2>Éditeur du site</h2>
+    <p>Maxence Lefebvre, entrepreneur individuel (micro-entreprise), Normandie, France.</p>
+    <div class="pending-box">
+      <p>SIRET en cours d'attribution — immatriculation en cours auprès de l'INSEE. Cette page sera mise à jour dès réception du numéro.</p>
+    </div>
+
+    <h2>Contact</h2>
+    <p>Email : <a href="mailto:contact.facero2026@gmail.com">contact.facero2026@gmail.com</a></p>
+
+    <h2>Directeur de la publication</h2>
+    <p>Maxence Lefebvre.</p>
+
+    <h2>Hébergement</h2>
+    <p>Vercel Inc. — 340 S Lemon Ave #4133, Walnut, CA 91789, États-Unis.</p>
+
+    <h2>Propriété intellectuelle</h2>
+    <p>L'ensemble des contenus présents sur ce site (textes, visuels, structure) est la propriété de l'éditeur, sauf mention contraire. Toute reproduction sans autorisation est interdite.</p>
+  </div>
+</body>
+</html>
+`;
+}
+
+// ---------------------------------------------------------------------------
 // Page 404 — servie automatiquement par Vercel pour toute route inconnue
 // (fichier 404.html à la racine de l'output statique, convention native,
 // aucune config vercel.json requise). Personnalisation fondée sur une vraie
@@ -12563,11 +12646,9 @@ function writeBuiltFile(filePath, contents) {
 // générée par utilisateur (compte, admin, concept, profil entrepreneur,
 // succès, désabonnement, les écrans d'auth) est exclue des deux.
 // ---------------------------------------------------------------------------
-// mentions-legales/politique-confidentialite volontairement absentes tant
-// que le contenu réel n'est pas rédigé (statut juridique à confirmer,
-// jamais une page légale publiée avec des informations devinées) -- à
-// ajouter ici dès que ces deux pages existent.
-const PUBLIC_PAGES = ["/", "/conditions-remboursement", "/contact"];
+// politique-confidentialite volontairement absente tant que le contenu réel
+// n'est pas rédigé -- à ajouter ici dès que cette page existe.
+const PUBLIC_PAGES = ["/", "/conditions-remboursement", "/contact", "/mentions-legales"];
 
 const DISALLOWED_PATHS = [
   "/admin",
@@ -12607,6 +12688,7 @@ writeBuiltFile(OUT_FILE_ENTREPRENEUR_PROFILE, entrepreneurProfilePage({ brand, s
 writeBuiltFile(path.join(OUT_DIR, "conditions-remboursement.html"), conditionsRemboursementPage({ brand, siteUrl: SITE_URL }));
 writeBuiltFile(path.join(OUT_DIR, "404.html"), notFoundPage({ brand, siteUrl: SITE_URL }));
 writeBuiltFile(path.join(OUT_DIR, "contact.html"), contactPage({ brand, siteUrl: SITE_URL }));
+writeBuiltFile(path.join(OUT_DIR, "mentions-legales.html"), mentionsLegalesPage({ brand, siteUrl: SITE_URL }));
 writeBuiltFile(path.join(OUT_DIR, "sitemap.xml"), generateSitemap({ siteUrl: SITE_URL }));
 writeBuiltFile(path.join(OUT_DIR, "robots.txt"), generateRobotsTxt({ siteUrl: SITE_URL }));
 
