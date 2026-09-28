@@ -10871,6 +10871,95 @@ html, body {
   color: #ff6b6b;
   font-weight: 700;
 }
+
+.admin-analytics {
+  border-top: none;
+  padding-top: 0;
+  margin-bottom: 32px;
+  padding-bottom: 32px;
+}
+
+.admin-analytics__note {
+  font-size: 12px;
+  color: var(--color-steel);
+  margin: 0 0 20px;
+}
+
+.admin-analytics__subtitle {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--color-paper-soft);
+  margin: 24px 0 12px;
+}
+
+.admin-stat-tiles {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.admin-stat-tile {
+  flex: 1 1 160px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  padding: 16px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.admin-stat-tile__value {
+  font-size: 28px;
+  font-weight: 800;
+  color: var(--color-paper-soft);
+}
+
+.admin-stat-tile__label {
+  font-size: 12px;
+  color: var(--color-steel);
+}
+
+.admin-bar-chart {
+  display: flex;
+  align-items: flex-end;
+  gap: 4px;
+  height: 100px;
+  padding: 8px 0;
+}
+
+.admin-bar-chart__col {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+  height: 100%;
+  gap: 4px;
+}
+
+.admin-bar-chart__bar {
+  width: 100%;
+  min-height: 2px;
+  background: var(--color-cobalt);
+  border-radius: 3px 3px 0 0;
+}
+
+.admin-bar-chart__day {
+  font-size: 9px;
+  color: var(--color-steel);
+  white-space: nowrap;
+}
+
+.admin-analytics__columns {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 24px;
+}
+
+@media (max-width: 720px) {
+  .admin-analytics__columns { grid-template-columns: 1fr; }
+}
 `;
 }
 
@@ -12197,6 +12286,50 @@ function adminPage() {
       <span class="admin-count" id="admin-count"></span>
     </header>
 
+    <section class="admin-campaign admin-analytics" aria-label="Pages vues" id="analytics-section">
+      <h2 class="admin-campaign__title">Pages vues</h2>
+      <p class="admin-analytics__note">Mesure maison (funnel_events), aucun service tiers, aucun cookie. <span id="analytics-truncated" hidden> — calculé sur les 5000 évènements les plus récents.</span></p>
+
+      <div class="admin-stat-tiles">
+        <div class="admin-stat-tile">
+          <span class="admin-stat-tile__value" id="analytics-total">—</span>
+          <span class="admin-stat-tile__label">Total (fenêtre mesurée)</span>
+        </div>
+        <div class="admin-stat-tile">
+          <span class="admin-stat-tile__value" id="analytics-7d">—</span>
+          <span class="admin-stat-tile__label">7 derniers jours</span>
+        </div>
+        <div class="admin-stat-tile">
+          <span class="admin-stat-tile__value" id="analytics-today">—</span>
+          <span class="admin-stat-tile__label">Aujourd'hui</span>
+        </div>
+      </div>
+
+      <h3 class="admin-analytics__subtitle">14 derniers jours</h3>
+      <div class="admin-bar-chart" id="analytics-bar-chart"></div>
+
+      <div class="admin-analytics__columns">
+        <div>
+          <h3 class="admin-analytics__subtitle">Pages les plus vues</h3>
+          <div class="admin-table-wrap">
+            <table class="admin-table">
+              <thead><tr><th>Page</th><th>Vues</th></tr></thead>
+              <tbody id="analytics-path-table-body"></tbody>
+            </table>
+          </div>
+        </div>
+        <div>
+          <h3 class="admin-analytics__subtitle">Provenance</h3>
+          <div class="admin-table-wrap">
+            <table class="admin-table">
+              <thead><tr><th>Source</th><th>Vues</th></tr></thead>
+              <tbody id="analytics-referrer-table-body"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </section>
+
     <section class="admin-filters" aria-label="Filtres d'affichage">
       <label>Paiement
         <select id="filter-paid">
@@ -12530,9 +12663,56 @@ function adminPage() {
             document.getElementById("admin-content").hidden = false;
             applyFilters();
             updateCampaignPreview();
+            loadPageAnalytics();
           });
         }
         check();
+      }
+
+      function loadPageAnalytics() {
+        callAdminFunction("admin-get-page-analytics").then(function (result) {
+          if (!result || result.error) return;
+
+          document.getElementById("analytics-total").textContent = result.total;
+          document.getElementById("analytics-7d").textContent = result.last7DaysCount;
+          document.getElementById("analytics-today").textContent = result.todayCount;
+          document.getElementById("analytics-truncated").hidden = !result.truncated;
+
+          var maxCount = result.byDay.reduce(function (max, d) {
+            return Math.max(max, d.count);
+          }, 1);
+          var chart = document.getElementById("analytics-bar-chart");
+          chart.innerHTML = result.byDay
+            .map(function (d) {
+              var heightPct = Math.max(2, Math.round((d.count / maxCount) * 100));
+              var dayLabel = d.date.slice(5).replace("-", "/");
+              return (
+                '<div class="admin-bar-chart__col" title="' + d.date + " — " + d.count + ' vue(s)">' +
+                '<div class="admin-bar-chart__bar" style="height:' + heightPct + '%"></div>' +
+                '<span class="admin-bar-chart__day">' + dayLabel + "</span>" +
+                "</div>"
+              );
+            })
+            .join("");
+
+          var pathBody = document.getElementById("analytics-path-table-body");
+          pathBody.innerHTML = result.byPath.length
+            ? result.byPath
+                .map(function (row) {
+                  return "<tr><td>" + row.path + "</td><td>" + row.count + "</td></tr>";
+                })
+                .join("")
+            : "<tr><td colspan='2'>Aucune donnée pour l'instant.</td></tr>";
+
+          var referrerBody = document.getElementById("analytics-referrer-table-body");
+          referrerBody.innerHTML = result.byReferrer.length
+            ? result.byReferrer
+                .map(function (row) {
+                  return "<tr><td>" + row.referrer + "</td><td>" + row.count + "</td></tr>";
+                })
+                .join("")
+            : "<tr><td colspan='2'>Aucune donnée pour l'instant.</td></tr>";
+        });
       }
 
       init();
