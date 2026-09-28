@@ -8666,6 +8666,295 @@ function conditionsRemboursementPage({ brand, siteUrl }) {
 }
 
 // ---------------------------------------------------------------------------
+// Page 404 — servie automatiquement par Vercel pour toute route inconnue
+// (fichier 404.html à la racine de l'output statique, convention native,
+// aucune config vercel.json requise). Personnalisation fondée sur une vraie
+// donnée déjà connue (prenom, si une session existe) -- jamais une fausse
+// familiarité générique si personne n'est identifié.
+// ---------------------------------------------------------------------------
+function notFoundPage({ brand, siteUrl }) {
+  return `<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="robots" content="noindex" />
+<title>${brand.name} — Page introuvable</title>
+<meta name="description" content="Cette page n'existe pas ou a été déplacée." />
+<style>
+  :root { color-scheme: dark; }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0;
+    min-height: 100dvh;
+    background: #0A0E1A;
+    color: #F5F6F8;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Inter, Arial, sans-serif;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    padding: 24px;
+  }
+  .wrap { max-width: 440px; }
+  .code {
+    font-size: 15px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    color: #3D6BFF;
+    margin: 0 0 16px;
+  }
+  h1 { font-size: clamp(22px, 5vw, 28px); font-weight: 800; margin: 0 0 12px; line-height: 1.3; }
+  p { font-size: 15px; color: #8A8F98; line-height: 1.6; margin: 0 0 28px; }
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    background: #3D6BFF;
+    color: #fff;
+    text-decoration: none;
+    font-weight: 700;
+    font-size: 14px;
+    padding: 12px 22px;
+    border-radius: 10px;
+    transition: transform 200ms cubic-bezier(0.4, 0, 0.2, 1), background 200ms cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  .btn:hover { background: #2C55D9; transform: translateY(-2px); }
+  @media (prefers-reduced-motion: reduce) {
+    .btn { transition: none; }
+    .btn:hover { transform: none; }
+  }
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <p class="code">404</p>
+    <h1 id="notfound-title">Cette page n'existe pas.</h1>
+    <p>Le lien est peut-être ancien, ou l'adresse a une coquille — dans les deux cas, on ne l'a pas trouvée.</p>
+    <a class="btn" href="${siteUrl}">&larr; Retour à l'accueil</a>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="/js/supabase-client.js"></script>
+  <script>
+    (function () {
+      function personalize() {
+        var supabase = window.ColdTrendSupabase;
+        if (!supabase) return;
+        supabase.auth.getSession().then(function (res) {
+          var user = res.data.session ? res.data.session.user : null;
+          if (!user) return;
+          return supabase.from("profiles").select("prenom").eq("id", user.id).single();
+        }).then(function (result) {
+          var prenom = result && result.data ? result.data.prenom : null;
+          if (!prenom) return;
+          document.getElementById("notfound-title").textContent = prenom + ", cette page n'existe pas.";
+        }).catch(function () {
+          /* échec silencieux -- le titre générique reste affiché, jamais bloquant */
+        });
+      }
+      if (window.ColdTrendSupabase) {
+        personalize();
+      } else {
+        document.addEventListener("coldtrend:supabase-ready", personalize, { once: true });
+      }
+    })();
+  </script>
+</body>
+</html>
+`;
+}
+
+// ---------------------------------------------------------------------------
+// Page contact — /contact, publique, aucune session requise. Pré-remplit
+// l'email si une session existe (jamais redemander une info déjà connue),
+// jamais l'inverse (rester générique si personne n'est identifié).
+// ---------------------------------------------------------------------------
+function contactPage({ brand, siteUrl }) {
+  return `<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>${brand.name} — Contact</title>
+<meta name="description" content="Une question sur ColdTrend ? Écris-nous directement." />
+<style>
+  :root { color-scheme: dark; }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0;
+    min-height: 100dvh;
+    background: #0A0E1A;
+    color: #F5F6F8;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Inter, Arial, sans-serif;
+    line-height: 1.6;
+  }
+  .wrap { max-width: 520px; margin: 0 auto; padding: 40px 20px 80px; }
+  .back-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    color: #8A8F98;
+    text-decoration: none;
+    font-size: 14px;
+    margin-bottom: 32px;
+  }
+  .back-link:hover { color: #F5F6F8; }
+  h1 { font-size: clamp(24px, 5vw, 32px); font-weight: 800; margin: 0 0 8px; }
+  .subtitle { font-size: 15px; color: #8A8F98; margin: 0 0 32px; }
+  label { display: block; font-size: 13px; font-weight: 600; color: #8A8F98; margin: 0 0 6px; }
+  input, textarea {
+    width: 100%;
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 10px;
+    color: #F5F6F8;
+    font-size: 15px;
+    font-family: inherit;
+    padding: 12px 14px;
+    margin-bottom: 20px;
+  }
+  textarea { resize: vertical; min-height: 140px; }
+  input:focus, textarea:focus { outline: none; border-color: #3D6BFF; }
+  .honeypot { position: absolute; left: -9999px; width: 1px; height: 1px; overflow: hidden; }
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    background: #3D6BFF;
+    color: #fff;
+    border: none;
+    font-weight: 700;
+    font-size: 15px;
+    padding: 14px 22px;
+    border-radius: 10px;
+    cursor: pointer;
+  }
+  .btn:disabled { opacity: 0.6; cursor: default; }
+  .status {
+    font-size: 14px;
+    margin-top: 16px;
+    padding: 12px 14px;
+    border-radius: 10px;
+    display: none;
+  }
+  .status.is-success {
+    display: block;
+    background: rgba(0, 196, 140, 0.08);
+    border: 1px solid rgba(0, 196, 140, 0.3);
+    color: #F5F6F8;
+  }
+  .status.is-error {
+    display: block;
+    background: rgba(255, 107, 107, 0.08);
+    border: 1px solid rgba(255, 107, 107, 0.25);
+    color: #F5F6F8;
+  }
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <a class="back-link" href="${siteUrl}">&larr; Retour à l'accueil</a>
+    <h1>Contact</h1>
+    <p class="subtitle">Une question, un souci technique, autre chose ? Écris-nous directement, on répond nous-mêmes.</p>
+
+    <form id="contact-form">
+      <label for="contact-email">Ton email</label>
+      <input type="email" id="contact-email" name="email" required autocomplete="email" />
+
+      <label for="contact-subject">Sujet</label>
+      <input type="text" id="contact-subject" name="subject" required maxlength="150" />
+
+      <label for="contact-message">Message</label>
+      <textarea id="contact-message" name="message" required maxlength="4000"></textarea>
+
+      <div class="honeypot" aria-hidden="true">
+        <label for="contact-company">Entreprise</label>
+        <input type="text" id="contact-company" name="company" tabindex="-1" autocomplete="off" />
+      </div>
+
+      <button class="btn" type="submit" id="contact-submit">Envoyer</button>
+      <p class="status" id="contact-status" role="status" aria-live="polite"></p>
+    </form>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="/js/supabase-client.js"></script>
+  <script>
+    (function () {
+      function prefillEmail() {
+        var supabase = window.ColdTrendSupabase;
+        if (!supabase) return;
+        supabase.auth.getSession().then(function (res) {
+          var user = res.data.session ? res.data.session.user : null;
+          if (!user || !user.email) return;
+          var emailInput = document.getElementById("contact-email");
+          if (emailInput && !emailInput.value) emailInput.value = user.email;
+        }).catch(function () {
+          /* échec silencieux -- le champ reste vide, l'utilisateur le saisit */
+        });
+      }
+      if (window.ColdTrendSupabase) {
+        prefillEmail();
+      } else {
+        document.addEventListener("coldtrend:supabase-ready", prefillEmail, { once: true });
+      }
+
+      var form = document.getElementById("contact-form");
+      var statusEl = document.getElementById("contact-status");
+      var submitBtn = document.getElementById("contact-submit");
+
+      form.addEventListener("submit", function (e) {
+        e.preventDefault();
+        var supabase = window.ColdTrendSupabase;
+        if (!supabase) return;
+
+        var payload = {
+          email: document.getElementById("contact-email").value.trim(),
+          subject: document.getElementById("contact-subject").value.trim(),
+          message: document.getElementById("contact-message").value.trim(),
+          company: document.getElementById("contact-company").value
+        };
+
+        submitBtn.disabled = true;
+        submitBtn.textContent = "Envoi…";
+        statusEl.className = "status";
+        statusEl.textContent = "";
+
+        fetch(supabase.supabaseUrl + "/functions/v1/send-contact-message", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", apikey: supabase.supabaseKey },
+          body: JSON.stringify(payload)
+        })
+          .then(function (res) { return res.json(); })
+          .then(function (result) {
+            submitBtn.disabled = false;
+            submitBtn.textContent = "Envoyer";
+            if (result && result.success) {
+              statusEl.className = "status is-success";
+              statusEl.textContent = 'Message envoyé — "' + result.subject + '". On te répond directement par email.';
+              form.reset();
+            } else {
+              statusEl.className = "status is-error";
+              statusEl.textContent = (result && result.error) || "Échec de l'envoi, réessaie dans un instant.";
+            }
+          })
+          .catch(function () {
+            submitBtn.disabled = false;
+            submitBtn.textContent = "Envoyer";
+            statusEl.className = "status is-error";
+            statusEl.textContent = "Échec de l'envoi, réessaie dans un instant.";
+          });
+      });
+    })();
+  </script>
+</body>
+</html>
+`;
+}
+
+// ---------------------------------------------------------------------------
 // Page profil entrepreneur — /profil-entrepreneur, module optionnel proposé
 // APRÈS l'écran de résultat gratuit du quiz existant (jamais avant, jamais
 // une fusion) -- decision produit explicite. Reutilise
@@ -12184,7 +12473,18 @@ function desabonnementPage() {
 // seulement le code source (qui ne contient déjà aucun secret) mais la
 // sortie réellement écrite sur disque, après interpolation.
 // ---------------------------------------------------------------------------
-const FORBIDDEN_OUTPUT_PATTERNS = [/service_role/i, /sb_secret_/i, /SUPABASE_SERVICE/i];
+const FORBIDDEN_OUTPUT_PATTERNS = [
+  /service_role/i,
+  /sb_secret_/i,
+  /SUPABASE_SERVICE/i,
+  // Clés Stripe secrètes/restreintes -- ne doivent jamais apparaître dans
+  // une sortie statique (voir STRIPE_SECRET_KEY, utilisée uniquement côté
+  // edge functions, jamais dans ce script de build).
+  /sk_live_/i,
+  /sk_test_/i,
+  /rk_live_/i,
+  /rk_test_/i
+];
 
 function assertNoSecretsInOutput(filePath, contents) {
   FORBIDDEN_OUTPUT_PATTERNS.forEach((pattern) => {
@@ -12203,6 +12503,43 @@ function writeBuiltFile(filePath, contents) {
 }
 
 // ---------------------------------------------------------------------------
+// sitemap.xml / robots.txt — générés à chaque build à partir d'une seule
+// liste de pages publiques, jamais maintenus à la main séparément du site
+// réel. PUBLIC_PAGES = uniquement les pages indexables (contenu générique,
+// pas de session requise, rien de personnel) ; toute page authentifiée ou
+// générée par utilisateur (compte, admin, concept, profil entrepreneur,
+// succès, désabonnement, les écrans d'auth) est exclue des deux.
+// ---------------------------------------------------------------------------
+// mentions-legales/politique-confidentialite volontairement absentes tant
+// que le contenu réel n'est pas rédigé (statut juridique à confirmer,
+// jamais une page légale publiée avec des informations devinées) -- à
+// ajouter ici dès que ces deux pages existent.
+const PUBLIC_PAGES = ["/", "/conditions-remboursement", "/contact"];
+
+const DISALLOWED_PATHS = [
+  "/admin",
+  "/compte",
+  "/concept",
+  "/profil-entrepreneur",
+  "/succes",
+  "/desabonnement",
+  "/connexion",
+  "/inscription",
+  "/mot-de-passe-oublie",
+  "/reinitialiser-mot-de-passe"
+];
+
+function generateSitemap({ siteUrl }) {
+  const urls = PUBLIC_PAGES.map((p) => `  <url><loc>${siteUrl}${p}</loc></url>`).join("\n");
+  return `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${urls}\n</urlset>\n`;
+}
+
+function generateRobotsTxt({ siteUrl }) {
+  const disallowLines = DISALLOWED_PATHS.map((p) => `Disallow: ${p}`).join("\n");
+  return `User-agent: *\n${disallowLines}\n\nSitemap: ${siteUrl}/sitemap.xml\n`;
+}
+
+// ---------------------------------------------------------------------------
 // Build
 // ---------------------------------------------------------------------------
 
@@ -12215,6 +12552,10 @@ writeBuiltFile(OUT_FILE_SUCCESS, successPage({ brand, siteUrl: SITE_URL }));
 writeBuiltFile(OUT_FILE_CONCEPT, conceptPage({ brand, siteUrl: SITE_URL, commPlanPaymentLink: COMM_PLAN_PAYMENT_LINK }));
 writeBuiltFile(OUT_FILE_ENTREPRENEUR_PROFILE, entrepreneurProfilePage({ brand, siteUrl: SITE_URL, stripePaymentLink: STRIPE_PAYMENT_LINK }));
 writeBuiltFile(path.join(OUT_DIR, "conditions-remboursement.html"), conditionsRemboursementPage({ brand, siteUrl: SITE_URL }));
+writeBuiltFile(path.join(OUT_DIR, "404.html"), notFoundPage({ brand, siteUrl: SITE_URL }));
+writeBuiltFile(path.join(OUT_DIR, "contact.html"), contactPage({ brand, siteUrl: SITE_URL }));
+writeBuiltFile(path.join(OUT_DIR, "sitemap.xml"), generateSitemap({ siteUrl: SITE_URL }));
+writeBuiltFile(path.join(OUT_DIR, "robots.txt"), generateRobotsTxt({ siteUrl: SITE_URL }));
 
 writeBuiltFile(path.join(OUT_DIR, "css", "design-tokens.css"), designTokensCss());
 writeBuiltFile(path.join(OUT_DIR, "css", "auth.css"), authCss());

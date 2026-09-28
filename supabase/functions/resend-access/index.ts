@@ -54,7 +54,7 @@ Deno.serve(async (req) => {
 
   const { data: profile, error: profileError } = await supabaseAdmin
     .from("profiles")
-    .select("paid_at")
+    .select("paid_at, prenom")
     .eq("id", userRes.user.id)
     .single();
 
@@ -72,6 +72,8 @@ Deno.serve(async (req) => {
   const email = userRes.user.email;
   if (!email) return json({ error: "Aucune adresse email associée à ce compte." }, 400);
 
+  const greeting = profile.prenom ? `${profile.prenom},` : "Salut,";
+
   const emailRes = await fetch("https://api.resend.com/emails", {
     method: "POST",
     headers: {
@@ -82,7 +84,7 @@ Deno.serve(async (req) => {
       from: FROM_ADDRESS,
       to: email,
       subject: "Ton accès ColdTrend",
-      html: `<p>Voici à nouveau ton accès à la base de SaaS vérifiés :</p><p><a href="${accessSheetUrl}">${accessSheetUrl}</a></p><p>— ColdTrend</p>`
+      html: `<p>${greeting}</p><p>Voici à nouveau ton accès à la base de SaaS vérifiés :</p><p><a href="${accessSheetUrl}">${accessSheetUrl}</a></p><p>— ColdTrend</p>`
     })
   });
 

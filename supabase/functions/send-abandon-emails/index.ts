@@ -48,7 +48,7 @@ Deno.serve(async (req) => {
 
   const { data: profiles, error: profilesError } = await supabaseAdmin
     .from("profiles")
-    .select("id, funnel_last_step, updated_at")
+    .select("id, funnel_last_step, updated_at, prenom")
     .eq("converted", false)
     .gt("funnel_last_step", 0)
     .lt("funnel_last_step", TOTAL_QUESTIONS)
@@ -80,6 +80,7 @@ Deno.serve(async (req) => {
         continue;
       }
       const resumeLink = linkRes.data.properties.action_link;
+      const greeting = profile.prenom ? `${profile.prenom},` : "Salut,";
 
       const emailRes = await fetch("https://api.resend.com/emails", {
         method: "POST",
@@ -90,10 +91,10 @@ Deno.serve(async (req) => {
         body: JSON.stringify({
           from: FROM_ADDRESS,
           to: email,
-          subject: "Tu avais commencé à chercher un SaaS vérifié",
+          subject: "Tu avais commencé à générer ton concept de SaaS",
           html: `
-            <p>Salut,</p>
-            <p>Tu avais commencé à chercher un SaaS vérifié sur ColdTrend sans aller jusqu'au bout.</p>
+            <p>${greeting}</p>
+            <p>Tu avais commencé à générer ton concept de SaaS sur ColdTrend sans aller jusqu'au bout.</p>
             <p><a href="${resumeLink}">Reprends exactement où tu t'étais arrêté</a> — tes réponses précédentes sont toujours là.</p>
             <p>— ColdTrend</p>
           `,
