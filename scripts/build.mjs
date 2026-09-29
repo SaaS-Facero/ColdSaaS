@@ -545,6 +545,7 @@ const quiz = {
       chapterLabel: "Ton objectif",
       chapterIcon: "objectif",
       title: "Combien de revenu tu vises, à terme ?",
+      subtext: "Dis-nous où tu veux aller, on construit le concept autour de ça.",
       type: "slider",
       min: 0,
       max: 20000,
@@ -593,6 +594,7 @@ const quiz = {
       chapterLabel: "Ton délai",
       chapterIcon: "delai",
       title: "En combien de temps souhaites-tu générer tes premiers revenus ?",
+      subtext: "Dis-nous ton rythme, on adapte les canaux suggérés en conséquence.",
       type: "single",
       options: [
         { value: "des_que_possible", label: "Dès que possible" },
@@ -616,14 +618,14 @@ const quiz = {
         {
           value: "coldtrend_video",
           label: "Créer mes vidéos directement via ColdTrend",
-          hint: "Décris ton produit, la vidéo se génère depuis ton espace.",
+          hint: "Tu ne veux pas filmer toi-même ? Décris ton produit, la vidéo se génère depuis ton espace — bientôt disponible.",
           badge: "Bientôt disponible",
           highlight: true
         },
-        { value: "organique", label: "Organique", hint: "Construire une audience avant de vendre." },
-        { value: "pub_payante", label: "Publicité payante", hint: "Payer pour la visibilité plutôt que d'attendre qu'elle vienne." },
-        { value: "clippers", label: "Clippers", hint: "Des créateurs qui démultiplient ton contenu sur leurs propres comptes." },
-        { value: "ne_sait_pas", label: "Je ne sais pas encore", hint: "On te proposera une direction cohérente avec ton profil." }
+        { value: "organique", label: "Organique", hint: "Tu veux construire une audience ? On te propose une direction adaptée." },
+        { value: "pub_payante", label: "Publicité payante", hint: "Tu préfères payer pour la visibilité ? On l'intègre dans les canaux suggérés." },
+        { value: "clippers", label: "Clippers", hint: "Tu veux t'appuyer sur des créateurs ? On en tient compte dans le concept." },
+        { value: "ne_sait_pas", label: "Je ne sais pas encore", hint: "Pas de direction en tête ? On te propose ce qui correspond le mieux à ton profil." }
       ]
     },
     {
