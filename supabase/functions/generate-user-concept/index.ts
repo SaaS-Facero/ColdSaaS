@@ -71,6 +71,19 @@ const AGE_LABELS: Record<string, string> = {
   "45_54": "45-54 ans",
   "55_plus": "55 ans et plus",
 };
+const DELAI_LABELS: Record<string, string> = {
+  des_que_possible: "Dès que possible",
+  "3_mois": "Dans les 3 prochains mois",
+  "6_mois": "Dans les 6 prochains mois",
+  pas_de_delai: "Pas de délai précis en tête",
+};
+const ACQUISITION_LABELS: Record<string, string> = {
+  coldtrend_video: "Vidéos générées via ColdTrend (fonctionnalité pas encore livrée)",
+  organique: "Organique (construire une audience avant de vendre)",
+  pub_payante: "Publicité payante",
+  clippers: "Clippers (créateurs qui démultiplient le contenu sur leurs propres comptes)",
+  ne_sait_pas: "Ne sait pas encore",
+};
 
 function formatObjectifRevenu(v: number | null): string {
   if (typeof v !== "number") return "non communiqué";
@@ -88,14 +101,18 @@ function buildPrompt(a: {
   budget: string | null;
   temps: string | null;
   objectifRevenu: number | null;
+  delaiRevenus: string | null;
+  acquisition: string | null;
 }) {
-  const system = `Tu es un consultant produit senior spécialisé en création de concepts SaaS pour des porteurs de projet français. Ton rôle : à partir du profil d'une personne (situation, expérience, tranche d'âge, secteur visé, budget, temps disponible, objectif de revenu), proposer UN concept de SaaS cohérent et actionnable.
+  const system = `Tu es un consultant produit senior spécialisé en création de concepts SaaS pour des porteurs de projet français. Ton rôle : à partir du profil d'une personne (situation, expérience, tranche d'âge, secteur visé, budget, temps disponible, objectif de revenu, délai souhaité pour les premiers revenus, mode d'acquisition préféré), proposer UN concept de SaaS cohérent et actionnable.
 
 Règles strictes :
 - INTERDICTION ABSOLUE de mentionner un chiffre de revenu, un MRR, une projection de gain, ou toute promesse de résultat financier -- y compris l'objectif de revenu fourni dans le profil : il sert uniquement à orienter le modèle économique suggéré (ex. micro-SaaS de niche vs produit visant un marché plus large), il ne doit jamais être répété ni reformulé dans ta sortie.
 - Ne jamais écrire "prouvé" ou "garanti" -- ce concept est une proposition générée, pas une donnée vérifiée. Le ton doit rester factuel et mesuré, jamais vendeur.
 - La cible (persona) doit être dérivée logiquement du secteur et de l'intention -- générale et crédible, jamais un persona avec des détails inventés (prénom, âge précis, etc.).
 - Les canaux d'acquisition doivent être réalistes compte tenu du budget et du temps disponible, et cohérents avec la tranche d'âge fournie (ex. social organique/court format plausible pour une tranche jeune, réseau professionnel/email/bouche-à-oreille plausible pour une tranche plus âgée) -- jamais une liste générique copiée-collée, jamais un stéréotype réducteur non plus.
+- Le délai souhaité pour les premiers revenus est une intention déclarée par la personne, jamais une donnée à commenter qualitativement ("ambitieux", "réaliste", "trop court") ni à transformer en estimation de probabilité de réussite ou en promesse de délai en retour -- sers-t'en uniquement pour orienter le TON et la NATURE des canaux suggérés (ex. privilégier des canaux à mise en œuvre rapide si le délai est "dès que possible").
+- Le mode d'acquisition préféré oriente directement les canaux suggérés (ex. si "organique" est choisi, privilégie des canaux organiques ; si "publicité payante", inclus au moins un canal payant ; si "clippers", mentionne ce levier). Si le mode choisi est "Vidéos générées via ColdTrend (fonctionnalité pas encore livrée)", tu peux évoquer cette possibilité UNIQUEMENT au conditionnel (ex. "pourrait à terme..."), jamais comme un moyen déjà disponible ou une promesse.
 - La direction artistique (palette, style de logo) reste descriptive en mots, jamais une génération d'image.
 
 Format de sortie : JSON strict, aucun texte hors JSON.`;
@@ -116,6 +133,8 @@ Format de sortie : JSON strict, aucun texte hors JSON.`;
 - Budget de démarrage : ${a.budget ? BUDGET_LABELS[a.budget] || a.budget : "non communiqué"}
 - Temps disponible/semaine : ${a.temps ? TEMPS_LABELS[a.temps] || a.temps : "non communiqué"}
 - Objectif de revenu à terme (pour orienter le modèle économique, jamais à répéter en sortie) : ${formatObjectifRevenu(a.objectifRevenu)}
+- Délai souhaité pour les premiers revenus (intention déclarée, jamais à commenter ni à transformer en promesse) : ${a.delaiRevenus ? DELAI_LABELS[a.delaiRevenus] || a.delaiRevenus : "non communiqué"}
+- Mode d'acquisition préféré (oriente directement les canaux suggérés) : ${a.acquisition ? ACQUISITION_LABELS[a.acquisition] || a.acquisition : "non communiqué"}
 
 Génère un concept de SaaS pour cette personne. Réponds au format JSON :
 
@@ -167,7 +186,15 @@ Deno.serve(async (req) => {
   // forceRegenerate contourne le cache : utilisé par le lien "tu cherches
   // plutôt à racheter ?" sur l'écran résultat, sans quoi cet endpoint
   // renverrait indéfiniment l'ancien concept généré pour "creation".
-  let body: { situation?: string; passif?: string; age?: string; objectifRevenu?: number; forceRegenerate?: boolean } = {};
+  let body: {
+    situation?: string;
+    passif?: string;
+    age?: string;
+    objectifRevenu?: number;
+    delaiRevenus?: string;
+    acquisition?: string;
+    forceRegenerate?: boolean;
+  } = {};
   try {
     body = await req.json();
   } catch {
@@ -201,6 +228,8 @@ Deno.serve(async (req) => {
     budget: profileRow.budget,
     temps: profileRow.temps,
     objectifRevenu: typeof body.objectifRevenu === "number" ? body.objectifRevenu : null,
+    delaiRevenus: typeof body.delaiRevenus === "string" ? body.delaiRevenus : null,
+    acquisition: typeof body.acquisition === "string" ? body.acquisition : null,
   });
 
   let llmRes: Response;

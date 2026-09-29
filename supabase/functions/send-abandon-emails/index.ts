@@ -14,7 +14,7 @@
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
-const TOTAL_QUESTIONS = 7; // doit rester synchronisé avec quiz.questions.length dans scripts/build.mjs
+const TOTAL_QUESTIONS = 10; // doit rester synchronisé avec le nombre d'écrans type "question" dans quiz.questions (scripts/build.mjs) -- situation/age/passif/secteur/budget/objectifRevenu/temps/delaiRevenus/acquisition/dejaCherche
 const INACTIVITY_HOURS = 24;
 const SITE_URL = "https://coldtrend.com";
 const FROM_ADDRESS = "ColdTrend <bonjour@coldtrend.com>";

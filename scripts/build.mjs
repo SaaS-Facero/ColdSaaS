@@ -416,7 +416,7 @@ const quiz = {
       stepName: "intro",
       type: "intro",
       title: "Pas un quiz de plus.",
-      subtext: "8 questions, aucune pour te trier dans une case — chacune sert à générer un concept de SaaS qui correspond vraiment à ta situation, pas à deviner qui tu es.",
+      subtext: "10 questions, aucune pour te trier dans une case — chacune sert à générer un concept de SaaS qui correspond vraiment à ta situation, pas à deviner qui tu es.",
       cta: "Commencer"
     },
     {
@@ -548,7 +548,7 @@ const quiz = {
       type: "slider",
       min: 0,
       max: 20000,
-      step: 500
+      step: 5
     },
     {
       // Charnière de fin de chapitre 1 -- climax émotionnel du quiz, pas
@@ -579,6 +579,51 @@ const quiz = {
         { value: "midlow", label: "5–10h" },
         { value: "midhigh", label: "10–20h" },
         { value: "full", label: "Temps plein" }
+      ]
+    },
+    {
+      // Intention déclarée, jamais commentée qualitativement ("ambitieux",
+      // "réaliste") ni transformée en estimation de probabilité de
+      // réussite -- juste réutilisée factuellement par generate-user-concept
+      // pour orienter le ton/les canaux suggérés (voir buildPrompt côté
+      // edge function).
+      id: "delaiRevenus",
+      stepName: "delai-revenus",
+      chapter: 2,
+      chapterLabel: "Ton délai",
+      chapterIcon: "delai",
+      title: "En combien de temps souhaites-tu générer tes premiers revenus ?",
+      type: "single",
+      options: [
+        { value: "des_que_possible", label: "Dès que possible" },
+        { value: "3_mois", label: "Dans les 3 prochains mois" },
+        { value: "6_mois", label: "Dans les 6 prochains mois" },
+        { value: "pas_de_delai", label: "Pas de délai précis en tête" }
+      ]
+    },
+    {
+      // "coldtrend_video" en tête de liste + glow discret (highlight),
+      // jamais sans son badge "Bientôt disponible" à taille lisible --
+      // garde-fou explicite du brief, vérifié visuellement avant livraison.
+      id: "acquisition",
+      stepName: "acquisition",
+      chapter: 2,
+      chapterLabel: "Ton acquisition",
+      chapterIcon: "acquisition",
+      title: "Comment souhaites-tu faire ton acquisition client ?",
+      type: "single",
+      options: [
+        {
+          value: "coldtrend_video",
+          label: "Créer mes vidéos directement via ColdTrend",
+          hint: "Décris ton produit, la vidéo se génère depuis ton espace.",
+          badge: "Bientôt disponible",
+          highlight: true
+        },
+        { value: "organique", label: "Organique", hint: "Construire une audience avant de vendre." },
+        { value: "pub_payante", label: "Publicité payante", hint: "Payer pour la visibilité plutôt que d'attendre qu'elle vienne." },
+        { value: "clippers", label: "Clippers", hint: "Des créateurs qui démultiplient ton contenu sur leurs propres comptes." },
+        { value: "ne_sait_pas", label: "Je ne sais pas encore", hint: "On te proposera une direction cohérente avec ton profil." }
       ]
     },
     {
@@ -1927,6 +1972,39 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
     font-weight: 400;
   }
 
+  .quiz-option__label-row {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  /* Garde-fou non négociable : jamais un badge minuscule qui se perd --
+     taille proche du label (15px), poids fort, pilule colorée bien
+     visible, jamais relégué à une mention discrète. */
+  .quiz-option__badge {
+    display: inline-flex;
+    align-items: center;
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--cobalt);
+    background: rgba(0, 71, 255, 0.14);
+    border: 1px solid rgba(0, 71, 255, 0.35);
+    border-radius: 999px;
+    padding: 3px 11px;
+    line-height: 1.3;
+    white-space: nowrap;
+  }
+
+  /* Mise en avant discrète (glow) -- jamais au détriment de la lisibilité
+     du badge "Bientôt disponible" ci-dessus, qui garde sa propre taille
+     quelle que soit la carte. */
+  .quiz-option--highlight {
+    border-color: rgba(0, 71, 255, 0.45);
+    background: rgba(0, 71, 255, 0.07);
+    box-shadow: 0 0 0 1px rgba(0, 71, 255, 0.2), 0 12px 28px -16px rgba(0, 71, 255, 0.5);
+  }
+
   .quiz-option__check {
     margin-left: auto;
     flex-shrink: 0;
@@ -2126,7 +2204,46 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
      reste visible pour l'affordance de drag ; la barre de remplissage est un
      calque séparé animé en transform pour un mouvement fluide (voir
      updateRevenueSlider() côté client), jamais en saut brutal. */
-  .revenue-slider { text-align: center; }
+  .revenue-slider { text-align: center; position: relative; }
+
+  /* Élément d'ambiance en arrière-plan -- jamais devant le slider/le chiffre
+     (positionné en premier dans le DOM, sous le contenu statique qui suit,
+     voir la règle de stacking naturelle sans z-index à gérer). Animé via la
+     propriété left plutôt que transform: translateX() seul : la traversée
+     doit couvrir toute la largeur réelle du conteneur quel que soit le
+     breakpoint, ce qu'un pourcentage de transform (relatif à la taille de
+     l'élément lui-même, pas du conteneur) ne permet pas -- coût de reflow
+     négligeable pour un seul petit élément décoratif. */
+  .revenue-slider-bg {
+    position: absolute;
+    inset: 0;
+    overflow: hidden;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .revenue-slider-bg__coin {
+    position: absolute;
+    top: 15%;
+    left: -12%;
+    color: var(--cobalt);
+    opacity: 0.2;
+    animation: revenue-coin-sweep 10s cubic-bezier(0.37, 0, 0.63, 1) infinite, revenue-coin-bob 3.4s ease-in-out infinite;
+  }
+
+  @keyframes revenue-coin-sweep {
+    from { left: -12%; }
+    to { left: 108%; }
+  }
+
+  @keyframes revenue-coin-bob {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-14px); }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .revenue-slider-bg { display: none; }
+  }
   .revenue-slider__badge {
     display: inline-block;
     font-size: 12px;
@@ -5367,6 +5484,8 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
           passif: ans.passif || null,
           age: ans.age || null,
           objectifRevenu: typeof ans.objectifRevenu === "number" ? ans.objectifRevenu : null,
+          delaiRevenus: ans.delaiRevenus || null,
+          acquisition: ans.acquisition || null,
           forceRegenerate: !!forceRegenerate
         })
           .then(function (res) {
@@ -6955,11 +7074,14 @@ function renderFaqItems(items) {
 }
 
 function renderQuizOption(opt) {
-  return `<button class="quiz-option" type="button" data-value="${opt.value}"${
+  return `<button class="quiz-option${opt.highlight ? " quiz-option--highlight" : ""}" type="button" data-value="${opt.value}"${
     opt.followup ? ` data-followup="${opt.followup.replace(/"/g, "&quot;")}"` : ""
   }>
                 <span class="quiz-option__body">
-                  <span class="quiz-option__label">${opt.label}</span>
+                  <span class="quiz-option__label-row">
+                    <span class="quiz-option__label">${opt.label}</span>
+                    ${opt.badge ? `<span class="quiz-option__badge">${opt.badge}</span>` : ""}
+                  </span>
                   ${opt.hint ? `<span class="quiz-option__hint">${opt.hint}</span>` : ""}
                 </span>
                 <span class="quiz-option__check" aria-hidden="true">${ICON_CHECK_SMALL}</span>
@@ -7048,6 +7170,10 @@ const ICON_QUIZ_RECHERCHE =
   '<svg width="28" height="28" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="10.5" cy="10.5" r="6.5" stroke="currentColor" stroke-width="1.75"/><path d="M19 19l-4-4" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"/></svg>';
 const ICON_QUIZ_AGE =
   '<svg width="28" height="28" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="3.5" y="5" width="17" height="15" rx="2" stroke="currentColor" stroke-width="1.75"/><path d="M3.5 9.5h17" stroke="currentColor" stroke-width="1.75"/><path d="M8 3v3.5M16 3v3.5" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"/></svg>';
+const ICON_QUIZ_DELAI =
+  '<svg width="28" height="28" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M5 4v6l4 3-4 3v6" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/><path d="M19 4v6l-4 3 4 3v6" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+const ICON_QUIZ_ACQUISITION =
+  '<svg width="28" height="28" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="7" cy="7" r="2.5" stroke="currentColor" stroke-width="1.75"/><circle cx="17" cy="7" r="2.5" stroke="currentColor" stroke-width="1.75"/><circle cx="12" cy="17" r="2.5" stroke="currentColor" stroke-width="1.75"/><path d="M8.8 8.8L10.5 15M15.2 8.8L13.5 15M9.5 7h5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>';
 
 const QUIZ_CHAPTER_ICONS = {
   situation: ICON_QUIZ_SITUATION,
@@ -7056,6 +7182,8 @@ const QUIZ_CHAPTER_ICONS = {
   secteur: ICON_QUIZ_SECTEUR,
   budget: ICON_QUIZ_BUDGET,
   objectif: ICON_QUIZ_OBJECTIF,
+  delai: ICON_QUIZ_DELAI,
+  acquisition: ICON_QUIZ_ACQUISITION,
   temps: ICON_QUIZ_TEMPS,
   recherche: ICON_QUIZ_RECHERCHE
 };
@@ -7227,6 +7355,12 @@ function renderQuizQuestionScreen(question, index) {
           <h2 class="quiz-question-title">${question.title}</h2>
           ${question.subtext ? `<p class="quiz-subtext">${question.subtext}</p>` : ""}
           <div class="revenue-slider">
+            <div class="revenue-slider-bg" aria-hidden="true">
+              <svg class="revenue-slider-bg__coin" width="40" height="40" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <circle cx="20" cy="20" r="17" stroke="currentColor" stroke-width="2"/>
+                <text x="20" y="26" text-anchor="middle" font-size="17" font-weight="700" fill="currentColor" font-family="inherit">€</text>
+              </svg>
+            </div>
             <p class="revenue-slider__badge" id="revenue-slider-badge"></p>
             <p class="revenue-slider__value" id="revenue-slider-value"></p>
             <div class="revenue-slider__control">
