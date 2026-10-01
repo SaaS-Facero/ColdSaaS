@@ -14433,6 +14433,25 @@ html, body {
   margin-bottom: 24px;
 }
 
+/* Raccourci vers le Mode Vidéo (/demo), poussé à droite du header. */
+.admin-demo-btn {
+  margin-left: auto;
+  align-self: center;
+  padding: 8px 14px;
+  border-radius: 10px;
+  background: var(--color-cobalt, #0047FF);
+  color: #fff;
+  font-size: 14px;
+  font-weight: 700;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.admin-demo-btn:hover,
+.admin-demo-btn:focus-visible {
+  filter: brightness(1.12);
+}
+
 .admin-title {
   font-size: 22px;
   font-weight: 800;
@@ -15506,6 +15525,7 @@ function comptePage() {
           </button>
           <div class="dossier__user-dropdown" id="user-dropdown">
             <a class="dossier__user-dropdown-item" id="admin-link-btn" href="/admin" style="display:none;">Accéder à l'admin</a>
+            <a class="dossier__user-dropdown-item" id="demo-link-btn" href="/demo" style="display:none;">🎬 Mode Vidéo</a>
             <button type="button" class="dossier__user-dropdown-item" id="manage-subscription-btn" style="display:none;">Gérer mon abonnement</button>
             <button type="button" class="dossier__user-dropdown-item" id="resend-access-btn" style="display:none;">Renvoyer mon accès par email</button>
             <button type="button" class="dossier__user-dropdown-item" id="signout-btn">Se déconnecter</button>
@@ -15848,7 +15868,10 @@ function comptePage() {
         // compte décide seulement de ce qui est affiché et verrouillé, voir
         // loadGeneratedConcept().
         if (profile.is_admin) {
+          // Simple raccourci d'affichage : /demo revérifie le rôle côté
+          // serveur (generate-demo-concept) avant d'afficher quoi que ce soit.
           document.getElementById("admin-link-btn").style.display = "block";
+          document.getElementById("demo-link-btn").style.display = "block";
         }
         if (profile.paid_at || profile.stripe_customer_id) {
           document.getElementById("manage-subscription-btn").style.display = "block";
@@ -16075,6 +16098,7 @@ function adminPage() {
       <a class="auth-brand" href="/">${brand.name}</a>
       <h1 class="admin-title">Back-office</h1>
       <span class="admin-count" id="admin-count"></span>
+      <a class="admin-demo-btn" href="/demo">🎬 Mode Vidéo</a>
     </header>
 
     <section class="admin-campaign admin-analytics" aria-label="Pages vues" id="analytics-section">
