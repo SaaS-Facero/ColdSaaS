@@ -8202,7 +8202,7 @@ function renderQuizQuestionScreen(question, index) {
                  l'objectif visé, jamais comme des clients ni des résultats. -->
             <figure class="pause-vision">
               <div class="pause-vision__row">
-                ${[1, 2, 3, 4].map((n) => `<img class="pause-vision__img" src="/lifestyle/vision-${n}.webp" alt="" width="64" height="64" loading="lazy" decoding="async" />`).join("")}
+                ${[1, 2, 3, 4].map((n) => `<img class="pause-vision__img" src="/lifestyle/vision-${n}.webp" alt="" width="64" height="64" decoding="async" />`).join("")}
               </div>
               <figcaption class="pause-vision__caption">Le genre de vie que tu vises.</figcaption>
             </figure>
