@@ -3350,6 +3350,22 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
     margin-bottom: 16px;
   }
 
+  /* Écran plus haut que la vue sur mobile : il défile, rien ne se tasse
+     (sinon la carte projection est écrasée par le flex-shrink). Marge
+     basse pour la bulle flottante en bas à droite. */
+  .quiz-gate > * {
+    flex-shrink: 0;
+  }
+
+  .quiz-gate {
+    padding-bottom: 72px;
+  }
+
+  .quiz-gate .quiz-footer {
+    margin-top: 0;
+    padding-top: 18px;
+  }
+
   .gate-card {
     position: relative;
     overflow: hidden;
