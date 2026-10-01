@@ -5398,66 +5398,392 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
     margin: 0 0 28px;
   }
 
-  /* Écran de chargement de 5-6s avant paiement -- centré comme les autres
-     écrans "cadre" (intro/résultat), pas une question. */
-  .quiz-loading-transition {
-    justify-content: center;
-    align-items: center;
-    text-align: center;
+  /* ---- Phase 8 : "La seule chose qui manque" ---------------------------- */
+  .quiz-screen.quiz-bridge {
+    justify-content: flex-start;
+    padding-bottom: 16px;
   }
 
-  .loading-transition__spinner {
-    width: 40px;
-    height: 40px;
-    margin: 0 auto 24px;
-    border-radius: 999px;
-    border: 3px solid rgba(255, 255, 255, 0.12);
-    border-top-color: var(--cobalt);
-    animation: loading-transition-spin 900ms linear infinite;
+  .quiz-bridge > *,
+  .quiz-payment > * {
+    flex-shrink: 0;
   }
 
-  @keyframes loading-transition-spin {
-    to { transform: rotate(360deg); }
+  .quiz-bridge .dash__liquid,
+  .quiz-payment .dash__liquid {
+    inset: 0;
+    border-radius: 0;
   }
 
-  .loading-transition__label {
-    font-size: 17px;
-    font-weight: 700;
-    color: var(--paper-soft);
-    max-width: 340px;
-    margin: 0 auto 24px;
-    min-height: 2.6em;
+  .bridge__title {
+    display: flex;
+    flex-direction: column;
+    margin: 8px 0 18px;
+    font-size: clamp(28px, 8vw, 36px);
+    font-weight: 800;
+    letter-spacing: -0.025em;
+    line-height: 1.12;
+    color: #fff;
+  }
+
+  .bridge__title-accent {
+    color: var(--cobalt-soft);
+    opacity: 0;
+    filter: blur(8px);
+    transform: translateY(6px);
+  }
+
+  .quiz-screen.is-active .bridge__title-accent {
+    animation: bridge-accent-in 700ms cubic-bezier(0.22, 1, 0.36, 1) 1700ms forwards;
+  }
+
+  @keyframes bridge-accent-in {
+    to { opacity: 1; filter: none; transform: none; }
+  }
+
+  .bridge-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .bridge-item {
     display: flex;
     align-items: center;
-    justify-content: center;
-    opacity: 1;
-    transition: opacity 150ms ease;
+    gap: 14px;
+    padding: 13px 16px;
+    border-radius: 18px;
+    opacity: 0;
+    transform: translateX(-14px) scale(0.98);
   }
 
-  .loading-transition__label.is-swapping {
+  .quiz-screen.is-active .bridge-item {
+    animation: bridge-item-in 560ms cubic-bezier(0.34, 1.45, 0.64, 1) forwards;
+    animation-delay: calc(var(--i) * 260ms + 300ms);
+  }
+
+  @keyframes bridge-item-in {
+    to { opacity: 1; transform: none; }
+  }
+
+  .bridge-item__check {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    width: 30px;
+    height: 30px;
+    border-radius: 50%;
+    color: #fff;
+    background: var(--verified-green);
+    box-shadow: 0 0 18px rgba(0, 196, 140, 0.55);
+    transform: scale(0);
+  }
+
+  .quiz-screen.is-active .bridge-item__check {
+    animation: bridge-check-pop 460ms cubic-bezier(0.34, 1.8, 0.64, 1) forwards;
+    animation-delay: calc(var(--i) * 260ms + 520ms);
+  }
+
+  @keyframes bridge-check-pop {
+    to { transform: scale(1); }
+  }
+
+  .bridge-item__check svg {
+    width: 15px;
+    height: 15px;
+  }
+
+  .bridge-item__text {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    font-size: 13px;
+    line-height: 1.4;
+    color: var(--steel);
+  }
+
+  .bridge-item__text strong {
+    font-size: 15px;
+    color: var(--paper-soft);
+  }
+
+  /* La pièce manquante : emplacement vide en pointillés qui respire. */
+  .bridge-item--missing {
+    border: 1.5px dashed rgba(127, 168, 255, 0.55);
+    background: rgba(0, 71, 255, 0.07);
+  }
+
+  .quiz-screen.is-active .bridge-item--missing {
+    animation:
+      bridge-item-in 560ms cubic-bezier(0.34, 1.45, 0.64, 1) forwards,
+      bridge-missing-glow 2.4s ease-in-out 1.8s infinite;
+    animation-delay: calc(var(--i) * 260ms + 300ms), 1.8s;
+  }
+
+  @keyframes bridge-missing-glow {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(0, 71, 255, 0); }
+    50% { box-shadow: 0 0 0 6px rgba(0, 71, 255, 0.16), 0 0 34px rgba(0, 71, 255, 0.45); }
+  }
+
+  .bridge-item__key {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    width: 30px;
+    height: 30px;
+    border-radius: 50%;
+    font-size: 15px;
+    border: 1.5px dashed rgba(127, 168, 255, 0.6);
+  }
+
+  .bridge__line {
+    margin: 20px 0 0;
+    font-size: 16px;
+    font-weight: 700;
+    line-height: 1.45;
+    color: var(--paper-soft);
     opacity: 0;
   }
 
-  .loading-transition__track {
-    width: 100%;
-    max-width: 280px;
-    height: 6px;
-    margin: 0 auto;
-    border-radius: 999px;
-    background: rgba(255, 255, 255, 0.08);
-    overflow: hidden;
+  .quiz-screen.is-active .bridge__line {
+    animation: dash-in 600ms ease-out 2000ms forwards;
   }
 
-  .loading-transition__fill {
-    height: 100%;
-    width: 0%;
-    background: linear-gradient(90deg, var(--cobalt-dark), var(--cobalt));
+  .bridge__cta {
+    font-size: 17px;
+    padding: 17px;
+    box-shadow: 0 0 0 1px rgba(0, 71, 255, 0.5), 0 18px 40px -14px rgba(0, 71, 255, 0.95);
+  }
+
+  /* ---- Phase 8 : paiement, même langage "liquid glass" ------------------ */
+  .quiz-screen.quiz-payment {
+    justify-content: flex-start;
+  }
+
+  .quiz-screen.quiz-payment::before,
+  .quiz-screen.quiz-payment::after {
+    display: none;
+  }
+
+  .pay-head {
+    position: relative;
+    margin-bottom: 14px;
+  }
+
+  .pay-head__title {
+    margin: 6px 0 6px;
+    font-size: clamp(28px, 8vw, 34px);
+    font-weight: 800;
+    letter-spacing: -0.025em;
+    line-height: 1.12;
+    color: #fff;
+  }
+
+  .quiz-payment .quiz-payment__teaser {
+    padding: 0;
+    margin: 0;
+    border: none;
+    background: none;
+    color: var(--steel);
+  }
+
+  .pay-guarantee {
+    display: flex;
+    align-items: flex-start;
+    gap: 14px;
+    margin-bottom: 16px;
+    padding: 16px;
+    border-color: rgba(0, 196, 140, 0.35);
+    background:
+      radial-gradient(120% 100% at 0% 0%, rgba(0, 196, 140, 0.2), transparent 60%),
+      rgba(255, 255, 255, 0.03);
+    color: var(--paper-soft);
+    text-decoration: none;
+    opacity: 0;
+    transform: translateY(10px);
+    transition: transform 260ms cubic-bezier(0.34, 1.56, 0.64, 1);
+  }
+
+  .quiz-screen.is-active .pay-guarantee {
+    animation: dash-in 640ms cubic-bezier(0.34, 1.45, 0.64, 1) 80ms forwards;
+  }
+
+  .pay-guarantee:active {
+    transform: scale(0.98);
+  }
+
+  .pay-guarantee__seal {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    width: 44px;
+    height: 44px;
+    border-radius: 14px;
+    background: linear-gradient(145deg, #00C48C, #00936A);
+    box-shadow: 0 8px 22px -8px rgba(0, 196, 140, 0.9), inset 0 1px 0 rgba(255, 255, 255, 0.35);
+  }
+
+  .pay-guarantee__seal svg {
+    width: 22px;
+    height: 22px;
+  }
+
+  .pay-guarantee__body {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    min-width: 0;
+  }
+
+  .pay-guarantee__body strong {
+    font-size: 16px;
+    line-height: 1.3;
+  }
+
+  .pay-guarantee__steps {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    font-size: 13px;
+    color: var(--steel);
+  }
+
+  .pay-guarantee__steps b {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 17px;
+    height: 17px;
+    margin-right: 6px;
+    border-radius: 50%;
+    font-size: 10px;
+    color: var(--verified-green);
+    background: rgba(0, 196, 140, 0.15);
+  }
+
+  .pay-guarantee__link {
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--verified-green);
+    text-decoration: underline;
+    text-underline-offset: 2px;
+  }
+
+  .quiz-payment .payment-card {
+    padding: 22px 16px 18px;
+    border-radius: 26px;
+    border-color: rgba(127, 168, 255, 0.28);
+    background:
+      radial-gradient(120% 80% at 100% 0%, rgba(0, 71, 255, 0.22), transparent 60%),
+      linear-gradient(145deg, rgba(255, 255, 255, 0.1), rgba(255, 255, 255, 0.02));
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.28),
+      0 30px 60px -30px rgba(0, 71, 255, 0.85);
+    margin-bottom: 16px;
+  }
+
+  .quiz-payment .payment-card:hover {
+    transform: none;
+  }
+
+  .quiz-payment .duration-cards {
+    position: relative;
+    gap: 12px;
+  }
+
+  .quiz-payment .duration-card {
+    border-radius: 20px;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    background: rgba(255, 255, 255, 0.04);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.12);
+    -webkit-backdrop-filter: blur(12px);
+    backdrop-filter: blur(12px);
+    -webkit-tap-highlight-color: transparent;
+    transition: transform 320ms cubic-bezier(0.34, 1.56, 0.64, 1), border-color 220ms ease, background 220ms ease, box-shadow 260ms ease;
+  }
+
+  .quiz-payment .duration-card:active {
+    transform: scale(0.97);
+  }
+
+  .quiz-payment .duration-card[aria-checked="true"] {
+    border-color: rgba(127, 168, 255, 0.85);
+    background:
+      radial-gradient(120% 120% at 50% 0%, rgba(0, 71, 255, 0.35), transparent 70%),
+      rgba(0, 71, 255, 0.12);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.3),
+      0 0 0 1px rgba(127, 168, 255, 0.5),
+      0 18px 40px -18px rgba(0, 71, 255, 0.95);
+    transform: scale(1.015);
+  }
+
+  .quiz-payment .duration-card__badge {
+    background: linear-gradient(135deg, #3D7BFF, #0047FF);
+    box-shadow: 0 6px 16px -6px rgba(0, 71, 255, 0.9);
+  }
+
+  /* CTA final : reflet liquide qui traverse le bouton en boucle. */
+  .quiz-payment .btn--cta-final {
+    position: relative;
+    overflow: hidden;
+    border-radius: 16px;
+    background: linear-gradient(135deg, #3D7BFF, #0047FF 60%, #0036C4);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.35), 0 18px 40px -14px rgba(0, 71, 255, 0.95);
+  }
+
+  .quiz-payment .btn--cta-final::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(105deg, transparent 30%, rgba(255, 255, 255, 0.35) 50%, transparent 70%);
+    transform: translateX(-120%);
+    animation: pay-cta-sheen 3.4s ease-in-out 1.2s infinite;
+    pointer-events: none;
+  }
+
+  @keyframes pay-cta-sheen {
+    0% { transform: translateX(-120%); }
+    40%, 100% { transform: translateX(120%); }
+  }
+
+  .pay-included {
+    padding: 18px 16px 8px;
+    margin-bottom: 18px;
+  }
+
+  .pay-included .included-list__title {
+    position: relative;
+    margin-top: 0;
+  }
+
+  .pay-included .included-list {
+    position: relative;
   }
 
   @media (prefers-reduced-motion: reduce) {
-    .loading-transition__spinner { animation: none; }
-    .loading-transition__label { transition: none; }
-    .loading-transition__fill { transition: none !important; }
+    .quiz-screen.is-active .bridge__title-accent,
+    .bridge__title-accent { animation: none; opacity: 1; filter: none; transform: none; }
+    .quiz-screen.is-active .bridge-item,
+    .bridge-item { animation: none; opacity: 1; transform: none; }
+    .quiz-screen.is-active .bridge-item__check,
+    .bridge-item__check { animation: none; transform: none; }
+    .quiz-screen.is-active .bridge__line,
+    .bridge__line { animation: none; opacity: 1; }
+    .quiz-screen.is-active .pay-guarantee,
+    .pay-guarantee { animation: none; opacity: 1; transform: none; }
+    .quiz-payment .btn--cta-final::after { animation: none; display: none; }
+    .quiz-payment .duration-card { transition: none; }
   }
 
   .quiz-resume__checklist {
@@ -7389,6 +7715,9 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
         var teaserEl = document.getElementById("quiz-teaser");
         var conceptName = answers.concept ? answers.concept.concept_name : "ton concept";
         teaserEl.textContent = conceptName + " — débloque la description complète, la cible et les canaux d'acquisition.";
+        var payTitle = document.getElementById("pay-title");
+        var projectName = typeof answers.nomProjet === "string" && answers.nomProjet.trim() ? answers.nomProjet.trim() : answers.concept ? answers.concept.concept_name : "";
+        if (payTitle) payTitle.textContent = projectName ? "Lance " + projectName : "Lance ton projet";
 
         initDurationCards();
         initPromoBanner();
@@ -7603,57 +7932,50 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
           });
       }
 
-      // Écran de chargement de 5-6s inséré juste avant l'écran de paiement --
-      // purement dramaturgique (le travail réel -- teaser, lien Stripe,
-      // offre de bienvenue -- est déjà lancé en amont dans goToPayment(),
-      // pas ici). Le texte bascule une fois vers une question rhétorique au
-      // milieu du chargement, jamais une vraie collecte de réponse -- pas
-      // d'entrée dans answers, pas de retour possible dessus via un tag.
-      var LOADING_TRANSITION_MS = 5600;
-      var LOADING_QUESTION_AT_MS = 2800;
-      var LOADING_QUESTION_TEXT = "Es-tu prêt à engager des clippers pour ton SaaS ?";
+      // Phase 8 : écran "La seule chose qui manque" entre le résultat et le
+      // paiement (remplace l'ancien chargement de 5,6 s, dont la question
+      // clippers est désormais posée pendant l'assemblage). Récapitule ce
+      // qui a été construit avec les vraies réponses ; seule la dernière
+      // pièce, l'accès, reste vide. Le paiement n'arrive que sur clic.
+      var bridgeScreen = document.getElementById("quiz-bridge");
+
+      function fillBridge() {
+        var conceptEl = document.getElementById("bridge-concept");
+        var name = answers.concept && answers.concept.concept_name ? answers.concept.concept_name : typeof answers.nomProjet === "string" ? answers.nomProjet.trim() : "";
+        if (conceptEl && name) conceptEl.textContent = name;
+
+        var projEl = document.getElementById("bridge-projection");
+        if (projEl && answers.age !== "moins_18") {
+          var p = computeProjection(answers);
+          projEl.textContent = "~" + p.mrr.toLocaleString("fr-FR") + " €/mois à " + p.months + " mois (estimation basse)";
+        }
+
+        var channelsEl = document.getElementById("bridge-channels");
+        if (channelsEl) {
+          var parts = [];
+          if (answers.influenceurs === "oui") parts.push("Influenceurs");
+          if (answers.clippers === "oui") parts.push("Clippers");
+          if (answers.plateformes && ECHO_LABELS.plateformes[answers.plateformes] && answers.plateformes !== "aucune") {
+            parts.push(ECHO_LABELS.plateformes[answers.plateformes]);
+          }
+          if (answers.temps && ECHO_LABELS.temps[answers.temps]) parts.push(ECHO_LABELS.temps[answers.temps] + " par semaine");
+          if (parts.length) channelsEl.textContent = parts.join(" · ");
+        }
+      }
 
       function startLoadingTransition() {
-        var loadingScreen = document.getElementById("quiz-loading-transition");
-        var label = document.getElementById("loading-transition-label");
-        var fill = document.getElementById("loading-transition-fill");
-        if (!loadingScreen || !label || !fill) {
+        if (!bridgeScreen) {
           transitionTo(paymentScreen, "forward");
           return;
         }
-
-        label.textContent = "Préparation de ton accès…";
-        label.classList.remove("is-swapped");
-        fill.style.transition = "none";
-        fill.style.width = "0%";
-
-        transitionTo(loadingScreen, "forward");
-
-        var durationMs = reduceMotion ? 0 : LOADING_TRANSITION_MS;
-        var questionAtMs = reduceMotion ? 0 : LOADING_QUESTION_AT_MS;
-
-        window.requestAnimationFrame(function () {
-          fill.style.transition = "width " + durationMs + "ms linear";
-          fill.style.width = "100%";
+        fillBridge();
+        transitionTo(bridgeScreen, "forward");
+        // Une vibration par pièce cochée, au rythme de la cascade CSS.
+        [0, 1, 2, 3].forEach(function (i) {
+          window.setTimeout(function () {
+            if (currentScreenEl === bridgeScreen) haptic();
+          }, 450 + i * 260);
         });
-
-        window.setTimeout(function () {
-          // Fondu discret plutôt qu'un remplacement de texte brutal -- même
-          // technique que le badge du slider objectif de revenu.
-          label.classList.add("is-swapping");
-          window.setTimeout(
-            function () {
-              label.textContent = LOADING_QUESTION_TEXT;
-              label.classList.remove("is-swapping");
-              label.classList.add("is-swapped");
-            },
-            reduceMotion ? 0 : 150
-          );
-        }, questionAtMs);
-
-        window.setTimeout(function () {
-          transitionTo(paymentScreen, "forward");
-        }, durationMs);
       }
 
       // Même pattern que callEdgeFunction() (voir /compte) : POST avec le
@@ -9428,6 +9750,13 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
           return;
         }
 
+        if (e.target.closest("#bridge-cta")) {
+          haptic();
+          trackEvent("bridge_cta_clicked", {});
+          transitionTo(paymentScreen, "forward");
+          return;
+        }
+
         if (e.target.closest("#result-intention-toggle")) {
           handleIntentionToggle();
           return;
@@ -10612,23 +10941,69 @@ function renderQuizOverlay({ quiz, pricing, stripeLink }) {
         <button class="btn btn--primary btn--full" id="quiz-minor-exit-btn" type="button">Retour à l'accueil</button>
       </div>
 
-      <div class="quiz-screen quiz-loading-transition" data-screen="loading-transition" data-step-name="chargement" id="quiz-loading-transition">
-        <div class="loading-transition__spinner" aria-hidden="true"></div>
-        <p class="loading-transition__label" id="loading-transition-label">Préparation de ton accès…</p>
-        <div class="loading-transition__track" aria-hidden="true">
-          <div class="loading-transition__fill" id="loading-transition-fill"></div>
+      <!-- Phase 8 : "La seule chose qui manque" -- récapitulatif de tout ce
+           qui a été construit, la dernière pièce (l'accès) reste vide. -->
+      <div class="quiz-screen quiz-bridge" data-screen="bridge" data-step-name="manque" id="quiz-bridge">
+        <div class="dash__liquid" aria-hidden="true">
+          <span class="dash__blob dash__blob--1"></span>
+          <span class="dash__blob dash__blob--2"></span>
+        </div>
+        <span class="dash__eyebrow">Récapitulatif</span>
+        <h2 class="bridge__title">Tout est prêt.<span class="bridge__title-accent">Sauf une chose.</span></h2>
+        <ul class="bridge-list">
+          <li class="glass bridge-item" style="--i:0">
+            <span class="bridge-item__check" aria-hidden="true">${ICON_CHECK_SMALL}</span>
+            <span class="bridge-item__text"><strong>Ton profil</strong><span>Tes réponses, analysées une par une</span></span>
+          </li>
+          <li class="glass bridge-item" style="--i:1">
+            <span class="bridge-item__check" aria-hidden="true">${ICON_CHECK_SMALL}</span>
+            <span class="bridge-item__text"><strong>Ton concept</strong><span id="bridge-concept">Généré pour toi</span></span>
+          </li>
+          <li class="glass bridge-item" style="--i:2">
+            <span class="bridge-item__check" aria-hidden="true">${ICON_CHECK_SMALL}</span>
+            <span class="bridge-item__text"><strong>Ta projection</strong><span id="bridge-projection">Calculée sur tes réponses</span></span>
+          </li>
+          <li class="glass bridge-item" style="--i:3">
+            <span class="bridge-item__check" aria-hidden="true">${ICON_CHECK_SMALL}</span>
+            <span class="bridge-item__text"><strong>Tes canaux</strong><span id="bridge-channels">Choisis selon ton temps</span></span>
+          </li>
+          <li class="bridge-item bridge-item--missing" style="--i:4">
+            <span class="bridge-item__key" aria-hidden="true">🔑</span>
+            <span class="bridge-item__text"><strong>Ton accès</strong><span>Pour tout débloquer et passer à l'action</span></span>
+          </li>
+        </ul>
+        <p class="bridge__line">La seule chose qui manque, c'est toi&nbsp;: ton accès, et le premier pas.</p>
+        <div class="quiz-footer quiz-footer--sticky">
+          <button class="btn btn--primary btn--full bridge__cta" id="bridge-cta" type="button">Voir mon accès</button>
         </div>
       </div>
 
       <div class="quiz-screen quiz-payment" data-screen="payment" data-step-name="paiement">
-        <p class="quiz-payment__teaser" id="quiz-teaser"></p>
+        <div class="dash__liquid" aria-hidden="true">
+          <span class="dash__blob dash__blob--1"></span>
+          <span class="dash__blob dash__blob--2"></span>
+          <span class="dash__blob dash__blob--3"></span>
+        </div>
+        <div class="pay-head">
+          <span class="dash__eyebrow"><span class="dash__live" aria-hidden="true"></span>Ton accès</span>
+          <h2 class="pay-head__title" id="pay-title">Lance ton projet</h2>
+          <p class="quiz-payment__teaser" id="quiz-teaser"></p>
+        </div>
 
-        <a class="guarantee-banner" href="/conditions-remboursement" target="_blank" rel="noopener">
-          ${ICON_SHIELD}
-          <span><strong>Pas de vente en 7 jours&nbsp;?</strong> Remboursé. <span class="guarantee-banner__link">Voir les conditions</span></span>
+        <a class="glass pay-guarantee" href="/conditions-remboursement" target="_blank" rel="noopener">
+          <span class="pay-guarantee__seal" aria-hidden="true">${ICON_SHIELD}</span>
+          <span class="pay-guarantee__body">
+            <strong>Pas de vente en 7 jours&nbsp;? Remboursé.</strong>
+            <span class="pay-guarantee__steps">
+              <span><b>1</b> Tu publies comme prévu pendant 7 jours</span>
+              <span><b>2</b> Aucune vente&nbsp;?</span>
+              <span><b>3</b> Remboursé intégralement</span>
+            </span>
+            <span class="pay-guarantee__link">Voir les conditions</span>
+          </span>
         </a>
 
-        <div class="payment-card" id="payment-card">
+        <div class="glass payment-card" id="payment-card">
           <p class="quiz-return-banner" id="quiz-return-banner" hidden>Bon retour — reprends exactement là où tu en étais.</p>
 
           <div class="promo-banner" id="promo-banner" hidden>
@@ -10668,10 +11043,7 @@ function renderQuizOverlay({ quiz, pricing, stripeLink }) {
           <p class="stripe-reassurance">${ICON_LOCK} Paiement sécurisé via <strong>&nbsp;Stripe</strong></p>
         </div>
 
-        <a class="guarantee-floating" href="/conditions-remboursement" target="_blank" rel="noopener">
-          ${ICON_SHIELD} Satisfait ou remboursé — voir les conditions
-        </a>
-
+        <div class="glass pay-included">
         <p class="included-list__title">Ce que tu débloques</p>
         <ul class="included-list">
           <li>${ICON_CHECK_SMALL} Ton concept de SaaS complet : description, cible, canaux, direction artistique</li>
@@ -10679,6 +11051,7 @@ function renderQuizOverlay({ quiz, pricing, stripeLink }) {
           <li class="included-list__soon">${ICON_CHECK_SMALL} Génération de vidéos publicitaires <span class="soon-badge">Bientôt disponible</span></li>
           <li class="included-list__soon">${ICON_CHECK_SMALL} Guides et ressources <span class="soon-badge">Bientôt disponible</span></li>
         </ul>
+        </div>
 
         <p class="stripe-reassurance stripe-reassurance--secondary">${ICON_LOCK} Paiement traité et sécurisé par Stripe — aucune donnée bancaire ne transite par ColdTrend</p>
 
