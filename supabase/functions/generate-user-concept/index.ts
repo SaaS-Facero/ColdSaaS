@@ -160,7 +160,16 @@ type Profile = {
   objectifRevenu: number | null;
   delai: string | null;
   nomProjet: string | null;
+  influenceurs: string | null;
+  clippers: string | null;
 };
+
+// Réponses aux pop-ups de l'écran d'assemblage (oui/non).
+function ouiNon(v: string | null, oui: string, non: string) {
+  if (v === "oui") return oui;
+  if (v === "non") return non;
+  return "non communiqué";
+}
 
 function buildPrompt(a: Profile) {
   const system = `Tu es un consultant produit senior spécialisé en création de concepts SaaS pour des porteurs de projet français. Ton rôle : à partir du profil d'une personne, proposer UN concept de SaaS cohérent et actionnable.
@@ -203,6 +212,8 @@ Format de sortie : JSON strict, aucun texte hors JSON.`;
 - Objectif de revenu (oriente le modèle économique, jamais à répéter) : ${formatObjectifRevenu(a.objectifRevenu)}
 - Délai souhaité (intention, jamais à commenter) : ${a.delai ? `d'ici ${a.delai} mois` : "non communiqué"}
 - Nom de projet choisi par la personne : ${a.nomProjet ? `"${a.nomProjet}"` : "aucun"}
+- Collaborer avec des influenceurs : ${ouiNon(a.influenceurs, "prêt à le faire", "refuse -- ne pas le proposer comme canal")}
+- Faire appel à des clippers (comptes qui republient des extraits) : ${ouiNon(a.clippers, "prêt à le faire", "refuse -- ne pas le proposer comme canal")}
 
 Génère un concept de SaaS pour cette personne. Si un nom de projet est fourni, tu peux le reprendre tel quel pour concept_name s'il convient, sinon t'en inspirer. Réponds au format JSON :
 
@@ -301,6 +312,8 @@ Deno.serve(async (req) => {
     objectifRevenu: typeof body.objectifRevenu === "number" ? body.objectifRevenu : null,
     delai: str(body.delai),
     nomProjet: cleanFreeText(body.nomProjet, 40),
+    influenceurs: str(body.influenceurs),
+    clippers: str(body.clippers),
   });
 
   let llmRes: Response;

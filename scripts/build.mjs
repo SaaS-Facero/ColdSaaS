@@ -767,6 +767,51 @@ const quiz = {
       cta: "C'est mon projet"
     },
     {
+      // Phase Engagement, écran 16 -- remplace la question "persévérance"
+      // (tout le monde répond oui) par un engagement à valider en
+      // maintenant appuyé. Pas de segment de progression : moment de
+      // cadrage, pas une question.
+      id: "engagement",
+      stepName: "engagement",
+      type: "engagement",
+      title: "Avant de construire, un engagement.",
+      subtext: "Ton projet mérite que tu t'y tiennes.",
+      echoSubtext: "{nomProjet} mérite que tu t'y tiennes.",
+      commitments: [
+        { text: "Je bloque du temps chaque semaine pour mon projet.", echo: "Je bloque {temps} par semaine pour mon projet." },
+        { text: "Je publie, même quand ce n'est pas parfait." },
+        { text: "Je ne lâche pas au premier obstacle." }
+      ]
+    },
+    {
+      // Phase Loading, écran 17 -- étapes cochées une à une, slogans
+      // rotatifs (ex-écrans 15-18), interrompu par 2 pop-ups plein écran.
+      // Les réponses (influenceurs, clippers) orientent les canaux du
+      // concept (voir generate-user-concept).
+      id: "assemblage",
+      stepName: "assemblage",
+      type: "assembling",
+      title: "On assemble ton projet",
+      echoTitle: "On assemble {nomProjet}",
+      steps: [
+        "Analyse de ton profil",
+        "Choix de ta cible",
+        "Sélection de tes canaux",
+        "Construction de ton concept",
+        "Préparation de ton plan"
+      ],
+      slogans: [
+        "Bienvenue sur ColdTrend.",
+        "Trouve les idées qui marchent vraiment.",
+        "L'IA rédige, toi tu appliques.",
+        "L'objectif : changer ta vie."
+      ],
+      popups: [
+        { field: "influenceurs", atStep: 2, question: "Es-tu prêt à engager des influenceurs ?", hint: "Pour faire parler de ton produit plus vite." },
+        { field: "clippers", atStep: 4, question: "Es-tu prêt à engager des clippers ?", hint: "Ils démultiplient ton contenu sur leurs comptes." }
+      ]
+    },
+    {
       // Dernière étape avant le résultat (déplacée depuis le tout début du
       // funnel) -- voir resolve-identity (supabase/functions/) : un seul
       // appel serveur qui gère "nouveau compte ou existant" en une fois.
@@ -2559,6 +2604,291 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
 
   .quiz-minor-exit .btn {
     margin-top: 24px;
+  }
+
+  /* .btn impose display:inline-flex, qui l'emporte sur l'attribut hidden. */
+  .quiz-next[hidden] {
+    display: none;
+  }
+
+  /* ---- Écran 16 : engagement, empreinte à maintenir appuyée ---------- */
+  .engage-list {
+    list-style: none;
+    margin: 20px 0 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .engage-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    padding: 14px 16px;
+    border-radius: 14px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    background: rgba(255, 255, 255, 0.03);
+    font-size: 15px;
+    line-height: 1.45;
+    color: var(--paper-soft);
+    opacity: 0;
+    transform: translateY(8px);
+    transition: border-color 260ms ease, background 260ms ease;
+  }
+
+  .quiz-screen.is-active .engage-item {
+    animation: audit-item-in 460ms cubic-bezier(0.34, 1.4, 0.64, 1) forwards;
+    animation-delay: calc(var(--i) * 140ms + 200ms);
+  }
+
+  .engage-item__check {
+    flex-shrink: 0;
+    width: 20px;
+    height: 20px;
+    margin-top: 1px;
+    border-radius: 50%;
+    border: 2px solid rgba(255, 255, 255, 0.2);
+    transition: background 240ms ease, border-color 240ms ease, transform 300ms cubic-bezier(0.34, 1.56, 0.64, 1);
+  }
+
+  .quiz-engagement.is-engaged .engage-item {
+    border-color: rgba(0, 196, 140, 0.35);
+    background: rgba(0, 196, 140, 0.06);
+  }
+
+  .quiz-engagement.is-engaged .engage-item__check {
+    border-color: var(--verified-green);
+    background: var(--verified-green);
+    transform: scale(1.1);
+  }
+
+  .engage-hold {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    margin: 28px 0 8px;
+  }
+
+  .engage-hold__btn {
+    position: relative;
+    width: 104px;
+    height: 104px;
+    padding: 0;
+    border-radius: 50%;
+    border: none;
+    background: radial-gradient(circle, rgba(0, 71, 255, 0.28), rgba(0, 71, 255, 0.06) 70%);
+    color: var(--paper-soft);
+    cursor: pointer;
+    touch-action: none;
+    user-select: none;
+    -webkit-user-select: none;
+    -webkit-touch-callout: none;
+    -webkit-tap-highlight-color: transparent;
+    transition: transform 200ms ease;
+  }
+
+  .engage-hold__btn:focus-visible {
+    outline: 2px solid var(--cobalt);
+    outline-offset: 4px;
+  }
+
+  .engage-hold__btn.is-holding {
+    transform: scale(0.94);
+  }
+
+  .engage-hold__ring {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    transform: rotate(-90deg);
+  }
+
+  .engage-hold__ring circle {
+    fill: none;
+    stroke-width: 4;
+  }
+
+  .engage-hold__track {
+    stroke: rgba(255, 255, 255, 0.1);
+  }
+
+  .engage-hold__progress {
+    stroke: var(--cobalt);
+    stroke-linecap: round;
+    stroke-dasharray: 301.6;
+    stroke-dashoffset: 301.6;
+    filter: drop-shadow(0 0 6px rgba(0, 71, 255, 0.8));
+  }
+
+  .engage-hold__btn.is-releasing .engage-hold__progress {
+    transition: stroke-dashoffset 300ms ease-out;
+  }
+
+  .quiz-engagement.is-engaged .engage-hold__progress {
+    stroke: var(--verified-green);
+    filter: drop-shadow(0 0 8px rgba(0, 196, 140, 0.8));
+  }
+
+  .engage-hold__icon {
+    position: relative;
+    width: 46px;
+    height: 46px;
+  }
+
+  .quiz-engagement.is-engaged .engage-hold__icon {
+    color: var(--verified-green);
+  }
+
+  .engage-hold__hint {
+    margin: 12px 0 0;
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--steel);
+  }
+
+  .quiz-engagement.is-engaged .engage-hold__hint {
+    color: var(--verified-green);
+  }
+
+  /* ---- Écran 17 : assemblage du projet -------------------------------- */
+  .quiz-assemble {
+    text-align: center;
+  }
+
+  .assemble-slogan {
+    min-height: 1.5em;
+    margin: 6px 0 22px;
+    font-size: 17px;
+    font-weight: 700;
+    color: var(--cobalt-soft);
+    transition: opacity 220ms ease, transform 220ms ease;
+  }
+
+  .assemble-slogan.is-swapping {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+
+  .assemble-bar {
+    height: 8px;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.08);
+    overflow: hidden;
+  }
+
+  .assemble-bar__fill {
+    height: 100%;
+    width: 0;
+    border-radius: inherit;
+    background: linear-gradient(90deg, var(--cobalt-dark), var(--cobalt));
+    box-shadow: 0 0 14px rgba(0, 71, 255, 0.7);
+    transition: width 900ms cubic-bezier(0.22, 1, 0.36, 1);
+  }
+
+  .assemble-percent {
+    margin: 8px 0 18px;
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--steel);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .quiz-assemble .audit-steps {
+    text-align: left;
+    max-width: 340px;
+    margin: 0 auto;
+  }
+
+  /* Pop-up plein écran qui interrompt l'assemblage (influenceurs, clippers). */
+  .assemble-popup {
+    position: absolute;
+    inset: 0;
+    z-index: 60;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px 16px;
+    background: rgba(5, 8, 15, 0.82);
+    -webkit-backdrop-filter: blur(8px);
+    backdrop-filter: blur(8px);
+    animation: assemble-popup-fade 220ms ease-out;
+  }
+
+  .assemble-popup[hidden] {
+    display: none;
+  }
+
+  .assemble-popup__card {
+    width: 100%;
+    max-width: 380px;
+    padding: 28px 22px 22px;
+    border-radius: 20px;
+    text-align: center;
+    border: 1px solid rgba(0, 71, 255, 0.4);
+    background:
+      radial-gradient(circle at 50% 0%, rgba(0, 71, 255, 0.25), transparent 70%),
+      var(--ink);
+    box-shadow: 0 30px 80px -30px rgba(0, 71, 255, 0.8);
+    animation: assemble-popup-in 420ms cubic-bezier(0.34, 1.56, 0.64, 1);
+  }
+
+  .assemble-popup__eyebrow {
+    margin: 0 0 8px;
+    font-size: 12px;
+    font-weight: 800;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--cobalt-soft);
+  }
+
+  .assemble-popup__question {
+    margin: 0 0 8px;
+    font-size: 22px;
+    font-weight: 800;
+    line-height: 1.25;
+    color: var(--paper-soft);
+  }
+
+  .assemble-popup__hint {
+    margin: 0 0 22px;
+    font-size: 14px;
+    line-height: 1.5;
+    color: var(--steel);
+  }
+
+  .assemble-popup__actions {
+    display: flex;
+    gap: 10px;
+  }
+
+  .assemble-popup__actions .btn {
+    flex: 1;
+    max-width: none;
+    width: auto;
+    padding-left: 12px;
+    padding-right: 12px;
+  }
+
+  @keyframes assemble-popup-fade {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
+
+  @keyframes assemble-popup-in {
+    from { opacity: 0; transform: scale(0.9) translateY(12px); }
+    to { opacity: 1; transform: none; }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .quiz-screen.is-active .engage-item,
+    .engage-item { animation: none; opacity: 1; transform: none; }
+    .engage-hold__btn { transition: none; }
+    .assemble-slogan { transition: none; }
+    .assemble-bar__fill { transition: none; }
+    .assemble-popup,
+    .assemble-popup__card { animation: none; }
   }
 
   @media (prefers-reduced-motion: reduce) {
@@ -5812,6 +6142,18 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
           return;
         }
 
+        if (id === "engagement") {
+          nextBtn.disabled = !answers.engagement;
+          nextBtn.hidden = !answers.engagement;
+          return;
+        }
+
+        if (id === "assemblage") {
+          nextBtn.disabled = !assemblyDone;
+          nextBtn.hidden = !assemblyDone;
+          return;
+        }
+
         if (id === "situation") {
           // Seul bouton de cet écran : "Valider" du champ libre revenus.
           nextBtn.disabled = !(answers.situation && answers.revenusAutre && answers.revenusAutre.trim());
@@ -5866,6 +6208,9 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
         applyEcho(nextEl);
         if (nextEl.getAttribute("data-id") === "objectifRevenu") startTitleRotator();
         else stopTitleRotator();
+        if (nextEl.getAttribute("data-id") === "engagement") syncEngagementUI();
+        if (nextEl.getAttribute("data-id") === "assemblage") runAssembly();
+        else stopAssembly();
 
         nextEl.style.transition = "none";
         nextEl.style.opacity = "0";
@@ -5984,6 +6329,8 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
           objectifRevenu: typeof ans.objectifRevenu === "number" ? ans.objectifRevenu : null,
           delai: ans.delai || null,
           nomProjet: ans.nomProjet || null,
+          influenceurs: ans.influenceurs || null,
+          clippers: ans.clippers || null,
           forceRegenerate: !!forceRegenerate
         })
           .then(function (res) {
@@ -6510,8 +6857,17 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
           "2": "deux plateformes",
           "3": "trois plateformes",
           "4_plus": "quatre plateformes ou plus"
+        },
+        temps: {
+          low: "moins de 5h",
+          mid: "5 à 15h",
+          high: "plus de 15h"
         }
       };
+
+      // Champs libres repris tels quels (insérés via textContent, jamais
+      // en HTML).
+      var ECHO_RAW_FIELDS = { nomProjet: true };
 
       function applyEcho(screenEl) {
         Array.prototype.forEach.call(screenEl.querySelectorAll("[data-echo]"), function (el) {
@@ -6520,6 +6876,9 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
           var text = el.getAttribute("data-echo").replace(/[{]([a-zA-Z]+)[}]/g, function (match, field) {
             var labels = ECHO_LABELS[field];
             var label = labels && answers[field] ? labels[answers[field]] : null;
+            if (ECHO_RAW_FIELDS[field] && typeof answers[field] === "string" && answers[field].trim()) {
+              label = answers[field].trim();
+            }
             if (!label) missing = true;
             return label || "";
           });
@@ -6744,6 +7103,265 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
           });
       }
 
+      // ---- Écran 16 : engagement (appui long sur l'empreinte) ------------
+      // rAF plutôt qu'une transition CSS : relâcher avant la fin annule
+      // proprement, et la durée reste exacte même en reduced-motion.
+      var ENGAGE_HOLD_MS = 1300;
+      var ENGAGE_RING_LENGTH = 301.6; // 2 * PI * 48 (rayon du cercle SVG)
+      var engageHoldStart = null;
+      var engageHoldFrame = null;
+
+      function setEngageRing(progress) {
+        var ring = document.getElementById("engage-hold-progress");
+        if (ring) ring.style.strokeDashoffset = String(ENGAGE_RING_LENGTH * (1 - progress));
+      }
+
+      function syncEngagementUI() {
+        var screenEl = stage.querySelector('[data-id="engagement"]');
+        if (!screenEl) return;
+        var engaged = !!answers.engagement;
+        screenEl.classList.toggle("is-engaged", engaged);
+        setEngageRing(engaged ? 1 : 0);
+        var hint = document.getElementById("engage-hold-hint");
+        if (hint) hint.textContent = engaged ? "Engagement pris. On construit." : "Maintiens l'empreinte pour t'engager";
+        updateNextEnabled(screenEl);
+      }
+
+      function completeEngagement() {
+        answers.engagement = true;
+        try {
+          if (navigator.vibrate) navigator.vibrate([20, 40, 30]);
+        } catch (err) {
+          /* repli silencieux (iOS) */
+        }
+        var btn = document.getElementById("engage-hold-btn");
+        if (btn) btn.classList.remove("is-holding");
+        syncEngagementUI();
+        saveDraftLocally();
+        trackEvent("engagement_signed", {});
+        var screenEl = stage.querySelector('[data-id="engagement"]');
+        window.setTimeout(function () {
+          if (currentScreenEl === screenEl && !editContext) goForwardFromQuestion();
+        }, 900);
+      }
+
+      function engageHoldTick(now) {
+        if (engageHoldStart === null) return;
+        var progress = Math.min(1, (now - engageHoldStart) / ENGAGE_HOLD_MS);
+        setEngageRing(progress);
+        if (progress >= 1) {
+          engageHoldStart = null;
+          engageHoldFrame = null;
+          completeEngagement();
+          return;
+        }
+        engageHoldFrame = window.requestAnimationFrame(engageHoldTick);
+      }
+
+      function startEngageHold() {
+        if (answers.engagement || engageHoldStart !== null) return;
+        var btn = document.getElementById("engage-hold-btn");
+        btn.classList.remove("is-releasing");
+        btn.classList.add("is-holding");
+        haptic();
+        engageHoldStart = performance.now();
+        engageHoldFrame = window.requestAnimationFrame(engageHoldTick);
+      }
+
+      function cancelEngageHold() {
+        if (engageHoldStart === null) return;
+        engageHoldStart = null;
+        if (engageHoldFrame) window.cancelAnimationFrame(engageHoldFrame);
+        engageHoldFrame = null;
+        var btn = document.getElementById("engage-hold-btn");
+        btn.classList.remove("is-holding");
+        btn.classList.add("is-releasing");
+        setEngageRing(0);
+      }
+
+      (function initEngagementHold() {
+        var btn = document.getElementById("engage-hold-btn");
+        if (!btn) return;
+        btn.addEventListener("pointerdown", function (e) {
+          if (e.button !== 0) return;
+          e.preventDefault();
+          try {
+            btn.setPointerCapture(e.pointerId);
+          } catch (err) {
+            /* capture indisponible : pointerup suffit */
+          }
+          startEngageHold();
+        });
+        ["pointerup", "pointercancel", "lostpointercapture"].forEach(function (type) {
+          btn.addEventListener(type, cancelEngageHold);
+        });
+        // Appui long sur mobile = menu contextuel / loupe : bloqués ici.
+        btn.addEventListener("contextmenu", function (e) {
+          e.preventDefault();
+        });
+        btn.addEventListener("keydown", function (e) {
+          if (e.key !== " " && e.key !== "Enter") return;
+          e.preventDefault();
+          if (!e.repeat) startEngageHold();
+        });
+        btn.addEventListener("keyup", function (e) {
+          if (e.key !== " " && e.key !== "Enter") return;
+          cancelEngageHold();
+        });
+        btn.addEventListener("blur", cancelEngageHold);
+      })();
+
+      // ---- Écran 17 : assemblage du projet --------------------------------
+      // Étapes cochées une à une + slogans rotatifs. Les pop-ups (data-popups)
+      // mettent l'assemblage en pause avant l'étape atStep, jusqu'à réponse ;
+      // une réponse déjà donnée (retour arrière) n'est jamais redemandée.
+      var ASSEMBLE_STEP_MS = 1500;
+      var ASSEMBLE_SLOGAN_MS = 2200;
+      var assemblyDone = false;
+      var assemblyStepTimer = null;
+      var assemblySloganTimer = null;
+      var assemblyStep = 0;
+      var assemblyPopup = null;
+
+      function assembleScreen() {
+        return stage.querySelector('[data-id="assemblage"]');
+      }
+
+      function setAssemblePercent(p) {
+        var fill = document.getElementById("assemble-bar-fill");
+        var label = document.getElementById("assemble-percent");
+        if (fill) fill.style.width = p + "%";
+        if (label) label.textContent = p + " %";
+      }
+
+      function hideAssemblePopup() {
+        assemblyPopup = null;
+        var popup = document.getElementById("assemble-popup");
+        if (popup) popup.hidden = true;
+      }
+
+      function stopAssembly() {
+        if (assemblyStepTimer) window.clearTimeout(assemblyStepTimer);
+        if (assemblySloganTimer) window.clearInterval(assemblySloganTimer);
+        assemblyStepTimer = null;
+        assemblySloganTimer = null;
+        hideAssemblePopup();
+      }
+
+      function startAssembleSlogans(screenEl) {
+        var el = document.getElementById("assemble-slogan");
+        var slogans = JSON.parse(screenEl.getAttribute("data-slogans") || "[]");
+        if (!el || slogans.length === 0) return;
+        var i = 0;
+        el.classList.remove("is-swapping");
+        el.textContent = slogans[0];
+        assemblySloganTimer = window.setInterval(function () {
+          i = (i + 1) % slogans.length;
+          if (reduceMotion) {
+            el.textContent = slogans[i];
+            return;
+          }
+          el.classList.add("is-swapping");
+          window.setTimeout(function () {
+            el.textContent = slogans[i];
+            el.classList.remove("is-swapping");
+          }, 220);
+        }, ASSEMBLE_SLOGAN_MS);
+      }
+
+      function showAssemblePopup(popup) {
+        assemblyPopup = popup;
+        document.getElementById("assemble-popup-question").textContent = popup.question;
+        document.getElementById("assemble-popup-hint").textContent = popup.hint || "";
+        var el = document.getElementById("assemble-popup");
+        el.hidden = false;
+        haptic();
+        trackEvent("assembly_popup_view", { field: popup.field });
+        var first = el.querySelector("[data-popup-answer]");
+        if (first) first.focus();
+      }
+
+      function finishAssembly() {
+        assemblyDone = true;
+        if (assemblySloganTimer) window.clearInterval(assemblySloganTimer);
+        assemblySloganTimer = null;
+        var screenEl = assembleScreen();
+        var slogan = document.getElementById("assemble-slogan");
+        if (slogan) {
+          slogan.classList.remove("is-swapping");
+          slogan.textContent = "C'est prêt.";
+        }
+        try {
+          if (navigator.vibrate) navigator.vibrate([15, 30, 15]);
+        } catch (err) {
+          /* repli silencieux (iOS) */
+        }
+        updateNextEnabled(screenEl);
+        trackEvent("assembly_completed", {});
+        assemblyStepTimer = window.setTimeout(function () {
+          assemblyStepTimer = null;
+          if (currentScreenEl === screenEl && !editContext) goForwardFromQuestion();
+        }, 1000);
+      }
+
+      function activateAssembleStep() {
+        var screenEl = assembleScreen();
+        var steps = screenEl.querySelectorAll("[data-assemble-step]");
+        var total = steps.length;
+        if (assemblyStep >= total) {
+          finishAssembly();
+          return;
+        }
+        var popups = JSON.parse(screenEl.getAttribute("data-popups") || "[]");
+        for (var i = 0; i < popups.length; i += 1) {
+          if (popups[i].atStep === assemblyStep && !answers[popups[i].field]) {
+            showAssemblePopup(popups[i]);
+            return;
+          }
+        }
+        var stepEl = steps[assemblyStep];
+        stepEl.classList.add("is-active");
+        assemblyStepTimer = window.setTimeout(function () {
+          assemblyStepTimer = null;
+          stepEl.classList.remove("is-active");
+          stepEl.classList.add("is-done");
+          assemblyStep += 1;
+          setAssemblePercent(Math.round((assemblyStep / total) * 100));
+          activateAssembleStep();
+        }, ASSEMBLE_STEP_MS);
+      }
+
+      function runAssembly() {
+        stopAssembly();
+        var screenEl = assembleScreen();
+        if (!screenEl) return;
+        assemblyDone = false;
+        assemblyStep = 0;
+        Array.prototype.forEach.call(screenEl.querySelectorAll("[data-assemble-step]"), function (s) {
+          s.classList.remove("is-done", "is-active");
+        });
+        setAssemblePercent(0);
+        updateNextEnabled(screenEl);
+        startAssembleSlogans(screenEl);
+        activateAssembleStep();
+      }
+
+      (function initAssemblePopup() {
+        var el = document.getElementById("assemble-popup");
+        if (!el) return;
+        el.addEventListener("click", function (e) {
+          var btn = e.target.closest("[data-popup-answer]");
+          if (!btn || !assemblyPopup) return;
+          var field = assemblyPopup.field;
+          answers[field] = btn.getAttribute("data-popup-answer");
+          haptic();
+          trackEvent("assembly_popup_answer", { field: field, answer: answers[field] });
+          hideAssemblePopup();
+          saveDraftLocally();
+          activateAssembleStep();
+        });
+      })();
+
       function resetCustomScreens() {
         stopTitleRotator();
         var rotator = document.getElementById("quiz-title-rotator");
@@ -6759,6 +7377,9 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
           box.hidden = true;
         });
         resetAuditScreen();
+        stopAssembly();
+        assemblyDone = false;
+        syncEngagementUI();
       }
 
       function goForwardFromQuestion() {
@@ -7419,6 +8040,7 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
 
       function closeQuiz() {
         stopTitleRotator();
+        stopAssembly();
         if (overlay.classList.contains("is-open") && !reachedResult && currentScreenEl) {
           var stepName = currentScreenEl.getAttribute("data-step-name") || "inconnu";
           trackEvent("funnel_abandoned", { last_step: stepName });
@@ -8350,6 +8972,66 @@ function renderQuizQuestionScreen(question, index) {
         </div>`;
   }
 
+  if (question.type === "engagement") {
+    // Engagement validé par un appui long sur l'empreinte (voir
+    // initEngagementHold) -- clavier : maintenir Espace ou Entrée.
+    const escAttr = (v) => String(v).replace(/"/g, "&quot;");
+    const items = question.commitments
+      .map(
+        (c, i) => `<li class="engage-item" style="--i:${i}"><span class="engage-item__check" aria-hidden="true"></span><span${c.echo ? ` data-echo="${escAttr(c.echo)}"` : ""}>${c.text}</span></li>`
+      )
+      .join("\n            ");
+    return `<div class="quiz-screen quiz-engagement" data-screen="question" data-index="${index}" data-id="${question.id}" data-step-name="${question.stepName}"${skipAttrs}>
+          <h2 class="quiz-question-title">${question.title}</h2>
+          <p class="quiz-subtext"${question.echoSubtext ? ` data-echo="${escAttr(question.echoSubtext)}"` : ""}>${question.subtext}</p>
+          <ul class="engage-list">
+            ${items}
+          </ul>
+          <div class="engage-hold">
+            <button type="button" class="engage-hold__btn" id="engage-hold-btn" aria-label="Maintiens appuyé pour t'engager" aria-describedby="engage-hold-hint">
+              <svg class="engage-hold__ring" viewBox="0 0 104 104" aria-hidden="true">
+                <circle class="engage-hold__track" cx="52" cy="52" r="48"></circle>
+                <circle class="engage-hold__progress" id="engage-hold-progress" cx="52" cy="52" r="48"></circle>
+              </svg>
+              <svg class="engage-hold__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true">
+                <path d="M12 11c0 3.5-.6 6.4-2 8.6"/>
+                <path d="M8.5 7.6A4.5 4.5 0 0 1 16.5 10.5c0 2.6-.3 5-1 7.2"/>
+                <path d="M7.5 10.5c0 2.2-.4 4.2-1.2 5.8"/>
+                <path d="M5.2 6.2A8 8 0 0 1 20 10.5c0 1.8-.1 3.4-.4 5"/>
+                <path d="M4 10.5c0 1-.1 2-.3 3"/>
+                <path d="M14.2 14.5c-.2 2-.7 3.9-1.5 5.6"/>
+              </svg>
+            </button>
+            <p class="engage-hold__hint" id="engage-hold-hint" aria-live="polite">Maintiens l'empreinte pour t'engager</p>
+          </div>
+          <div class="quiz-footer">
+            <button class="btn btn--primary quiz-next" type="button" hidden>Continuer</button>
+          </div>
+        </div>`;
+  }
+
+  if (question.type === "assembling") {
+    // Chargement mis en scène (voir runAssembly) : étapes cochées une à
+    // une, slogans rotatifs, pop-ups plein écran (rendus dans l'overlay,
+    // #assemble-popup) qui mettent l'assemblage en pause jusqu'à réponse.
+    const escAttr = (v) => String(v).replace(/'/g, "&#39;");
+    const steps = question.steps
+      .map((s, i) => `<li class="audit-step" data-assemble-step="${i}">${s}</li>`)
+      .join("\n            ");
+    return `<div class="quiz-screen quiz-assemble" data-screen="question" data-index="${index}" data-id="${question.id}" data-step-name="${question.stepName}"${skipAttrs} data-slogans='${escAttr(JSON.stringify(question.slogans))}' data-popups='${escAttr(JSON.stringify(question.popups))}'>
+          <h2 class="quiz-question-title" data-echo="${question.echoTitle}">${question.title}</h2>
+          <p class="assemble-slogan" id="assemble-slogan">${question.slogans[0]}</p>
+          <div class="assemble-bar" aria-hidden="true"><div class="assemble-bar__fill" id="assemble-bar-fill"></div></div>
+          <p class="assemble-percent" id="assemble-percent" aria-live="polite">0 %</p>
+          <ul class="audit-steps" id="assemble-steps">
+            ${steps}
+          </ul>
+          <div class="quiz-footer">
+            <button class="btn btn--primary quiz-next" type="button" hidden>Continuer</button>
+          </div>
+        </div>`;
+  }
+
   if (question.type === "audit") {
     // Trois états dans le même écran : saisie de l'URL, analyse en cours
     // (étapes cochées une à une), résultats. "Passer" reste toujours
@@ -8454,6 +9136,17 @@ function renderQuizOverlay({ quiz, pricing, stripeLink }) {
       <button type="button" class="quiz-banner__action" id="quiz-edit-bar-return">Retour à mon résultat</button>
     </div>
     <div class="quiz-toast" id="quiz-toast" role="status" aria-live="polite"></div>
+    <div class="assemble-popup" id="assemble-popup" role="dialog" aria-modal="true" aria-labelledby="assemble-popup-question" hidden>
+      <div class="assemble-popup__card">
+        <p class="assemble-popup__eyebrow">Question rapide</p>
+        <h3 class="assemble-popup__question" id="assemble-popup-question"></h3>
+        <p class="assemble-popup__hint" id="assemble-popup-hint"></p>
+        <div class="assemble-popup__actions">
+          <button type="button" class="btn btn--primary" data-popup-answer="oui">Oui</button>
+          <button type="button" class="btn btn--secondary" data-popup-answer="non">Non</button>
+        </div>
+      </div>
+    </div>
     <div class="quiz-stage" id="quiz-stage">
       ${renderProofBackground()}
       ${questionScreens}
