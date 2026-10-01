@@ -1,4 +1,4 @@
-import { writeFileSync, mkdirSync } from "node:fs";
+import { writeFileSync, mkdirSync, readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
 
@@ -8,6 +8,36 @@ const OUT_FILE = path.join(OUT_DIR, "index.html");
 const OUT_FILE_SUCCESS = path.join(OUT_DIR, "succes.html");
 const OUT_FILE_CONCEPT = path.join(OUT_DIR, "concept.html");
 const OUT_FILE_ENTREPRENEUR_PROFILE = path.join(OUT_DIR, "profil-entrepreneur.html");
+
+// Témoignages de l'écran "Tu n'es pas le seul" -- data/testimonials.json,
+// tableau d'objets :
+//   { "photo": "testimonials/prenom.webp",   // WebP 96x96, dans public/
+//     "prenom": "Lina", "age": 24, "ville": "Lyon",
+//     "concept": "Planning auto pour coachs sportifs",
+//     "resultat_euros": 1200,                   // affiché SEULEMENT si preuve_url
+//     "preuve_url": "https://...",              // capture Stripe / preuve vérifiable
+//     "jalon": "1er client en 3 semaines",      // affiché à défaut de preuve
+//     "consentement": true }                    // accord écrit obtenu
+// Seules les entrées avec consentement === true et un résultat affichable
+// (montant prouvé ou jalon) sont gardées. Moins de 2 : carrousel masqué.
+function loadTestimonials() {
+  let raw = [];
+  try {
+    raw = JSON.parse(readFileSync(path.join(__dirname, "..", "data", "testimonials.json"), "utf8"));
+  } catch (err) {
+    console.warn("[build] data/testimonials.json illisible, aucun témoignage affiché :", err.message);
+    return [];
+  }
+  return (Array.isArray(raw) ? raw : [])
+    .filter((t) => t && t.consentement === true && t.prenom && t.photo && t.concept)
+    .map((t) => {
+      const proven = typeof t.resultat_euros === "number" && typeof t.preuve_url === "string" && t.preuve_url.trim() !== "";
+      const result = proven ? `${t.resultat_euros.toLocaleString("fr-FR")} € générés` : t.jalon || null;
+      return result ? { ...t, result } : null;
+    })
+    .filter(Boolean);
+}
+const TESTIMONIALS = loadTestimonials();
 
 // Toute config sensible/par-environnement se lit depuis process.env — jamais
 // en dur. Le second membre de chaque `??` n'est qu'un filet de sécurité pour
@@ -452,15 +482,14 @@ const quiz = {
       ]
     },
     {
-      // Phase Hook, écran 3 -- écran de pause statistique, avancé ici
-      // depuis la fin de l'ancien chapitre 1. 2 300 reprend le chiffre déjà
-      // publié dans le hero ("+2 300 entrepreneurs nous font confiance").
+      // Phase Hook, écran 3 -- preuve sociale, uniquement sur données
+      // réelles (voir le rendu "mirror" et social_proof_stats).
       id: "mirror",
       stepName: "miroir",
       type: "mirror",
-      eyebrow: "Tu n'es pas le premier, ni le dernier",
-      subtext: "personnes ont déjà généré leur concept de SaaS avec ColdTrend.",
-      pauseValue: 2300
+      title: "Tu n'es pas le seul à te lancer.",
+      subtext: "concepts de SaaS déjà générés avec ColdTrend.",
+      earlyText: "Tu fais partie des premiers à construire ton projet avec ColdTrend. Ton concept sera taillé pour toi, pas recyclé."
     },
     {
       // Phase Situation, écran 4 -- fusion "comment tu gagnes ta vie" +
@@ -1200,6 +1229,10 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
   /* Preuve sociale : chiffre indicatif, volontairement distinct visuellement
      du badge Cobalt Blue/Vérifié TrustMRR -- pas de bordure, pas de couleur
      de marque, pour ne jamais le confondre avec les preuves auditées. */
+  .hero__social-proof[hidden] {
+    display: none;
+  }
+
   .hero__social-proof {
     display: flex;
     align-items: center;
@@ -3719,57 +3752,52 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
     .quiz-screen.quiz-mirror::after { animation: none; opacity: 0.7; }
   }
 
-  /* Écran de pause statistique -- dégradé grisaille (Steel Gray décliné en
-     opacité, jamais une teinte tierce) plutôt que le cobalt-soft utilisé
-     ailleurs pour les eyebrows -- cet écran doit se sentir "en creux",
-     pas comme une nouvelle question. */
-  .quiz-mirror__eyebrow {
-    font-size: 13px;
-    font-weight: 700;
-    letter-spacing: 0.02em;
-    margin: 0 0 8px;
-    background: linear-gradient(90deg, var(--paper-soft), var(--steel));
-    -webkit-background-clip: text;
-    background-clip: text;
-    color: transparent;
-  }
-
+  /* Écran "Tu n'es pas le seul" -- titre, compteur réel (dès 100),
+     pile d'avatars, témoignages consentis, CTA collant. Plus de bulles
+     flottantes : rien ne chevauche le texte. */
   .pause-content {
     position: relative;
     z-index: 1;
+    text-align: center;
+    padding-bottom: 8px;
   }
 
-  /* Le CTA est en flux normal (pas de position ici), mais
-     .pause-avatars-bg est en position:absolute z-index:0 -- sans ceci il
-     peindrait par-dessus le bouton selon l'ordre d'empilement CSS standard
-     (positionné z-index:0 après un bloc statique). */
-  .quiz-mirror .quiz-footer {
-    position: relative;
-    z-index: 2;
+  .pause-title {
+    font-size: clamp(26px, 7vw, 34px);
+    font-weight: 800;
+    letter-spacing: -0.02em;
+    line-height: 1.15;
+    color: var(--paper-soft);
+    margin: 8px 0 20px;
+  }
+
+  .pause-stat[hidden],
+  .pause-early[hidden] {
+    display: none;
   }
 
   .pause-number-wrap {
     position: relative;
-    margin: 12px 0 16px;
+    margin: 4px 0 6px;
   }
 
   .pause-glow {
     position: absolute;
     left: 50%;
     top: 50%;
-    width: 220px;
-    height: 140px;
+    width: 260px;
+    height: 170px;
     transform: translate(-50%, -50%);
-    background: radial-gradient(circle, rgba(0, 71, 255, 0.35), transparent 70%);
-    filter: blur(6px);
+    background: radial-gradient(circle, rgba(0, 71, 255, 0.45), transparent 70%);
+    filter: blur(10px);
     animation: pause-glow-pulse 4.5s ease-in-out infinite;
   }
 
   .pause-number {
     position: relative;
-    font-size: clamp(48px, 13vw, 84px);
+    font-size: clamp(56px, 15vw, 88px);
     font-weight: 800;
-    letter-spacing: -0.02em;
+    letter-spacing: -0.03em;
     color: var(--paper-soft);
     font-variant-numeric: tabular-nums;
   }
@@ -3778,8 +3806,8 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
     font-size: 15px;
     color: var(--steel);
     line-height: 1.5;
-    max-width: 380px;
-    margin: 0 auto;
+    max-width: 340px;
+    margin: 0 auto 18px;
   }
 
   @keyframes pause-glow-pulse {
@@ -3787,115 +3815,165 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
     50% { opacity: 1; }
   }
 
-  /* Avatars flottants en arrière-plan -- décoratifs, jamais de vraies
-     photos/identités : de simples disques en dégradé Cobalt/Steel. */
-  .pause-avatars-bg {
-    position: absolute;
-    inset: 0;
-    z-index: 0;
-    pointer-events: none;
+  /* Pile d'avatars chevauchants -- silhouettes neutres, jamais la photo
+     de quelqu'un qui n'est pas client. Entrée en cascade avec ressort. */
+  .pause-avatars {
+    display: inline-flex;
+    align-items: center;
+    margin-bottom: 4px;
+  }
+
+  .pause-avatar {
+    width: 36px;
+    height: 36px;
+    border-radius: 999px;
+    margin-left: -10px;
+    border: 2px solid var(--ink);
+    background:
+      radial-gradient(circle at 50% 38%, rgba(255, 255, 255, 0.55) 0 22%, transparent 23%),
+      radial-gradient(ellipse at 50% 100%, rgba(255, 255, 255, 0.45) 0 42%, transparent 43%),
+      linear-gradient(135deg, var(--cobalt-dark), var(--cobalt));
+    opacity: 0;
+    transform: scale(0.6);
+  }
+
+  .pause-avatar:first-child {
+    margin-left: 0;
+  }
+
+  .pause-avatar:nth-child(even) {
+    background:
+      radial-gradient(circle at 50% 38%, rgba(255, 255, 255, 0.55) 0 22%, transparent 23%),
+      radial-gradient(ellipse at 50% 100%, rgba(255, 255, 255, 0.45) 0 42%, transparent 43%),
+      linear-gradient(135deg, #3a4150, var(--steel));
+  }
+
+  .quiz-screen.is-active .pause-avatar {
+    animation: pause-avatar-in 520ms cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+    animation-delay: calc(var(--i) * 70ms + 300ms);
+  }
+
+  @keyframes pause-avatar-in {
+    to { opacity: 1; transform: scale(1); }
+  }
+
+  .pause-avatars__more {
+    margin-left: 10px;
+    font-size: 15px;
+    font-weight: 800;
+    color: var(--paper-soft);
+  }
+
+  .pause-early {
+    font-size: 16px;
+    line-height: 1.55;
+    color: var(--paper-soft);
+    max-width: 360px;
+    margin: 8px auto 0;
+    padding: 18px 20px;
+    border-radius: 16px;
+    border: 1px solid rgba(138, 143, 152, 0.2);
+    background:
+      radial-gradient(circle at 50% 0%, rgba(0, 71, 255, 0.22), transparent 70%),
+      rgba(255, 255, 255, 0.03);
+  }
+
+  /* Témoignages -- verre dépoli léger, marquee lent, pause au survol, au
+     focus et au toucher (classe .is-paused posée en JS). */
+  .pause-testimonials {
     overflow: hidden;
+    margin: 26px -20px 0;
+    -webkit-mask-image: linear-gradient(90deg, transparent, #000 10%, #000 90%, transparent);
+    mask-image: linear-gradient(90deg, transparent, #000 10%, #000 90%, transparent);
   }
 
-  .pause-avatar-float {
-    position: absolute;
-    width: 26px;
-    height: 26px;
+  .pause-testimonials__track {
+    display: flex;
+    gap: 12px;
+    width: max-content;
+    animation: pause-marquee 40s linear infinite;
+  }
+
+  .pause-testimonials__dup {
+    display: flex;
+    gap: 12px;
+  }
+
+  .pause-testimonials:hover .pause-testimonials__track,
+  .pause-testimonials:focus-within .pause-testimonials__track,
+  .pause-testimonials.is-paused .pause-testimonials__track {
+    animation-play-state: paused;
+  }
+
+  @keyframes pause-marquee {
+    from { transform: translateX(0); }
+    to { transform: translateX(calc(-50% - 6px)); }
+  }
+
+  .pause-testimonial {
+    display: flex;
+    gap: 12px;
+    align-items: flex-start;
+    width: 260px;
+    margin: 0;
+    padding: 14px;
+    text-align: left;
+    border-radius: 16px;
+    border: 1px solid rgba(138, 143, 152, 0.2);
+    background: rgba(255, 255, 255, 0.04);
+    -webkit-backdrop-filter: blur(10px);
+    backdrop-filter: blur(10px);
+  }
+
+  .pause-testimonial__photo {
+    flex-shrink: 0;
     border-radius: 999px;
-    opacity: 0.2;
-    animation-name: pause-avatar-drift;
-    animation-timing-function: ease-in-out;
-    animation-iteration-count: infinite;
-    will-change: transform;
+    object-fit: cover;
   }
 
-  .pause-avatar-float--1 { background: linear-gradient(135deg, var(--cobalt), var(--cobalt-soft)); }
-  .pause-avatar-float--2 { background: linear-gradient(135deg, var(--steel), var(--cobalt)); }
-  .pause-avatar-float--3 { background: linear-gradient(135deg, var(--cobalt-dark), var(--cobalt-soft)); }
-  .pause-avatar-float--4 { background: var(--steel); opacity: 0.15; }
-  .pause-avatar-float--5 { background: linear-gradient(135deg, var(--cobalt-soft), var(--steel)); }
-
-  @keyframes pause-avatar-drift {
-    0% { transform: translate(0, 0); }
-    25% { transform: translate(14px, -10px); }
-    50% { transform: translate(-6px, 12px); }
-    75% { transform: translate(-14px, -6px); }
-    100% { transform: translate(0, 0); }
+  .pause-testimonial__who {
+    margin: 0 0 4px;
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--paper-soft);
   }
 
-  /* Orbite autour du chiffre -- même dégradés que les avatars flottants,
-     juste plus visibles (opacity 60-80%) et une trajectoire elliptique
-     avec une légère variation d'échelle (parallaxe : plus grand "devant",
-     plus petit "derrière"). */
-  .pause-orbit {
-    position: absolute;
-    left: 50%;
-    top: 38%;
-    width: 1px;
-    height: 1px;
+  .pause-testimonial__concept {
+    margin: 0 0 6px;
+    font-size: 13px;
+    color: var(--steel);
+    line-height: 1.4;
   }
 
-  .pause-avatar-orbit {
-    position: absolute;
-    left: 0;
-    top: 0;
-    width: 22px;
-    height: 22px;
-    margin: -11px 0 0 -11px;
-    border-radius: 999px;
-    animation-timing-function: linear;
-    animation-iteration-count: infinite;
-    will-change: transform;
+  .pause-testimonial__result {
+    margin: 0;
+    font-size: 14px;
+    font-weight: 800;
+    color: var(--cobalt-soft);
   }
 
-  .pause-avatar-orbit--1 { background: linear-gradient(135deg, var(--cobalt), var(--cobalt-soft)); animation: pause-orbit-1 22s linear infinite; }
-  .pause-avatar-orbit--2 { background: linear-gradient(135deg, var(--steel), var(--cobalt)); animation: pause-orbit-2 26s linear infinite; }
-  .pause-avatar-orbit--3 { background: var(--cobalt-soft); animation: pause-orbit-3 30s linear infinite; }
-  .pause-avatar-orbit--4 { background: linear-gradient(135deg, var(--cobalt-dark), var(--cobalt)); animation: pause-orbit-4 24s linear infinite; }
-  .pause-avatar-orbit--5 { background: linear-gradient(135deg, var(--steel), var(--cobalt-soft)); animation: pause-orbit-5 28s linear infinite; }
+  .pause-testimonials__note {
+    margin: 10px 0 0;
+    font-size: 11px;
+    color: var(--steel);
+  }
 
-  @keyframes pause-orbit-1 {
-    0% { transform: translate(-150px, 0) scale(0.75); opacity: 0.5; }
-    25% { transform: translate(0, -60px) scale(1); opacity: 0.85; }
-    50% { transform: translate(150px, 0) scale(0.75); opacity: 0.5; }
-    75% { transform: translate(0, 60px) scale(1); opacity: 0.85; }
-    100% { transform: translate(-150px, 0) scale(0.75); opacity: 0.5; }
-  }
-  @keyframes pause-orbit-2 {
-    0% { transform: translate(120px, 30px) scale(0.8); opacity: 0.55; }
-    25% { transform: translate(20px, -70px) scale(1); opacity: 0.8; }
-    50% { transform: translate(-120px, 30px) scale(0.8); opacity: 0.55; }
-    75% { transform: translate(-20px, 80px) scale(1); opacity: 0.8; }
-    100% { transform: translate(120px, 30px) scale(0.8); opacity: 0.55; }
-  }
-  @keyframes pause-orbit-3 {
-    0% { transform: translate(-100px, -50px) scale(0.7); opacity: 0.5; }
-    50% { transform: translate(100px, 50px) scale(1); opacity: 0.85; }
-    100% { transform: translate(-100px, -50px) scale(0.7); opacity: 0.5; }
-  }
-  @keyframes pause-orbit-4 {
-    0% { transform: translate(90px, -70px) scale(0.85); opacity: 0.6; }
-    50% { transform: translate(-90px, 70px) scale(1); opacity: 0.8; }
-    100% { transform: translate(90px, -70px) scale(0.85); opacity: 0.6; }
-  }
-  @keyframes pause-orbit-5 {
-    0% { transform: translate(-60px, 90px) scale(0.75); opacity: 0.5; }
-    50% { transform: translate(60px, -90px) scale(1); opacity: 0.85; }
-    100% { transform: translate(-60px, 90px) scale(0.75); opacity: 0.5; }
+  /* CTA collant en bas de l'écran, toujours visible même si le contenu
+     dépasse sur un petit téléphone. */
+  .quiz-footer--sticky {
+    position: sticky;
+    bottom: 0;
+    z-index: 2;
+    padding-bottom: 8px;
+    background: linear-gradient(180deg, transparent, var(--ink) 35%);
   }
 
   @media (prefers-reduced-motion: reduce) {
-    .pause-avatar-float,
-    .pause-avatar-orbit,
-    .pause-glow {
-      animation: none;
-    }
-    .pause-avatar-orbit--1 { opacity: 0.7; }
-    .pause-avatar-orbit--2 { opacity: 0.7; }
-    .pause-avatar-orbit--3 { opacity: 0.7; }
-    .pause-avatar-orbit--4 { opacity: 0.7; }
-    .pause-avatar-orbit--5 { opacity: 0.7; }
-    .pause-glow { opacity: 0.7; }
+    .pause-glow { animation: none; opacity: 0.8; }
+    .quiz-screen.is-active .pause-avatar,
+    .pause-avatar { animation: none; opacity: 1; transform: none; }
+    .pause-testimonials__track { animation: none; }
+    .pause-testimonials { overflow-x: auto; }
   }
 
   .quiz-result__concept-name {
@@ -4960,7 +5038,10 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
             <button type="button" class="btn btn--primary" id="hero-quiz-btn">${hero.ctaPrimary}</button>
             <a class="btn btn--secondary" href="#faq-title">${hero.ctaSecondary}</a>
           </div>
-          <div class="hero__social-proof">
+          <!-- Masqué tant que le vrai nombre de concepts générés
+               (social_proof_stats) n'atteint pas 100 : jamais un chiffre
+               inventé. Rempli côté client, arrondi à la centaine inférieure. -->
+          <div class="hero__social-proof" id="hero-social-proof" hidden>
             <div class="hero__social-proof-avatars" aria-hidden="true">
               <span class="hero__avatar" style="background:#7B8794">A</span>
               <span class="hero__avatar" style="background:#8A6FD9">M</span>
@@ -4968,7 +5049,7 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
               <span class="hero__avatar" style="background:#C97B4A">L</span>
               <span class="hero__avatar" style="background:#5A7FB8">R</span>
             </div>
-            <span class="hero__social-proof-text">+2 300 entrepreneurs nous font confiance</span>
+            <span class="hero__social-proof-text" id="hero-social-proof-text"></span>
           </div>
         </div>
 
@@ -6004,7 +6085,7 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
           return;
         }
         pauseCountUpDone = true;
-        var duration = 1300;
+        var duration = 1200;
         var start = null;
         function step(ts) {
           if (!start) start = ts;
@@ -6015,6 +6096,50 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
         }
         window.requestAnimationFrame(step);
       }
+
+      // Preuve sociale réelle : nombre total de concepts générés, lu via
+      // social_proof_stats (total agrégé uniquement, jamais une ligne).
+      // Arrondi à la centaine inférieure, affiché seulement à partir de
+      // 100 -- en dessous, le hero n'affiche rien et l'écran 3 garde son
+      // texte "tu fais partie des premiers".
+      function loadSocialProof() {
+        var supabase = window.ColdTrendSupabase;
+        if (!supabase) return;
+        supabase.rpc("social_proof_stats").then(function (res) {
+          var n = res && res.data && typeof res.data.concepts === "number" ? res.data.concepts : 0;
+          var rounded = Math.floor(n / 100) * 100;
+          if (rounded < 100) return;
+          var label = rounded.toLocaleString("fr-FR");
+          var heroEl = document.getElementById("hero-social-proof");
+          if (heroEl) {
+            document.getElementById("hero-social-proof-text").textContent = "+" + label + " concepts générés avec ColdTrend";
+            heroEl.hidden = false;
+          }
+          document.getElementById("quiz-pause-number").setAttribute("data-target", String(rounded));
+          document.getElementById("pause-avatars-more").textContent = "+" + label;
+          document.getElementById("pause-stat").hidden = false;
+          document.getElementById("pause-early").hidden = true;
+        });
+      }
+
+      if (window.ColdTrendSupabase) {
+        loadSocialProof();
+      } else {
+        document.addEventListener("coldtrend:supabase-ready", loadSocialProof, { once: true });
+      }
+
+      // Carrousel de témoignages : pause au toucher (en plus du survol, géré
+      // en CSS) -- reprend dès que le doigt se lève.
+      (function initTestimonialsPause() {
+        var carousel = document.getElementById("pause-testimonials");
+        if (!carousel) return;
+        carousel.addEventListener("touchstart", function () {
+          carousel.classList.add("is-paused");
+        }, { passive: true });
+        carousel.addEventListener("touchend", function () {
+          carousel.classList.remove("is-paused");
+        });
+      })();
 
       function goToResult() {
         reachedResult = true;
@@ -6037,10 +6162,28 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
 
         renderConceptTeaser(answers.concept || null);
 
-        fetchGeneratedConcept(answers, function (concept) {
-          if (!concept) return;
-          answers.concept = concept;
-          renderConceptTeaser(concept);
+        // Attend la session avant de demander le concept : à l'inscription
+        // par email, l'écran résultat s'affiche AVANT que resolve-identity
+        // ait créé la session (transition optimiste). Sans cette attente,
+        // l'appel partait sans session, échouait en silence et aucun
+        // concept n'était jamais généré pour les nouveaux comptes.
+        // Une seconde tentative couvre un échec ponctuel du modèle.
+        var pendingAuth = authResolutionPromise || Promise.resolve(true);
+        pendingAuth.then(function () {
+          fetchGeneratedConcept(answers, function (concept) {
+            if (concept) {
+              answers.concept = concept;
+              renderConceptTeaser(concept);
+              return;
+            }
+            window.setTimeout(function () {
+              fetchGeneratedConcept(answers, function (retried) {
+                if (!retried) return;
+                answers.concept = retried;
+                renderConceptTeaser(retried);
+              });
+            }, 2500);
+          });
         });
       }
 
@@ -8020,46 +8163,51 @@ function renderQuizQuestionScreen(question, index) {
   }
 
   if (question.type === "mirror") {
-    // Charnière de fin de chapitre 1 -- écran de pause statistique (voir
-    // commentaire sur la question "mirror" dans quiz.questions). Le
-    // compte-up de #quiz-pause-number est déclenché dans transitionTo(),
-    // pas ici (jamais lancé tant que l'écran n'est pas réellement affiché).
-    // Positions/durées des avatars flottants et orbitaux fixées au build
-    // (pas Math.random() côté client à chaque rendu -- déterministe, donc
-    // stable si l'écran est revisité).
-    const floatSeeds = [
-      { top: 8, left: 6, dur: 14, delay: 0 },
-      { top: 18, left: 82, dur: 17, delay: 1.2 },
-      { top: 30, left: 20, dur: 12, delay: 2.4 },
-      { top: 42, left: 68, dur: 16, delay: 0.6 },
-      { top: 55, left: 12, dur: 13, delay: 3 },
-      { top: 62, left: 90, dur: 15, delay: 1.8 },
-      { top: 74, left: 34, dur: 18, delay: 2.1 },
-      { top: 80, left: 58, dur: 12.5, delay: 0.9 },
-      { top: 15, left: 45, dur: 14.5, delay: 2.7 },
-      { top: 88, left: 78, dur: 16.5, delay: 1.5 }
-    ];
-    const floatAvatars = floatSeeds
-      .map(
-        (s, i) =>
-          `<span class="pause-avatar-float pause-avatar-float--${(i % 5) + 1}" style="top:${s.top}%;left:${s.left}%;animation-duration:${s.dur}s;animation-delay:${s.delay}s"></span>`
-      )
-      .join("");
-    const orbitAvatars = [1, 2, 3, 4, 5]
-      .map((n) => `<span class="pause-avatar-orbit pause-avatar-orbit--${n}"></span>`)
-      .join("");
-    return `<div class="quiz-screen quiz-mirror" data-screen="question" data-index="${index}" data-id="${question.id}" data-step-name="${question.stepName}"${skipAttrs}>
-          <div class="pause-avatars-bg" aria-hidden="true">${floatAvatars}</div>
-          <div class="pause-content">
-            <div class="pause-orbit" aria-hidden="true">${orbitAvatars}</div>
-            <p class="quiz-mirror__eyebrow">${question.eyebrow}</p>
-            <div class="pause-number-wrap">
-              <div class="pause-glow" aria-hidden="true"></div>
-              <div class="pause-number" id="quiz-pause-number" data-target="${question.pauseValue}">0</div>
+    // Écran "Tu n'es pas le seul" -- uniquement des données réelles :
+    // - compteur = vrai nombre de concepts générés (social_proof_stats,
+    //   arrondi à la centaine inférieure), affiché seulement à partir de
+    //   100 ; en dessous, le texte "premiers" dit la vérité ;
+    // - avatars = silhouettes neutres (jamais la photo de quelqu'un qui
+    //   n'est pas client), affichés avec le compteur ;
+    // - témoignages = data/testimonials.json, consentement obligatoire,
+    //   carrousel seulement à partir de 2 entrées valides.
+    const esc = (v) =>
+      String(v).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+    const avatars = Array.from({ length: 7 }, (_, i) => `<span class="pause-avatar" style="--i:${i}"></span>`).join("");
+    const testimonialCard = (t) => `<figure class="pause-testimonial">
+              <img class="pause-testimonial__photo" src="/${esc(t.photo)}" alt="" width="48" height="48" loading="lazy" decoding="async" />
+              <figcaption>
+                <p class="pause-testimonial__who">${esc(t.prenom)}, ${esc(t.age)} ans${t.ville ? " · " + esc(t.ville) : ""}</p>
+                <p class="pause-testimonial__concept">${esc(t.concept)}</p>
+                <p class="pause-testimonial__result">${esc(t.result)}</p>
+              </figcaption>
+            </figure>`;
+    // Doublé pour une boucle marquee sans coupure (translateX -50%).
+    const testimonialsBlock =
+      TESTIMONIALS.length >= 2
+        ? `<div class="pause-testimonials" id="pause-testimonials" tabindex="0" aria-label="Témoignages">
+            <div class="pause-testimonials__track">
+              ${TESTIMONIALS.map(testimonialCard).join("")}
+              <div class="pause-testimonials__dup" aria-hidden="true">${TESTIMONIALS.map(testimonialCard).join("")}</div>
             </div>
-            <p class="pause-subtext">${question.subtext}</p>
           </div>
-          <div class="quiz-footer">
+          <p class="pause-testimonials__note">Résultats individuels, non représentatifs.</p>`
+        : "";
+    return `<div class="quiz-screen quiz-mirror" data-screen="question" data-index="${index}" data-id="${question.id}" data-step-name="${question.stepName}"${skipAttrs}>
+          <div class="pause-content">
+            <h2 class="pause-title">${question.title}</h2>
+            <div class="pause-stat" id="pause-stat" hidden>
+              <div class="pause-number-wrap">
+                <div class="pause-glow" aria-hidden="true"></div>
+                <div class="pause-number" id="quiz-pause-number" data-target="0">0</div>
+              </div>
+              <p class="pause-subtext">${question.subtext}</p>
+              <div class="pause-avatars" aria-hidden="true">${avatars}<span class="pause-avatars__more" id="pause-avatars-more"></span></div>
+            </div>
+            <p class="pause-early" id="pause-early">${question.earlyText}</p>
+            ${testimonialsBlock}
+          </div>
+          <div class="quiz-footer quiz-footer--sticky">
             <button class="btn btn--primary quiz-next" type="button">Continuer</button>
           </div>
         </div>`;
