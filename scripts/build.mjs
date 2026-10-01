@@ -1260,12 +1260,7 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
     height: 28px;
     border-radius: 999px;
     border: 2px solid var(--ink, #0A0E1A);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 11px;
-    font-weight: 700;
-    color: rgba(255, 255, 255, 0.85);
+    object-fit: cover;
     margin-left: -8px;
   }
 
@@ -3835,23 +3830,14 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
     border-radius: 999px;
     margin-left: -10px;
     border: 2px solid var(--ink);
-    background:
-      radial-gradient(circle at 50% 38%, rgba(255, 255, 255, 0.55) 0 22%, transparent 23%),
-      radial-gradient(ellipse at 50% 100%, rgba(255, 255, 255, 0.45) 0 42%, transparent 43%),
-      linear-gradient(135deg, var(--cobalt-dark), var(--cobalt));
+    object-fit: cover;
+    background: var(--ink-soft);
     opacity: 0;
     transform: scale(0.6);
   }
 
   .pause-avatar:first-child {
     margin-left: 0;
-  }
-
-  .pause-avatar:nth-child(even) {
-    background:
-      radial-gradient(circle at 50% 38%, rgba(255, 255, 255, 0.55) 0 22%, transparent 23%),
-      radial-gradient(ellipse at 50% 100%, rgba(255, 255, 255, 0.45) 0 42%, transparent 43%),
-      linear-gradient(135deg, #3a4150, var(--steel));
   }
 
   .quiz-screen.is-active .pause-avatar {
@@ -5070,11 +5056,7 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
           </div>
           <div class="hero__social-proof" id="hero-social-proof">
             <div class="hero__social-proof-avatars" aria-hidden="true">
-              <span class="hero__avatar" style="background:#7B8794">A</span>
-              <span class="hero__avatar" style="background:#8A6FD9">M</span>
-              <span class="hero__avatar" style="background:#4A9B8E">S</span>
-              <span class="hero__avatar" style="background:#C97B4A">L</span>
-              <span class="hero__avatar" style="background:#5A7FB8">R</span>
+              ${[1, 2, 3, 4, 5].map((n) => `<img class="hero__avatar" src="/lifestyle/avatar-${n}.webp" alt="" width="28" height="28" decoding="async" />`).join("")}
             </div>
             <span class="hero__social-proof-text" id="hero-social-proof-text">+${SIGNUPS_LABEL} inscrits sur ColdTrend</span>
           </div>
@@ -8161,13 +8143,16 @@ function renderQuizQuestionScreen(question, index) {
   if (question.type === "mirror") {
     // Écran "Tu n'es pas le seul" :
     // - compteur = SIGNUPS_COUNT (inscrits, chiffre déclaré), count-up ;
-    // - avatars = silhouettes neutres (jamais la photo de quelqu'un
-    //   présenté comme client) ;
+    // - avatars = photos libres de droits fournies par l'exploitant
+    //   (public/lifestyle/avatar-*.webp), recadrées sur le visage ;
     // - témoignages = data/testimonials.json, consentement obligatoire,
     //   carrousel seulement à partir de 2 entrées valides.
     const esc = (v) =>
       String(v).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
-    const avatars = Array.from({ length: 7 }, (_, i) => `<span class="pause-avatar" style="--i:${i}"></span>`).join("");
+    const avatars = Array.from(
+      { length: 7 },
+      (_, i) => `<img class="pause-avatar" style="--i:${i}" src="/lifestyle/avatar-${i + 1}.webp" alt="" width="36" height="36" decoding="async" />`
+    ).join("");
     const testimonialCard = (t) => `<figure class="pause-testimonial">
               <img class="pause-testimonial__photo" src="/${esc(t.photo)}" alt="" width="48" height="48" loading="lazy" decoding="async" />
               <figcaption>
