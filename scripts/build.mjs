@@ -2045,6 +2045,10 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
     position: relative;
     flex: 1;
     overflow: hidden;
+    /* clip, pas seulement hidden : les écrans inactifs décalés de 24px
+       rendent la scène défilable, et le focus d'un champ la faisait
+       glisser de côté. clip interdit tout défilement. */
+    overflow: clip;
     padding: 0 20px;
   }
 
@@ -7439,6 +7443,11 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
           if (i < p.months) bar.style.height = Math.max(10, Math.round((p.series[i] / max) * 100)) + "%";
         });
       }
+
+      // Repli pour les navigateurs sans overflow: clip (voir .quiz-stage).
+      stage.addEventListener("scroll", function () {
+        if (stage.scrollLeft) stage.scrollLeft = 0;
+      });
 
       (function initGatePasswordToggle() {
         var eye = document.getElementById("gate-eye");
