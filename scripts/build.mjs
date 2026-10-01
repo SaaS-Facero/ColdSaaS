@@ -821,8 +821,11 @@ const quiz = {
       id: "auth",
       stepName: "auth",
       type: "auth",
-      title: "On garde ce qu'on vient de construire.",
-      subtext: "Tes réponses sont déjà là, on ne te les redemande pas. Juste un compte pour les retrouver — la suite continue juste après."
+      // Phase Gate, écran 18 -- projection floutée (calculée pour de vrai,
+      // voir computeProjection) au-dessus de la création de compte.
+      title: "Ton projet est prêt.",
+      echoTitle: "{nomProjet} est prêt.",
+      subtext: "Crée ton compte pour débloquer ta projection et ton concept complet."
     }
   ]
 };
@@ -3340,6 +3343,264 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
     flex: 1;
     height: 1px;
     background: rgba(255, 255, 255, 0.1);
+  }
+
+  /* ---- Écran 18 (Gate) : projection floutée + création de compte ------ */
+  .quiz-gate .quiz-subtext {
+    margin-bottom: 16px;
+  }
+
+  .gate-card {
+    position: relative;
+    overflow: hidden;
+    margin: 0 0 18px;
+    padding: 14px 16px 16px;
+    border-radius: 18px;
+    border: 1px solid rgba(0, 71, 255, 0.35);
+    background:
+      radial-gradient(120% 90% at 100% 0%, rgba(0, 71, 255, 0.22), transparent 60%),
+      rgba(255, 255, 255, 0.03);
+    box-shadow: 0 24px 60px -34px rgba(0, 71, 255, 0.9);
+    opacity: 0;
+    transform: translateY(10px) scale(0.98);
+  }
+
+  .quiz-screen.is-active .gate-card {
+    animation: gate-card-in 560ms cubic-bezier(0.34, 1.4, 0.64, 1) 120ms forwards;
+  }
+
+  @keyframes gate-card-in {
+    to { opacity: 1; transform: none; }
+  }
+
+  .gate-card__head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    margin-bottom: 10px;
+  }
+
+  .gate-card__label {
+    font-size: 12px;
+    font-weight: 800;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    color: var(--cobalt-soft);
+  }
+
+  .gate-card__lock {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 4px 9px;
+    border-radius: 999px;
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--paper-soft);
+    background: rgba(255, 255, 255, 0.08);
+  }
+
+  /* Les vrais chiffres sont dans le DOM, juste floutés et non sélectionnables. */
+  .gate-card__blur {
+    filter: blur(7px);
+    user-select: none;
+    -webkit-user-select: none;
+    pointer-events: none;
+  }
+
+  .gate-card__value {
+    margin: 0 0 10px;
+    font-size: 34px;
+    font-weight: 800;
+    letter-spacing: -0.02em;
+    color: var(--paper-soft);
+  }
+
+  .gate-card__value small {
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--steel);
+  }
+
+  .gate-chart {
+    display: flex;
+    align-items: flex-end;
+    gap: 6px;
+    height: 54px;
+    margin-bottom: 10px;
+  }
+
+  .gate-chart__bar {
+    flex: 1;
+    height: 10%;
+    border-radius: 6px 6px 2px 2px;
+    background: linear-gradient(180deg, var(--cobalt), rgba(0, 71, 255, 0.25));
+  }
+
+  .gate-chart__bar[hidden] {
+    display: none;
+  }
+
+  .gate-card__stats {
+    display: flex;
+    justify-content: space-between;
+    gap: 8px;
+    font-size: 13px;
+    color: var(--steel);
+  }
+
+  .gate-card__stats strong {
+    color: var(--paper-soft);
+  }
+
+  .gate-card__veil {
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    margin: 0 auto;
+    transform: translateY(-35%);
+    width: max-content;
+    max-width: calc(100% - 32px);
+    padding: 9px 14px;
+    border-radius: 999px;
+    font-size: 13px;
+    font-weight: 700;
+    color: #fff;
+    background: rgba(5, 8, 15, 0.72);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    box-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.8);
+  }
+
+  .gate-card__veil-icon {
+    display: inline-flex;
+    color: var(--cobalt-soft);
+  }
+
+  /* Reflet qui balaie la carte : "c'est là, juste derrière". */
+  .gate-card::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(105deg, transparent 35%, rgba(255, 255, 255, 0.08) 50%, transparent 65%);
+    transform: translateX(-100%);
+    pointer-events: none;
+  }
+
+  .quiz-screen.is-active .gate-card::after {
+    animation: gate-sheen 3.2s ease-in-out 900ms infinite;
+  }
+
+  @keyframes gate-sheen {
+    0% { transform: translateX(-100%); }
+    45%, 100% { transform: translateX(100%); }
+  }
+
+  .quiz-gate .quiz-google-btn {
+    padding: 14px 16px;
+    font-size: 16px;
+  }
+
+  .gate-input-wrap {
+    position: relative;
+  }
+
+  .gate-input-wrap .quiz-input {
+    padding-right: 84px;
+  }
+
+  .gate-input-ok {
+    position: absolute;
+    right: 14px;
+    top: 50%;
+    display: inline-flex;
+    color: var(--verified-green);
+    opacity: 0;
+    transform: translateY(-50%) scale(0.6);
+    transition: opacity 200ms ease, transform 300ms cubic-bezier(0.34, 1.56, 0.64, 1);
+  }
+
+  .gate-input-wrap.is-valid .gate-input-ok {
+    opacity: 1;
+    transform: translateY(-50%) scale(1);
+  }
+
+  .gate-input-wrap.is-valid .quiz-input {
+    border-color: rgba(0, 196, 140, 0.5);
+  }
+
+  .gate-eye {
+    position: absolute;
+    right: 8px;
+    top: 50%;
+    transform: translateY(-50%);
+    padding: 6px 10px;
+    border: none;
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.06);
+    color: var(--steel);
+    font-family: inherit;
+    font-size: 12px;
+    font-weight: 700;
+    cursor: pointer;
+  }
+
+  .gate-eye:hover,
+  .gate-eye:focus-visible {
+    color: var(--paper-soft);
+  }
+
+  .gate-submit:not(:disabled) {
+    box-shadow: 0 0 0 1px rgba(0, 71, 255, 0.5), 0 16px 36px -14px rgba(0, 71, 255, 0.9);
+  }
+
+  .gate-trust {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 6px 16px;
+    list-style: none;
+    margin: 14px 0 0;
+    padding: 0;
+    font-size: 12px;
+    color: var(--steel);
+  }
+
+  .gate-trust li {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+  }
+
+  .gate-trust svg {
+    width: 13px;
+    height: 13px;
+    color: var(--verified-green);
+  }
+
+  .gate-legal {
+    margin: 12px 0 0;
+    font-size: 11px;
+    line-height: 1.5;
+    text-align: center;
+    color: var(--steel);
+  }
+
+  .gate-legal a {
+    color: inherit;
+    text-decoration: underline;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .quiz-screen.is-active .gate-card,
+    .gate-card { animation: none; opacity: 1; transform: none; }
+    .quiz-screen.is-active .gate-card::after { animation: none; }
+    .gate-input-ok { transition: none; }
   }
 
   @keyframes quiz-auth-field-in {
@@ -6113,7 +6374,11 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
         if (id === "auth") {
           var authEmailInput = document.getElementById("quiz-auth-email");
           var authPasswordInput = document.getElementById("quiz-auth-password");
-          nextBtn.disabled = !(EMAIL_RE.test(authEmailInput.value.trim()) && authPasswordInput.value.length >= 6);
+          var emailOk = EMAIL_RE.test(authEmailInput.value.trim());
+          var passwordOk = authPasswordInput.value.length >= 6;
+          authEmailInput.parentNode.classList.toggle("is-valid", emailOk);
+          authPasswordInput.parentNode.classList.toggle("is-valid", passwordOk);
+          nextBtn.disabled = !(emailOk && passwordOk);
           return;
         }
 
@@ -6209,6 +6474,7 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
         if (nextEl.getAttribute("data-id") === "objectifRevenu") startTitleRotator();
         else stopTitleRotator();
         if (nextEl.getAttribute("data-id") === "engagement") syncEngagementUI();
+        if (nextEl.getAttribute("data-id") === "auth") renderGateProjection();
         if (nextEl.getAttribute("data-id") === "assemblage") runAssembly();
         else stopAssembly();
 
@@ -7102,6 +7368,73 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
             showAuditError("L'analyse a échoué, réessaie.");
           });
       }
+
+      // ---- Projection (fourchette basse, déterministe) -------------------
+      // Même formule pour l'aperçu flouté (écran 18) et le dévoilement
+      // (phase 7). Hypothèses volontairement prudentes et affichées :
+      // vues/mois selon le temps dispo, bonus plateformes/partenaires,
+      // montée en charge sur 3 mois, 0,2 % de conversion, 9 €/mois,
+      // 10 % de résiliation mensuelle. Jamais une promesse.
+      var PROJECTION_BASE_VIEWS = { low: 2000, mid: 5000, high: 10000 };
+      var PROJECTION_PLATFORM_BONUS = { aucune: 1, "1": 1.1, "2": 1.2, "3": 1.3, "4_plus": 1.4 };
+      var PROJECTION_CONVERSION = 0.002;
+      var PROJECTION_PRICE = 9;
+      var PROJECTION_CHURN = 0.1;
+
+      function computeProjection(ans) {
+        var months = Math.min(6, Math.max(1, parseInt(ans.delai, 10) || 3));
+        var views = (PROJECTION_BASE_VIEWS[ans.temps] || PROJECTION_BASE_VIEWS.mid) * (PROJECTION_PLATFORM_BONUS[ans.plateformes] || 1);
+        if (ans.influenceurs === "oui") views *= 1.3;
+        if (ans.clippers === "oui") views *= 1.5;
+        views = Math.floor(views / 100) * 100;
+        var clients = 0;
+        var series = [];
+        for (var m = 1; m <= months; m += 1) {
+          var monthViews = views * Math.min(1, m / 3);
+          clients = clients * (1 - PROJECTION_CHURN) + Math.floor(monthViews * PROJECTION_CONVERSION);
+          series.push(Math.floor(clients) * PROJECTION_PRICE);
+        }
+        var finalClients = Math.floor(clients);
+        return {
+          months: months,
+          views: views,
+          conversion: PROJECTION_CONVERSION,
+          price: PROJECTION_PRICE,
+          churn: PROJECTION_CHURN,
+          clients: finalClients,
+          mrr: Math.floor((finalClients * PROJECTION_PRICE) / 10) * 10,
+          series: series
+        };
+      }
+
+      function renderGateProjection() {
+        var mrrEl = document.getElementById("gate-mrr");
+        if (!mrrEl) return;
+        var p = computeProjection(answers);
+        mrrEl.textContent = p.mrr.toLocaleString("fr-FR");
+        document.getElementById("gate-clients").textContent = String(p.clients);
+        document.getElementById("gate-views").textContent = p.views.toLocaleString("fr-FR");
+        document.getElementById("gate-horizon").textContent = "à " + p.months + " mois";
+        var max = Math.max.apply(null, p.series.concat([1]));
+        Array.prototype.forEach.call(document.querySelectorAll("[data-gate-bar]"), function (bar, i) {
+          bar.hidden = i >= p.months;
+          if (i < p.months) bar.style.height = Math.max(10, Math.round((p.series[i] / max) * 100)) + "%";
+        });
+      }
+
+      (function initGatePasswordToggle() {
+        var eye = document.getElementById("gate-eye");
+        var input = document.getElementById("quiz-auth-password");
+        if (!eye || !input) return;
+        eye.addEventListener("click", function () {
+          var show = input.type === "password";
+          input.type = show ? "text" : "password";
+          eye.textContent = show ? "Masquer" : "Afficher";
+          eye.setAttribute("aria-pressed", show ? "true" : "false");
+          eye.setAttribute("aria-label", show ? "Masquer le mot de passe" : "Afficher le mot de passe");
+          input.focus();
+        });
+      })();
 
       // ---- Écran 16 : engagement (appui long sur l'empreinte) ------------
       // rAF plutôt qu'une transition CSS : relâcher avant la fin annule
@@ -8822,32 +9155,63 @@ function renderQuizQuestionScreen(question, index) {
   }
 
   if (question.type === "auth") {
-    // Dernière étape du parcours, pas un gate à part : même carte, même
-    // bouton "Continuer" (classe .quiz-next partagée avec les autres
-    // écrans). Le fond en mesh-gradient (.quiz-auth-mesh) et le stagger
-    // d'apparition des deux champs (.quiz-auth-field--1/--2) sont les seuls
-    // éléments visuels propres à cet écran.
-    return `<div class="quiz-screen" data-screen="question" data-index="${index}" data-id="${question.id}" data-step-name="${question.stepName}"${skipAttrs}>
+    // Écran 18 (Gate) : la projection est calculée côté client à l'entrée
+    // de l'écran (computeProjection, fourchette basse) et affichée floutée ;
+    // elle se dévoile en clair à l'écran suivant, une fois le compte créé.
+    // Les ids quiz-google-btn / quiz-auth-* / quiz-auth-submit sont repris
+    // par les handlers existants : ne pas les renommer.
+    const bars = Array.from({ length: 6 }, (_, i) => `<span class="gate-chart__bar" data-gate-bar="${i}"></span>`).join("");
+    return `<div class="quiz-screen quiz-gate" data-screen="question" data-index="${index}" data-id="${question.id}" data-step-name="${question.stepName}"${skipAttrs}>
           <div class="quiz-auth-mesh" aria-hidden="true"></div>
-          <h2 class="quiz-question-title">${question.title}</h2>
+          <h2 class="quiz-question-title" data-echo="${question.echoTitle}">${question.title}</h2>
           <p class="quiz-subtext">${question.subtext}</p>
+          <div class="gate-card" aria-label="Projection verrouillée">
+            <div class="gate-card__head">
+              <span class="gate-card__label">Ta projection <span id="gate-horizon">à 3 mois</span></span>
+              <span class="gate-card__lock">${ICON_LOCK} Verrouillée</span>
+            </div>
+            <div class="gate-card__blur" aria-hidden="true">
+              <p class="gate-card__value"><span id="gate-mrr">000</span> €<small>/mois</small></p>
+              <div class="gate-chart">${bars}</div>
+              <div class="gate-card__stats">
+                <span><strong id="gate-clients">00</strong> clients payants</span>
+                <span><strong id="gate-views">0 000</strong> vues/mois</span>
+              </div>
+            </div>
+            <div class="gate-card__veil">
+              <span class="gate-card__veil-icon">${ICON_LOCK}</span>
+              <span>Débloquée dès ton compte créé</span>
+            </div>
+          </div>
           <button type="button" class="quiz-google-btn" id="quiz-google-btn">
             ${ICON_GOOGLE}
             Continuer avec Google
           </button>
-          <div class="quiz-auth-divider"><span>ou</span></div>
+          <div class="quiz-auth-divider"><span>ou avec ton email</span></div>
           <div class="quiz-field quiz-auth-field quiz-auth-field--1">
             <label class="quiz-label" for="quiz-auth-email">Email</label>
-            <input class="quiz-input" id="quiz-auth-email" name="email" type="email" autocomplete="email" required />
+            <div class="gate-input-wrap">
+              <input class="quiz-input" id="quiz-auth-email" name="email" type="email" autocomplete="email" inputmode="email" placeholder="toi@exemple.com" required />
+              <span class="gate-input-ok" aria-hidden="true">${ICON_CHECK_SMALL}</span>
+            </div>
           </div>
           <div class="quiz-field quiz-auth-field quiz-auth-field--2">
             <label class="quiz-label" for="quiz-auth-password">Mot de passe</label>
-            <input class="quiz-input" id="quiz-auth-password" name="password" type="password" autocomplete="new-password" minlength="6" required />
+            <div class="gate-input-wrap">
+              <input class="quiz-input" id="quiz-auth-password" name="password" type="password" autocomplete="new-password" minlength="6" placeholder="6 caractères minimum" required />
+              <button type="button" class="gate-eye" id="gate-eye" aria-label="Afficher le mot de passe" aria-pressed="false">Afficher</button>
+            </div>
             <span class="quiz-field__error" id="quiz-auth-error" aria-live="polite"></span>
           </div>
           <div class="quiz-footer">
-            <button class="btn btn--primary quiz-next" id="quiz-auth-submit" type="button" disabled>Continuer</button>
+            <button class="btn btn--primary quiz-next gate-submit" id="quiz-auth-submit" type="button" disabled>Débloquer mon projet</button>
           </div>
+          <ul class="gate-trust">
+            <li>${ICON_CHECK_SMALL} Aucune carte demandée</li>
+            <li>${ICON_CHECK_SMALL} Réponses sauvegardées</li>
+            <li>${ICON_CHECK_SMALL} Zéro spam</li>
+          </ul>
+          <p class="gate-legal">En continuant, tu confirmes avoir 18 ans ou plus et accepter nos <a href="/mentions-legales" target="_blank" rel="noopener">mentions légales</a>.</p>
         </div>`;
   }
 
