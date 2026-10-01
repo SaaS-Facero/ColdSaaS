@@ -85,6 +85,9 @@ Deno.serve(async (req) => {
     .from("funnel_events")
     .select("metadata, created_at")
     .eq("event_name", "page_view")
+    // Mode Vidéo (/demo) : évènements marqués is_demo jamais comptés
+    // (la page démo n'en envoie pas, garde-fou si ça change un jour).
+    .eq("is_demo", false)
     .order("created_at", { ascending: false })
     .limit(MAX_ROWS);
 

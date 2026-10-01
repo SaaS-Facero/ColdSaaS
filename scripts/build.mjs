@@ -16610,6 +16610,870 @@ function writeBuiltFile(filePath, contents) {
 }
 
 // ---------------------------------------------------------------------------
+// /demo — Mode Vidéo (tournage TikTok/Insta), réservé aux admins.
+//
+// - Accès : la page n'affiche RIEN tant que generate-demo-concept n'a pas
+//   confirmé côté serveur que la session est celle d'un admin (profiles.role
+//   relu avec le rôle service). Sans session ou sans rôle admin : retour
+//   immédiat à l'accueil. Le HTML lui-même ne contient aucune donnée.
+// - Parcours : questions de demo.config.json (reprises de quiz.questions,
+//   mêmes libellés), puis "On assemble ton projet" avec les 2 pop-ups, puis
+//   le concept généré par le vrai LLM (cache par combinaison de réponses).
+// - Rien de collecté : pas de trackEvent, pas de page_view, pas de Crisp,
+//   aucune écriture dans profiles / user_concepts / funnel_events.
+// - Aucune projection de revenus, aucun témoignage.
+// - Tournage : cadre 9:16 centré (tailles en cqw, identiques quelle que
+//   soit la taille de l'écran), aucun bouton retour / croix / avatar.
+//   Raccourcis : R relancer, L ralenti x1,3, F plein écran.
+// ---------------------------------------------------------------------------
+function loadDemoConfig() {
+  let raw = {};
+  try {
+    raw = JSON.parse(readFileSync(path.join(__dirname, "..", "demo.config.json"), "utf8"));
+  } catch (err) {
+    console.warn("[build] demo.config.json illisible, configuration par défaut :", err.message);
+  }
+  const ids = Array.isArray(raw.questions) && raw.questions.length ? raw.questions : ["attente", "temps", "secteur", "reve"];
+  // Build bloqué si un id n'existe pas ou n'est pas une question à options :
+  // mieux qu'une démo cassée découverte au moment de filmer.
+  const questions = ids.map((id) => {
+    const q = quiz.questions.find((x) => x.id === id);
+    if (!q || (q.type !== "single" && q.type !== "multi")) {
+      throw new Error(`[demo.config.json] question "${id}" inconnue ou sans options (types single/multi uniquement).`);
+    }
+    return {
+      id: q.id,
+      title: q.title,
+      subtext: q.subtext || "",
+      type: q.type,
+      options: q.options.map((o) => ({ value: o.value, label: o.label, emoji: o.emoji || "" }))
+    };
+  });
+  const assembling = quiz.questions.find((x) => x.id === "assemblage");
+  const factor = Number(raw.slowMotionFactor);
+  return {
+    questions,
+    steps: assembling.steps,
+    slogans: assembling.slogans,
+    popups: assembling.popups,
+    slowMotion: raw.slowMotion === true,
+    slowFactor: factor >= 1 && factor <= 3 ? factor : 1.3
+  };
+}
+
+function demoPage() {
+  const config = loadDemoConfig();
+  const c = brand.colors;
+  return `<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="robots" content="noindex, nofollow" />
+  <title>${brand.name}</title>
+  <style>
+    :root {
+      --cobalt: ${c.cobalt};
+      --cobalt-soft: ${c.cobaltSoft};
+      --green: ${c.verifiedGreen};
+      --steel: ${c.steel};
+      --ink: ${c.ink};
+      --paper: #F2F4F8;
+      --slow: 1;
+    }
+
+    * { box-sizing: border-box; }
+
+    html, body {
+      margin: 0;
+      height: 100%;
+      background: #000;
+      color: var(--paper);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Inter, Arial, sans-serif;
+      overflow: hidden;
+      -webkit-font-smoothing: antialiased;
+      cursor: default;
+    }
+
+    /* Cadre 9:16 centré, bandes noires autour sur un écran horizontal. */
+    .d-frame {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      width: min(100vw, calc(100dvh * 9 / 16));
+      height: min(100dvh, calc(100vw * 16 / 9));
+      transform: translate(-50%, -50%);
+      overflow: hidden;
+      background: var(--ink);
+      container-type: size;
+    }
+
+    .d-frame[hidden] { display: none; }
+
+    .d-liquid { position: absolute; inset: 0; pointer-events: none; }
+
+    .d-blob {
+      position: absolute;
+      width: 80cqw;
+      height: 80cqw;
+      filter: blur(14cqw);
+      opacity: 0.5;
+      border-radius: 42% 58% 63% 37% / 41% 44% 56% 59%;
+      animation: d-liquid calc(16s * var(--slow)) ease-in-out infinite alternate;
+    }
+
+    .d-blob--1 { top: -20cqw; left: -25cqw; background: var(--cobalt); }
+    .d-blob--2 { bottom: -20cqw; right: -30cqw; background: var(--green); opacity: 0.28; animation-delay: -7s; }
+    .d-blob--3 { top: 45%; left: 20%; background: #7B4DFF; opacity: 0.3; animation-delay: -12s; }
+
+    @keyframes d-liquid {
+      0% { transform: translate(0, 0) rotate(0deg) scale(1); }
+      50% { transform: translate(10cqw, 8cqw) rotate(60deg) scale(1.15); }
+      100% { transform: translate(-6cqw, 14cqw) rotate(120deg) scale(0.95); }
+    }
+
+    .d-brand {
+      position: absolute;
+      top: 6cqw;
+      left: 0;
+      right: 0;
+      z-index: 2;
+      text-align: center;
+      font-size: 4.2cqw;
+      font-weight: 800;
+      letter-spacing: 0.02em;
+      opacity: 0.9;
+    }
+
+    .d-progress {
+      position: absolute;
+      top: 14cqw;
+      left: 7cqw;
+      right: 7cqw;
+      z-index: 2;
+      display: flex;
+      gap: 1.6cqw;
+    }
+
+    .d-progress[hidden] { display: none; }
+
+    .d-progress span {
+      flex: 1;
+      height: 1.1cqw;
+      border-radius: 99px;
+      background: rgba(255, 255, 255, 0.15);
+      overflow: hidden;
+    }
+
+    .d-progress span::after {
+      content: "";
+      display: block;
+      height: 100%;
+      width: 0;
+      background: var(--cobalt-soft);
+      transition: width calc(500ms * var(--slow)) ease;
+    }
+
+    .d-progress span.is-done::after { width: 100%; }
+
+    .d-stage {
+      position: absolute;
+      inset: 22cqw 7cqw 8cqw;
+    }
+
+    .d-screen {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      flex-direction: column;
+      animation: d-screen-in calc(560ms * var(--slow)) cubic-bezier(0.22, 1.2, 0.36, 1) both;
+    }
+
+    .d-screen.is-leaving {
+      animation: d-screen-out calc(260ms * var(--slow)) ease-in both;
+    }
+
+    @keyframes d-screen-in {
+      from { opacity: 0; transform: translateX(8cqw); }
+      to { opacity: 1; transform: none; }
+    }
+
+    @keyframes d-screen-out {
+      to { opacity: 0; transform: translateX(-8cqw); }
+    }
+
+    .d-title {
+      margin: 0 0 2.5cqw;
+      font-size: 8.6cqw;
+      font-weight: 800;
+      letter-spacing: -0.02em;
+      line-height: 1.12;
+    }
+
+    .d-sub {
+      margin: 0 0 5cqw;
+      font-size: 4.2cqw;
+      color: var(--steel);
+    }
+
+    .d-options {
+      display: flex;
+      flex-direction: column;
+      gap: 3cqw;
+    }
+
+    .d-option {
+      display: flex;
+      align-items: center;
+      gap: 3.5cqw;
+      width: 100%;
+      padding: 4.2cqw 4.5cqw;
+      border-radius: 5cqw;
+      border: 1px solid rgba(255, 255, 255, 0.14);
+      background: linear-gradient(145deg, rgba(255, 255, 255, 0.11), rgba(255, 255, 255, 0.03));
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.22);
+      -webkit-backdrop-filter: blur(20px) saturate(170%);
+      backdrop-filter: blur(20px) saturate(170%);
+      color: var(--paper);
+      font: inherit;
+      font-size: 4.6cqw;
+      font-weight: 700;
+      text-align: left;
+      cursor: pointer;
+      opacity: 0;
+      animation: d-pop calc(480ms * var(--slow)) cubic-bezier(0.34, 1.45, 0.64, 1) both;
+      animation-delay: calc((var(--i) * 80ms + 160ms) * var(--slow));
+      transition: transform calc(260ms * var(--slow)) cubic-bezier(0.34, 1.56, 0.64, 1), background 200ms ease, border-color 200ms ease;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    .d-option:active { transform: scale(0.97); }
+
+    .d-option.is-selected {
+      border-color: rgba(127, 168, 255, 0.9);
+      background: radial-gradient(120% 120% at 0% 0%, rgba(0, 71, 255, 0.45), transparent 70%), rgba(0, 71, 255, 0.16);
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.3), 0 0 0 1px rgba(127, 168, 255, 0.5), 0 4cqw 9cqw -4cqw rgba(0, 71, 255, 0.9);
+      transform: scale(1.02);
+    }
+
+    .d-option__emoji { font-size: 6cqw; }
+
+    @keyframes d-pop {
+      from { opacity: 0; transform: translateY(3cqw) scale(0.97); }
+      to { opacity: 1; transform: none; }
+    }
+
+    .d-cta {
+      margin-top: auto;
+      width: 100%;
+      padding: 4.4cqw;
+      border: none;
+      border-radius: 4.5cqw;
+      background: linear-gradient(135deg, #3D7BFF, var(--cobalt) 60%, #0036C4);
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.35), 0 4cqw 10cqw -4cqw rgba(0, 71, 255, 0.95);
+      color: #fff;
+      font: inherit;
+      font-size: 4.8cqw;
+      font-weight: 800;
+      cursor: pointer;
+      animation: d-pop calc(420ms * var(--slow)) ease both;
+    }
+
+    .d-cta[hidden] { display: none; }
+
+    /* Assemblage */
+    .d-center { text-align: center; }
+
+    .d-slogan {
+      min-height: 6cqw;
+      margin: 0 0 5cqw;
+      font-size: 4.6cqw;
+      font-weight: 700;
+      color: var(--cobalt-soft);
+      transition: opacity calc(220ms * var(--slow)) ease, transform calc(220ms * var(--slow)) ease;
+    }
+
+    .d-slogan.is-swapping { opacity: 0; transform: translateY(-1.5cqw); }
+
+    .d-bar {
+      height: 2cqw;
+      border-radius: 99px;
+      background: rgba(255, 255, 255, 0.1);
+      overflow: hidden;
+    }
+
+    .d-bar__fill {
+      height: 100%;
+      width: 0;
+      border-radius: inherit;
+      background: linear-gradient(90deg, #0033B8, var(--cobalt-soft));
+      box-shadow: 0 0 4cqw rgba(0, 71, 255, 0.8);
+      transition: width calc(900ms * var(--slow)) cubic-bezier(0.22, 1, 0.36, 1);
+    }
+
+    .d-percent {
+      margin: 2cqw 0 6cqw;
+      font-size: 3.6cqw;
+      font-weight: 700;
+      color: var(--steel);
+      font-variant-numeric: tabular-nums;
+    }
+
+    .d-steps {
+      list-style: none;
+      margin: 0;
+      padding: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 4cqw;
+      text-align: left;
+    }
+
+    .d-step {
+      position: relative;
+      padding-left: 9cqw;
+      font-size: 4.4cqw;
+      color: var(--steel);
+      transition: color 200ms ease;
+    }
+
+    .d-step::before {
+      content: "";
+      position: absolute;
+      left: 0;
+      top: 0.2cqw;
+      width: 5cqw;
+      height: 5cqw;
+      border-radius: 50%;
+      border: 0.6cqw solid rgba(255, 255, 255, 0.2);
+      box-sizing: border-box;
+    }
+
+    .d-step.is-active { color: var(--paper); }
+
+    .d-step.is-active::before {
+      border-color: var(--cobalt-soft);
+      border-top-color: transparent;
+      animation: d-spin calc(800ms * var(--slow)) linear infinite;
+    }
+
+    .d-step.is-done { color: var(--paper); }
+
+    .d-step.is-done::before {
+      border-color: var(--green);
+      background: var(--green);
+      box-shadow: 0 0 3cqw rgba(0, 196, 140, 0.6);
+    }
+
+    @keyframes d-spin { to { transform: rotate(360deg); } }
+
+    /* Pop-up plein cadre */
+    .d-popup {
+      position: absolute;
+      inset: 0;
+      z-index: 10;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 7cqw;
+      background: rgba(5, 8, 15, 0.8);
+      -webkit-backdrop-filter: blur(10px);
+      backdrop-filter: blur(10px);
+      animation: d-fade calc(220ms * var(--slow)) ease-out;
+    }
+
+    .d-popup[hidden] { display: none; }
+
+    .d-popup__card {
+      width: 100%;
+      padding: 8cqw 6cqw 6cqw;
+      border-radius: 6cqw;
+      text-align: center;
+      border: 1px solid rgba(0, 71, 255, 0.45);
+      background: radial-gradient(circle at 50% 0%, rgba(0, 71, 255, 0.28), transparent 70%), var(--ink);
+      box-shadow: 0 8cqw 20cqw -8cqw rgba(0, 71, 255, 0.85);
+      animation: d-popup-in calc(460ms * var(--slow)) cubic-bezier(0.34, 1.56, 0.64, 1);
+    }
+
+    .d-popup__eyebrow {
+      margin: 0 0 2cqw;
+      font-size: 3.2cqw;
+      font-weight: 800;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--cobalt-soft);
+    }
+
+    .d-popup__q { margin: 0 0 2cqw; font-size: 6.6cqw; font-weight: 800; line-height: 1.22; }
+    .d-popup__hint { margin: 0 0 6cqw; font-size: 4cqw; line-height: 1.45; color: var(--steel); }
+    .d-popup__actions { display: flex; gap: 3cqw; }
+
+    .d-popup__actions button {
+      flex: 1;
+      padding: 4cqw;
+      border-radius: 4cqw;
+      font: inherit;
+      font-size: 4.6cqw;
+      font-weight: 800;
+      cursor: pointer;
+    }
+
+    .d-yes { border: none; background: var(--cobalt); color: #fff; }
+    .d-no { border: 1px solid rgba(255, 255, 255, 0.2); background: transparent; color: var(--paper); }
+
+    @keyframes d-fade { from { opacity: 0; } }
+    @keyframes d-popup-in { from { opacity: 0; transform: scale(0.9) translateY(3cqw); } }
+
+    /* Concept */
+    .d-concept {
+      overflow-y: auto;
+      scrollbar-width: none;
+    }
+
+    .d-concept::-webkit-scrollbar { display: none; }
+
+    .d-eyebrow {
+      font-size: 3.4cqw;
+      font-weight: 800;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--green);
+    }
+
+    .d-name {
+      margin: 2cqw 0 2cqw;
+      font-size: 11cqw;
+      font-weight: 800;
+      letter-spacing: -0.03em;
+      line-height: 1.05;
+      background: linear-gradient(135deg, #fff, #9DB8FF);
+      -webkit-background-clip: text;
+      background-clip: text;
+      color: transparent;
+      clip-path: inset(0 100% 0 0);
+      animation: d-reveal calc(900ms * var(--slow)) cubic-bezier(0.22, 1, 0.36, 1) 150ms forwards;
+    }
+
+    @keyframes d-reveal { to { clip-path: inset(0 0 0 0); } }
+
+    .d-tagline {
+      margin: 0 0 5cqw;
+      font-size: 4.8cqw;
+      font-weight: 600;
+      line-height: 1.35;
+      opacity: 0;
+      animation: d-pop calc(500ms * var(--slow)) ease forwards;
+      animation-delay: calc(700ms * var(--slow));
+    }
+
+    .d-card {
+      margin-bottom: 3cqw;
+      padding: 4.5cqw;
+      border-radius: 5cqw;
+      border: 1px solid rgba(255, 255, 255, 0.13);
+      background: linear-gradient(145deg, rgba(255, 255, 255, 0.1), rgba(255, 255, 255, 0.025));
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.24);
+      -webkit-backdrop-filter: blur(20px) saturate(170%);
+      backdrop-filter: blur(20px) saturate(170%);
+      opacity: 0;
+      animation: d-pop calc(520ms * var(--slow)) cubic-bezier(0.34, 1.4, 0.64, 1) forwards;
+      animation-delay: calc((var(--i) * 180ms + 950ms) * var(--slow));
+    }
+
+    .d-card__label {
+      margin: 0 0 1.5cqw;
+      font-size: 3.2cqw;
+      font-weight: 800;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: var(--cobalt-soft);
+    }
+
+    .d-card__text { margin: 0; font-size: 4cqw; line-height: 1.5; }
+
+    .d-error { margin: auto 0; text-align: center; font-size: 4.6cqw; color: var(--steel); }
+
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { animation-duration: 1ms !important; animation-delay: 0ms !important; transition: none !important; }
+      .d-option, .d-card, .d-tagline { opacity: 1; }
+      .d-name { clip-path: none; }
+    }
+  </style>
+</head>
+<body>
+  <main class="d-frame" id="d-frame" hidden>
+    <div class="d-liquid" aria-hidden="true">
+      <span class="d-blob d-blob--1"></span>
+      <span class="d-blob d-blob--2"></span>
+      <span class="d-blob d-blob--3"></span>
+    </div>
+    <div class="d-brand">${brand.name}</div>
+    <div class="d-progress" id="d-progress">${config.questions.map(() => "<span></span>").join("")}</div>
+    <div class="d-stage" id="d-stage"></div>
+    <div class="d-popup" id="d-popup" role="dialog" aria-modal="true" hidden>
+      <div class="d-popup__card">
+        <p class="d-popup__eyebrow">Question rapide</p>
+        <p class="d-popup__q" id="d-popup-q"></p>
+        <p class="d-popup__hint" id="d-popup-hint"></p>
+        <div class="d-popup__actions">
+          <button type="button" class="d-yes" data-answer="oui">Oui</button>
+          <button type="button" class="d-no" data-answer="non">Non</button>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="/js/supabase-client.js"></script>
+  <script>
+    (function () {
+      var CONFIG = ${JSON.stringify(config)};
+      var STEP_MS = 1400;
+      var SLOGAN_MS = 2100;
+      var slow = CONFIG.slowMotion;
+      var frame = document.getElementById("d-frame");
+      var stage = document.getElementById("d-stage");
+      var progress = document.getElementById("d-progress");
+      var popup = document.getElementById("d-popup");
+      var accessToken = null;
+      var answers = {};
+      var index = 0;
+      var timers = [];
+      var runId = 0;
+      var pendingPopup = null;
+
+      // ---- Utilitaires --------------------------------------------------
+      function factor() {
+        return slow ? CONFIG.slowFactor : 1;
+      }
+
+      function applySlow() {
+        document.documentElement.style.setProperty("--slow", String(factor()));
+      }
+
+      // setTimeout ralenti par le mode lent, annulé en bloc par restart().
+      function later(fn, ms) {
+        var id = window.setTimeout(fn, ms * factor());
+        timers.push(id);
+        return id;
+      }
+
+      function clearTimers() {
+        timers.forEach(function (id) {
+          window.clearTimeout(id);
+          window.clearInterval(id);
+        });
+        timers = [];
+      }
+
+      function el(tag, className, text) {
+        var node = document.createElement(tag);
+        if (className) node.className = className;
+        if (text !== undefined) node.textContent = text;
+        return node;
+      }
+
+      function haptic(pattern) {
+        try {
+          if (navigator.vibrate) navigator.vibrate(pattern || 10);
+        } catch (err) {
+          /* iOS : pas de vibration */
+        }
+      }
+
+      function showScreen(screen) {
+        var old = stage.querySelector(".d-screen:not(.is-leaving)");
+        if (old) {
+          old.classList.add("is-leaving");
+          later(function () {
+            if (old.parentNode) old.parentNode.removeChild(old);
+          }, 260);
+        }
+        stage.appendChild(screen);
+      }
+
+      function setProgress(done) {
+        Array.prototype.forEach.call(progress.children, function (seg, i) {
+          seg.classList.toggle("is-done", i < done);
+        });
+      }
+
+      // ---- Accès admin (vérifié côté serveur) -----------------------------
+      function leave() {
+        window.location.replace("/");
+      }
+
+      function callDemo(body) {
+        var sb = window.ColdTrendSupabase;
+        return fetch(sb.supabaseUrl + "/functions/v1/generate-demo-concept", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            apikey: sb.supabaseKey,
+            Authorization: "Bearer " + accessToken
+          },
+          body: JSON.stringify(body)
+        }).then(function (res) {
+          return res.json().then(function (data) {
+            return { status: res.status, data: data };
+          });
+        });
+      }
+
+      function boot() {
+        var sb = window.ColdTrendSupabase;
+        if (!sb) return leave();
+        sb.auth.getSession().then(function (res) {
+          var session = res.data ? res.data.session : null;
+          if (!session) return leave();
+          accessToken = session.access_token;
+          return callDemo({ check: true }).then(function (out) {
+            if (out.status !== 200 || !out.data || out.data.ok !== true) return leave();
+            applySlow();
+            frame.hidden = false;
+            restart();
+          });
+        }).catch(leave);
+      }
+
+      // ---- Questions -------------------------------------------------------
+      function renderQuestion() {
+        var q = CONFIG.questions[index];
+        setProgress(index);
+        progress.hidden = false;
+        var screen = el("section", "d-screen");
+        screen.appendChild(el("h1", "d-title", q.title));
+        if (q.subtext) screen.appendChild(el("p", "d-sub", q.subtext));
+        var list = el("div", "d-options");
+        var cta = el("button", "d-cta", "Continuer");
+        cta.type = "button";
+        cta.hidden = true;
+        q.options.forEach(function (opt, i) {
+          var btn = el("button", "d-option");
+          btn.type = "button";
+          btn.style.setProperty("--i", String(i));
+          if (opt.emoji) btn.appendChild(el("span", "d-option__emoji", opt.emoji));
+          btn.appendChild(el("span", "", opt.label));
+          btn.addEventListener("click", function () {
+            haptic();
+            if (q.type === "multi") {
+              var current = answers[q.id] || [];
+              var pos = current.indexOf(opt.value);
+              if (pos === -1) current.push(opt.value);
+              else current.splice(pos, 1);
+              answers[q.id] = current;
+              btn.classList.toggle("is-selected", pos === -1);
+              cta.hidden = current.length === 0;
+              return;
+            }
+            answers[q.id] = opt.value;
+            Array.prototype.forEach.call(list.children, function (b) {
+              b.classList.remove("is-selected");
+            });
+            btn.classList.add("is-selected");
+            later(next, 450);
+          });
+          list.appendChild(btn);
+        });
+        cta.addEventListener("click", function () {
+          haptic();
+          next();
+        });
+        screen.appendChild(list);
+        screen.appendChild(cta);
+        showScreen(screen);
+      }
+
+      function next() {
+        index += 1;
+        if (index < CONFIG.questions.length) renderQuestion();
+        else runAssembly();
+      }
+
+      // ---- Assemblage + pop-ups ---------------------------------------------
+      function runAssembly() {
+        var myRun = runId;
+        setProgress(CONFIG.questions.length);
+        later(function () {
+          progress.hidden = true;
+        }, 500);
+        var screen = el("section", "d-screen d-center");
+        screen.appendChild(el("h1", "d-title", "On assemble ton projet"));
+        var slogan = el("p", "d-slogan", CONFIG.slogans[0]);
+        screen.appendChild(slogan);
+        var bar = el("div", "d-bar");
+        var fill = el("div", "d-bar__fill");
+        bar.appendChild(fill);
+        screen.appendChild(bar);
+        var percent = el("p", "d-percent", "0 %");
+        screen.appendChild(percent);
+        var list = el("ul", "d-steps");
+        var steps = CONFIG.steps.map(function (text) {
+          var li = el("li", "d-step", text);
+          list.appendChild(li);
+          return li;
+        });
+        screen.appendChild(list);
+        showScreen(screen);
+
+        var sloganIndex = 0;
+        var sloganTimer = window.setInterval(function () {
+          sloganIndex = (sloganIndex + 1) % CONFIG.slogans.length;
+          slogan.classList.add("is-swapping");
+          later(function () {
+            slogan.textContent = CONFIG.slogans[sloganIndex];
+            slogan.classList.remove("is-swapping");
+          }, 220);
+        }, SLOGAN_MS * factor());
+        timers.push(sloganTimer);
+
+        var conceptPromise = null;
+        var step = 0;
+
+        function activate() {
+          if (myRun !== runId) return;
+          // La génération part dès que les 2 pop-ups ont été répondues (les
+          // réponses entrent dans le prompt) ; la dernière étape attend sa
+          // réponse avant de se cocher.
+          if (!conceptPromise && answers.influenceurs && answers.clippers) {
+            conceptPromise = callDemo({ answers: answers });
+          }
+          if (step >= steps.length) {
+            window.clearInterval(sloganTimer);
+            (conceptPromise || callDemo({ answers: answers })).then(function (out) {
+              if (myRun !== runId) return;
+              renderConcept(out && out.status === 200 ? out.data.concept : null);
+            }).catch(function () {
+              if (myRun === runId) renderConcept(null);
+            });
+            return;
+          }
+          for (var i = 0; i < CONFIG.popups.length; i += 1) {
+            if (CONFIG.popups[i].atStep === step && !answers[CONFIG.popups[i].field]) {
+              openPopup(CONFIG.popups[i], activate);
+              return;
+            }
+          }
+          var current = steps[step];
+          current.classList.add("is-active");
+          later(function () {
+            current.classList.remove("is-active");
+            current.classList.add("is-done");
+            step += 1;
+            var p = Math.round((step / steps.length) * 100);
+            fill.style.width = p + "%";
+            percent.textContent = p + " %";
+            haptic(6);
+            activate();
+          }, STEP_MS);
+        }
+
+        later(activate, 500);
+      }
+
+      function openPopup(def, resume) {
+        pendingPopup = { def: def, resume: resume };
+        document.getElementById("d-popup-q").textContent = def.question;
+        document.getElementById("d-popup-hint").textContent = def.hint || "";
+        popup.hidden = false;
+        haptic();
+      }
+
+      popup.addEventListener("click", function (e) {
+        var btn = e.target.closest("[data-answer]");
+        if (!btn || !pendingPopup) return;
+        var current = pendingPopup;
+        pendingPopup = null;
+        answers[current.def.field] = btn.getAttribute("data-answer");
+        haptic();
+        popup.hidden = true;
+        later(current.resume, 250);
+      });
+
+      // ---- Concept généré ---------------------------------------------------
+      function renderConcept(concept) {
+        var screen = el("section", "d-screen d-concept");
+        if (!concept) {
+          screen.appendChild(el("p", "d-error", "Génération indisponible. Appuie sur R pour relancer."));
+          showScreen(screen);
+          return;
+        }
+        screen.appendChild(el("span", "d-eyebrow", "Ton concept est prêt"));
+        screen.appendChild(el("h1", "d-name", concept.concept_name));
+        screen.appendChild(el("p", "d-tagline", concept.tagline));
+        [
+          ["Ce que ça fait", concept.description],
+          ["Pour qui", concept.target_persona],
+          ["Comment le faire connaître", concept.channels]
+        ].forEach(function (pair, i) {
+          var card = el("div", "d-card");
+          card.style.setProperty("--i", String(i));
+          card.appendChild(el("p", "d-card__label", pair[0]));
+          card.appendChild(el("p", "d-card__text", pair[1]));
+          screen.appendChild(card);
+        });
+        showScreen(screen);
+        haptic([12, 40, 12, 40, 30]);
+        later(confetti, 900);
+      }
+
+      function confetti() {
+        if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+        function burst() {
+          if (!window.confetti) return;
+          var rect = frame.getBoundingClientRect();
+          var x = (rect.left + rect.width / 2) / window.innerWidth;
+          window.confetti({
+            particleCount: 110,
+            spread: 70,
+            startVelocity: 40,
+            origin: { x: x, y: 0.3 },
+            colors: ["#0047FF", "#3D7BFF", "#00C48C", "#FFFFFF"]
+          });
+        }
+        if (window.confetti) return burst();
+        var s = document.createElement("script");
+        s.src = "https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.3/dist/confetti.browser.min.js";
+        s.onload = burst;
+        document.head.appendChild(s);
+      }
+
+      // ---- Relance et raccourcis de tournage ---------------------------------
+      function restart() {
+        runId += 1;
+        clearTimers();
+        pendingPopup = null;
+        popup.hidden = true;
+        answers = {};
+        index = 0;
+        stage.innerHTML = "";
+        renderQuestion();
+      }
+
+      document.addEventListener("keydown", function (e) {
+        if (frame.hidden || e.metaKey || e.ctrlKey || e.altKey) return;
+        var key = e.key.toLowerCase();
+        if (key === "r") {
+          restart();
+        } else if (key === "l") {
+          slow = !slow;
+          applySlow();
+        } else if (key === "f") {
+          if (document.fullscreenElement) document.exitFullscreen();
+          else if (document.documentElement.requestFullscreen) document.documentElement.requestFullscreen();
+        }
+      });
+
+      if (window.ColdTrendSupabase) boot();
+      else document.addEventListener("coldtrend:supabase-ready", boot, { once: true });
+    })();
+  </script>
+</body>
+</html>
+`;
+}
+
+// ---------------------------------------------------------------------------
 // sitemap.xml / robots.txt — générés à chaque build à partir d'une seule
 // liste de pages publiques, jamais maintenus à la main séparément du site
 // réel. PUBLIC_PAGES = uniquement les pages indexables (contenu générique,
@@ -16623,6 +17487,7 @@ const PUBLIC_PAGES = ["/", "/conditions-remboursement", "/contact", "/mentions-l
 
 const DISALLOWED_PATHS = [
   "/admin",
+  "/demo",
   "/compte",
   "/concept",
   "/profil-entrepreneur",
@@ -16675,6 +17540,7 @@ writeBuiltFile(path.join(OUT_DIR, "mot-de-passe-oublie.html"), motDePasseOubliee
 writeBuiltFile(path.join(OUT_DIR, "reinitialiser-mot-de-passe.html"), reinitialiserMotDePassePage());
 writeBuiltFile(path.join(OUT_DIR, "compte.html"), comptePage());
 writeBuiltFile(path.join(OUT_DIR, "admin.html"), adminPage());
+writeBuiltFile(path.join(OUT_DIR, "demo.html"), demoPage());
 writeBuiltFile(path.join(OUT_DIR, "desabonnement.html"), desabonnementPage());
 
 console.log("Aucun motif interdit (service_role / sb_secret_ / SUPABASE_SERVICE) trouvé dans la sortie buildée.");
