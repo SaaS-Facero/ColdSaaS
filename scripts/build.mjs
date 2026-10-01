@@ -5728,7 +5728,71 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
     transform: scale(1.015);
   }
 
+  /* Carte compacte en ligne, façon réglage iOS : durée et montant facturé
+     à gauche, prix/jour à droite. Le montant facturé reste à 14px en
+     --paper-soft (garde-fou, voir .duration-card__monthly). */
+  .quiz-payment .duration-card {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 2px 12px;
+    padding: 18px 16px 14px;
+    text-align: left;
+  }
+
+  .quiz-payment .duration-card__price-wrap {
+    display: contents;
+  }
+
+  .quiz-payment .duration-card__label {
+    grid-column: 1;
+    grid-row: 1;
+    font-size: 18px;
+    font-weight: 800;
+    color: #fff;
+  }
+
+  .quiz-payment .duration-card__billing-row {
+    grid-column: 1;
+    grid-row: 2;
+    justify-content: flex-start;
+  }
+
+  .quiz-payment .duration-card__note {
+    grid-column: 1;
+    grid-row: 3;
+    margin-top: 2px;
+    font-size: 11px;
+  }
+
+  .quiz-payment .duration-card__daily-price {
+    grid-column: 2;
+    grid-row: 1 / 3;
+    align-self: center;
+    justify-self: end;
+    font-size: 30px;
+    letter-spacing: -0.02em;
+    white-space: nowrap;
+  }
+
+  .quiz-payment .duration-card.is-highlighted .duration-card__daily-price {
+    font-size: 32px;
+  }
+
+  .quiz-payment .duration-card__equivalent {
+    grid-column: 2;
+    grid-row: 3;
+    justify-self: end;
+    margin-top: 0;
+  }
+
+  .quiz-payment .duration-card__anchor {
+    display: none;
+  }
+
   .quiz-payment .duration-card__badge {
+    left: 16px;
+    transform: none;
     background: linear-gradient(135deg, #3D7BFF, #0047FF);
     box-shadow: 0 6px 16px -6px rgba(0, 71, 255, 0.9);
   }
@@ -7714,7 +7778,9 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
         trackEvent("result_cta_clicked", {});
         var teaserEl = document.getElementById("quiz-teaser");
         var conceptName = answers.concept ? answers.concept.concept_name : "ton concept";
-        teaserEl.textContent = conceptName + " — débloque la description complète, la cible et les canaux d'acquisition.";
+        teaserEl.textContent = answers.concept
+          ? conceptName + " : débloque la description complète, la cible et les canaux d'acquisition."
+          : "Débloque ton concept complet : description, cible et canaux d'acquisition.";
         var payTitle = document.getElementById("pay-title");
         var projectName = typeof answers.nomProjet === "string" && answers.nomProjet.trim() ? answers.nomProjet.trim() : answers.concept ? answers.concept.concept_name : "";
         if (payTitle) payTitle.textContent = projectName ? "Lance " + projectName : "Lance ton projet";
