@@ -3282,7 +3282,9 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
 
   .quiz-auth-mesh {
     position: absolute;
-    inset: -20% -10% auto -10%;
+    /* Jamais au-delà des bords latéraux : un débordement horizontal fait
+       défiler la scène de côté dès qu'un champ prend le focus. */
+    inset: -20% 0 auto 0;
     height: 260px;
     z-index: -1;
     background:
