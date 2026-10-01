@@ -64,12 +64,13 @@ const PASSIF_LABELS: Record<string, string> = {
   deja_vendu: "A déjà vendu quelque chose en ligne",
   ca_tourne: "A déjà un business en ligne qui tourne",
 };
+// Tranches du quiz (phase Hook) -- "moins_18" n'arrive jamais ici : le
+// quiz s'arrête sur un écran de sortie avant toute génération.
 const AGE_LABELS: Record<string, string> = {
-  moins_25: "Moins de 25 ans",
+  "18_24": "18-24 ans",
   "25_34": "25-34 ans",
-  "35_44": "35-44 ans",
-  "45_54": "45-54 ans",
-  "55_plus": "55 ans et plus",
+  "35_50": "35-50 ans",
+  "50_plus": "50 ans et plus",
 };
 const DELAI_LABELS: Record<string, string> = {
   des_que_possible: "Dès que possible",
@@ -199,6 +200,10 @@ Deno.serve(async (req) => {
     body = await req.json();
   } catch {
     /* corps vide accepté -- champs manquants restent "non communiqué" */
+  }
+
+  if (body.age === "moins_18") {
+    return json({ error: "Service réservé aux 18 ans et plus." }, 403);
   }
 
   if (!body.forceRegenerate) {

@@ -409,15 +409,54 @@ const quiz = {
   // segment (framing, pas avancement).
   questions: [
     {
-      // Écran de contexte narratif, remplace l'ancienne ouverture directe
-      // sur "auth" -- pose le cadre avant toute question plutôt que de
-      // commencer par demander un compte.
-      id: "intro",
-      stepName: "intro",
-      type: "intro",
-      title: "Pas un quiz de plus.",
-      subtext: "10 questions, aucune pour te trier dans une case — chacune sert à générer un concept de SaaS qui correspond vraiment à ta situation, pas à deviner qui tu es.",
-      cta: "Commencer"
+      // Phase Hook, écran 1 -- ouverture sur l'intention (engagement
+      // immédiat) plutôt que sur l'âge. Distinct de answers.intention
+      // (creation/rachat, colonne profiles) : ici c'est l'attente du jour,
+      // réutilisée en écho dès l'écran suivant.
+      id: "attente",
+      stepName: "attente",
+      chapter: 1,
+      chapterLabel: "Ton objectif du jour",
+      chapterIcon: "objectif",
+      title: "Tu attends quoi aujourd'hui ?",
+      type: "single",
+      options: [
+        { value: "premiers_euros", label: "Générer mes premiers euros", emoji: "💶" },
+        { value: "idee_gagnante", label: "Trouver l'idée gagnante", emoji: "💡" },
+        { value: "saas_en_ligne", label: "Mettre mon SaaS en ligne", emoji: "🚀" }
+      ]
+    },
+    {
+      // Phase Hook, écran 2 -- service réservé aux 18+. "moins_18" ne mène
+      // jamais à la suite du quiz : écran de sortie, aucune réponse
+      // conservée (voir handleMinorExit côté client).
+      id: "age",
+      stepName: "age",
+      chapter: 1,
+      chapterLabel: "Ton âge",
+      chapterIcon: "age",
+      title: "Tu as quel âge ?",
+      subtext: "On adapte tout à ton âge.",
+      echoSubtext: "Pour {attente}, on adapte tout à ton âge.",
+      type: "single",
+      options: [
+        { value: "moins_18", label: "Moins de 18 ans" },
+        { value: "18_24", label: "18–24 ans" },
+        { value: "25_34", label: "25–34 ans" },
+        { value: "35_50", label: "35–50 ans" },
+        { value: "50_plus", label: "50 ans et plus" }
+      ]
+    },
+    {
+      // Phase Hook, écran 3 -- écran de pause statistique, avancé ici
+      // depuis la fin de l'ancien chapitre 1. 2 300 reprend le chiffre déjà
+      // publié dans le hero ("+2 300 entrepreneurs nous font confiance").
+      id: "mirror",
+      stepName: "miroir",
+      type: "mirror",
+      eyebrow: "Tu n'es pas le premier, ni le dernier",
+      subtext: "personnes ont déjà généré leur concept de SaaS avec ColdTrend.",
+      pauseValue: 2300
     },
     {
       // Écran "intention" (Racheter/Copier) retiré du parcours visible --
@@ -445,28 +484,6 @@ const quiz = {
           hint: "Tu connais déjà les bases, tu cherches ta prochaine idée."
         },
         { value: "autre", label: "Autre", hint: "Ta situation ne rentre pas dans une case toute faite." }
-      ]
-    },
-    {
-      // Transitoire comme situation/passif/objectifRevenu : jamais persisté
-      // dans profiles, transmis à generate-user-concept dans le corps de la
-      // requête pour orienter les canaux d'acquisition suggérés (ex. social
-      // organique pour les tranches jeunes, réseau pro/email pour les
-      // tranches plus âgées) -- seul usage réel trouvé, buildMirrorText()
-      // n'existe plus depuis le passage à l'écran de pause statistique.
-      id: "age",
-      stepName: "age",
-      chapter: 1,
-      chapterLabel: "Ton âge",
-      chapterIcon: "age",
-      title: "Tu as quel âge ?",
-      type: "single",
-      options: [
-        { value: "moins_25", label: "Moins de 25 ans" },
-        { value: "25_34", label: "25–34 ans" },
-        { value: "35_44", label: "35–44 ans" },
-        { value: "45_54", label: "45–54 ans" },
-        { value: "55_plus", label: "55 ans et plus" }
       ]
     },
     {
@@ -550,21 +567,6 @@ const quiz = {
       min: 0,
       max: 20000,
       step: 5
-    },
-    {
-      // Charnière de fin de chapitre 1 -- climax émotionnel du quiz, pas
-      // une question. Écran de pause statistique (remplace l'ancien texte
-      // miroir personnalisé) : compte-rendu social générique, pas de
-      // fragment construit à partir des réponses. 2 300 reprend le chiffre
-      // déjà affiché dans le hero ("+2 300 entrepreneurs nous font
-      // confiance") -- cohérence avec une donnée déjà publiée sur le site,
-      // pas un nouveau chiffre inventé pour cet écran.
-      id: "mirror",
-      stepName: "miroir",
-      type: "mirror",
-      eyebrow: "Tu n'es pas le premier, ni le dernier",
-      subtext: "personnes ont déjà généré leur concept de SaaS avec ColdTrend.",
-      pauseValue: 2300
     },
     {
       id: "temps",
@@ -2171,6 +2173,43 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
   .quiz-option.is-selected {
     border-color: var(--cobalt);
     background: rgba(0, 71, 255, 0.14);
+    box-shadow: 0 0 0 1px var(--cobalt), 0 10px 30px -14px rgba(0, 71, 255, 0.7);
+  }
+
+  /* Sélection animée -- petit rebond (ressort) au tap, transform only. */
+  .quiz-screen.is-active .quiz-option.is-selected {
+    animation: quiz-option-pop 320ms cubic-bezier(0.34, 1.56, 0.64, 1);
+  }
+
+  @keyframes quiz-option-pop {
+    0% { transform: scale(1); }
+    45% { transform: scale(1.035); }
+    100% { transform: scale(1); }
+  }
+
+  .quiz-option__emoji {
+    flex-shrink: 0;
+    font-size: 24px;
+    line-height: 1;
+  }
+
+  .quiz-minor-exit {
+    text-align: center;
+  }
+
+  .quiz-minor-exit__eyebrow {
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--steel);
+    margin: 0 0 12px;
+  }
+
+  .quiz-minor-exit .btn {
+    margin-top: 24px;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .quiz-screen.is-active .quiz-option.is-selected { animation: none; }
   }
 
   .quiz-followup {
@@ -5036,7 +5075,18 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
         return Math.abs(hash) % 2 === 0 ? "A" : "B";
       }
 
+      // Tant que l'âge n'est pas confirmé (18+), rien ne part en base : les
+      // évènements du quiz sont gardés en mémoire, puis envoyés si l'âge
+      // est majeur, ou jetés sans jamais être transmis si "moins_18" --
+      // c'est ce qui rend vraie la phrase "rien n'a été enregistré".
+      var ageGatePending = false;
+      var pendingQuizEvents = [];
+
       function trackEvent(name, props, variant) {
+        if (ageGatePending) {
+          pendingQuizEvents.push([name, props, variant]);
+          return;
+        }
         if (window.console && console.debug) {
           console.debug("[trackEvent]", name, props || {});
         }
@@ -5075,7 +5125,8 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
       var questionScreens = Array.prototype.slice.call(stage.querySelectorAll('[data-screen="question"]'));
       var resultScreen = stage.querySelector('[data-screen="result"]');
       var paymentScreen = stage.querySelector('[data-screen="payment"]');
-      var allScreens = questionScreens.concat([resultScreen, paymentScreen]);
+      var minorExitScreen = document.getElementById("quiz-minor-exit");
+      var allScreens = questionScreens.concat([resultScreen, paymentScreen, minorExitScreen]);
       var quizPayBtnDefaultText = document.getElementById("quiz-pay-btn").textContent;
       var TOTAL_STEPS = progressSegs.length; // dynamique : un segment par question taguée chapter (voir quiz.questions)
 
@@ -5106,7 +5157,10 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
       var SECTOR_LABELS = ${JSON.stringify(quiz.sectorLabels)};
       var BUDGET_LABELS = ${JSON.stringify(quiz.budgetLabels)};
       var TIME_LABELS = ${JSON.stringify(quiz.timeLabels)};
-      var EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      // Backslashes doublés : ce script vit dans un template literal Node,
+      // un "\s" simple y devient "s" à la génération (bug constaté en prod :
+      // toute adresse contenant la lettre "s" était refusée).
+      var EMAIL_RE = /^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/;
 
       // Prix moyen par client explicite et fixe -- jamais un chiffre déduit
       // ou variable, juste une illustration transparente déclarée dans le
@@ -5238,14 +5292,16 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
       // site (FAQ, /concept.html), pas une nouvelle courbe inventée pour le
       // quiz. Les hovers (options, boutons) restent sur leurs transitions
       // CSS existantes, non touchées ici.
+      // Effet ressort : léger dépassement sur le transform uniquement
+      // (cubic-bezier > 1), l'opacité garde une courbe douce sans rebond.
       var ENTER_TRANSITION = reduceMotion
         ? "opacity 220ms ease-out"
-        : "transform 420ms cubic-bezier(0.16, 1, 0.3, 1), opacity 420ms cubic-bezier(0.16, 1, 0.3, 1)";
+        : "transform 460ms cubic-bezier(0.34, 1.4, 0.64, 1), opacity 380ms cubic-bezier(0.16, 1, 0.3, 1)";
       var EXIT_TRANSITION = reduceMotion
         ? "opacity 220ms ease-out"
         : "transform 280ms cubic-bezier(0.4, 0, 1, 1), opacity 280ms cubic-bezier(0.4, 0, 1, 1)";
       var EXIT_MS = reduceMotion ? 220 : 280;
-      var ENTER_MS = reduceMotion ? 220 : 420;
+      var ENTER_MS = reduceMotion ? 220 : 460;
       // Écran miroir -- climax émotionnel du quiz, doit se sentir différent
       // du reste : apparition nettement plus lente sur la même courbe.
       var MIRROR_ENTER_TRANSITION = reduceMotion
@@ -5381,6 +5437,8 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
 
         var enterFrom = direction === "back" ? -24 : 24;
         var exitTo = direction === "back" ? 24 : -24;
+
+        applyEcho(nextEl);
 
         nextEl.style.transition = "none";
         nextEl.style.opacity = "0";
@@ -5931,6 +5989,79 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
         return res.json();
       }
 
+      var ADULT_AGES = ["18_24", "25_34", "35_50", "50_plus"];
+
+      function isAdultAge(value) {
+        return ADULT_AGES.indexOf(value) !== -1;
+      }
+
+      // Âge majeur confirmé : envoie les évènements gardés en mémoire depuis
+      // l'ouverture du quiz, puis le suivi redevient direct.
+      function clearAgeGate() {
+        if (!ageGatePending) return;
+        ageGatePending = false;
+        var queued = pendingQuizEvents;
+        pendingQuizEvents = [];
+        queued.forEach(function (evt) {
+          trackEvent(evt[0], evt[1], evt[2]);
+        });
+      }
+
+      // Moins de 18 ans : aucune collecte. Les évènements en attente sont
+      // jetés sans avoir été envoyés, les réponses effacées de la mémoire
+      // et du brouillon local, puis écran de sortie.
+      function handleMinorExit() {
+        pendingQuizEvents = [];
+        answers = { intention: "creation" };
+        navHistory = [];
+        updateBackVisibility();
+        clearDraftLocally();
+        if (quizTagsEl) {
+          quizTagsEl.innerHTML = "";
+          quizTagsEl.classList.remove("is-visible");
+        }
+        stage.querySelectorAll(".quiz-option.is-selected").forEach(function (btn) {
+          btn.classList.remove("is-selected");
+        });
+        setProgress(0, true);
+        transitionTo(minorExitScreen, "forward");
+      }
+
+      // Libellés en écho : reprennent une réponse précédente dans le texte
+      // d'un écran ({champ} dans data-echo). Repli sur le texte d'origine si
+      // la réponse citée manque.
+      var ECHO_LABELS = {
+        attente: {
+          premiers_euros: "générer tes premiers euros",
+          idee_gagnante: "trouver ton idée gagnante",
+          saas_en_ligne: "mettre ton SaaS en ligne"
+        }
+      };
+
+      function applyEcho(screenEl) {
+        Array.prototype.forEach.call(screenEl.querySelectorAll("[data-echo]"), function (el) {
+          if (!el.hasAttribute("data-echo-fallback")) el.setAttribute("data-echo-fallback", el.textContent);
+          var missing = false;
+          var text = el.getAttribute("data-echo").replace(/[{]([a-zA-Z]+)[}]/g, function (match, field) {
+            var labels = ECHO_LABELS[field];
+            var label = labels && answers[field] ? labels[answers[field]] : null;
+            if (!label) missing = true;
+            return label || "";
+          });
+          el.textContent = missing ? el.getAttribute("data-echo-fallback") : text;
+        });
+      }
+
+      // Retour haptique au tap -- navigator.vibrate n'existe pas sur iOS
+      // Safari : rien ne se passe, sans erreur.
+      function haptic() {
+        try {
+          if (navigator.vibrate) navigator.vibrate(10);
+        } catch (err) {
+          /* repli silencieux */
+        }
+      }
+
       function goForwardFromQuestion() {
         if (editContext) {
           handleEditSave();
@@ -5939,6 +6070,15 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
 
         var currentEl = questionScreens[currentQuestionIndex];
         var currentId = currentEl.getAttribute("data-id");
+
+        if (currentId === "age") {
+          if (answers.age === "moins_18") {
+            handleMinorExit();
+            return;
+          }
+          clearAgeGate();
+        }
+
         trackEvent("funnel_step_complete", {
           step_number: currentQuestionIndex + 1,
           answer: answers[currentId]
@@ -6107,9 +6247,12 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
       // silencieusement faute d'utilisateur). Le brouillon vit en
       // localStorage jusque-là, migré vers profiles par persistQuizAnswers()
       // une fois le compte créé (voir goToResult()), puis vidé.
-      var QUIZ_DRAFT_KEY = "coldtrend_quiz_draft";
+      // _v2 : ordre des écrans changé (phase Hook) -- un ancien brouillon
+      // pointerait vers le mauvais écran, il est simplement ignoré.
+      var QUIZ_DRAFT_KEY = "coldtrend_quiz_draft_v2";
 
       function saveDraftLocally() {
+        if (ageGatePending) return;
         try {
           window.localStorage.setItem(
             QUIZ_DRAFT_KEY,
@@ -6195,6 +6338,7 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
       // possible — sans ça, funnel_last_step ne reflète jamais l'état réel
       // tant que le quiz n'est pas fini.
       function persistProgress(stepIndex) {
+        if (ageGatePending) return;
         var supabase = window.ColdTrendSupabase;
         if (!supabase) return;
         var pending = authResolutionPromise || Promise.resolve(true);
@@ -6488,6 +6632,8 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
 
       function openQuiz() {
         answers = { intention: "creation" };
+        ageGatePending = true;
+        pendingQuizEvents = [];
         navHistory = [];
         currentQuestionIndex = 0;
         currentScreenEl = null;
@@ -6550,6 +6696,23 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
         updateBackVisibility();
 
         determineStartIndex().then(function (startIndex) {
+          // Jamais de reprise au-delà de l'écran d'âge sans âge majeur
+          // connu : l'âge n'est pas stocké en base, donc une reprise depuis
+          // profiles repasse toujours par l'intention puis l'âge.
+          var ageIndex = -1;
+          for (var i = 0; i < questionScreens.length; i += 1) {
+            if (questionScreens[i].getAttribute("data-id") === "age") {
+              ageIndex = i;
+              break;
+            }
+          }
+          if (isAdultAge(answers.age)) {
+            clearAgeGate();
+          } else if (ageIndex !== -1 && startIndex > ageIndex) {
+            startIndex = answers.attente ? ageIndex : 0;
+            navHistory = buildNavHistoryUpTo(startIndex);
+            updateBackVisibility();
+          }
           currentQuestionIndex = startIndex;
           if (startIndex >= questionScreens.length) {
             setProgress(progressFillCount(questionScreens.length));
@@ -6579,6 +6742,7 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
       stage.addEventListener("click", function (e) {
         var optBtn = e.target.closest(".quiz-option, .quiz-chip");
         if (optBtn) {
+          haptic();
           var screenEl = optBtn.closest(".quiz-screen");
           var id = screenEl.getAttribute("data-id");
           var optionsWrap = screenEl.querySelector("[data-quiz-options]");
@@ -6667,6 +6831,11 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
 
         if (e.target.closest("#result-intention-toggle")) {
           handleIntentionToggle();
+          return;
+        }
+
+        if (e.target.closest("#quiz-minor-exit-btn")) {
+          closeQuiz();
           return;
         }
 
@@ -7079,6 +7248,7 @@ function renderQuizOption(opt) {
   return `<button class="quiz-option${opt.highlight ? " quiz-option--highlight" : ""}" type="button" data-value="${opt.value}"${
     opt.followup ? ` data-followup="${opt.followup.replace(/"/g, "&quot;")}"` : ""
   }>
+                ${opt.emoji ? `<span class="quiz-option__emoji" aria-hidden="true">${opt.emoji}</span>` : ""}
                 <span class="quiz-option__body">
                   <span class="quiz-option__label-row">
                     <span class="quiz-option__label">${opt.label}</span>
@@ -7258,7 +7428,7 @@ function renderQuizQuestionScreen(question, index) {
             <p class="pause-subtext">${question.subtext}</p>
           </div>
           <div class="quiz-footer">
-            <button class="btn btn--primary quiz-next" type="button">Continuer — Chapitre 2</button>
+            <button class="btn btn--primary quiz-next" type="button">Continuer</button>
           </div>
         </div>`;
   }
@@ -7401,10 +7571,16 @@ function renderQuizQuestionScreen(question, index) {
 
   const chapterAttr = question.chapter ? ` data-chapter="${question.chapter}"` : "";
 
+  // echoSubtext : texte qui reprend une réponse précédente ({champ}),
+  // résolu côté client à l'entrée de l'écran (voir applyEcho). subtext sert
+  // de repli si la réponse citée manque (reprise de brouillon partielle).
+  const echoAttr = question.echoSubtext ? ` data-echo="${question.echoSubtext.replace(/"/g, "&quot;")}"` : "";
+  const subtextHtml = question.subtext || question.echoSubtext ? `<p class="quiz-subtext"${echoAttr}>${question.subtext || ""}</p>` : "";
+
   return `<div class="quiz-screen" data-screen="question" data-index="${index}" data-id="${question.id}" data-step-name="${question.stepName}"${skipAttrs}${chapterAttr}>
           ${renderChapterHeader(question)}
           <h2 class="quiz-question-title">${question.title}</h2>
-          ${question.subtext ? `<p class="quiz-subtext">${question.subtext}</p>` : ""}
+          ${subtextHtml}
           ${renderQuizOptions(question)}
           ${followupBlock}
           ${footerBlock}
@@ -7496,6 +7672,13 @@ function renderQuizOverlay({ quiz, pricing, stripeLink }) {
           <p class="payment-faq__title">Questions fréquentes</p>
           ${renderFaqItems(paymentFaqItems)}
         </div>
+      </div>
+
+      <div class="quiz-screen quiz-minor-exit" data-screen="minor-exit" id="quiz-minor-exit">
+        <p class="quiz-minor-exit__eyebrow">ColdTrend est réservé aux 18 ans et plus</p>
+        <h2 class="quiz-question-title">Reviens nous voir à ta majorité.</h2>
+        <p class="quiz-subtext">Rien de ce que tu as répondu n'a été enregistré.</p>
+        <button class="btn btn--primary btn--full" id="quiz-minor-exit-btn" type="button">Retour à l'accueil</button>
       </div>
 
       <div class="quiz-screen quiz-loading-transition" data-screen="loading-transition" data-step-name="chargement" id="quiz-loading-transition">
