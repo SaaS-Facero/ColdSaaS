@@ -4234,6 +4234,591 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
     text-align: center;
   }
 
+  /* ---- Phase 7 : tableau de bord "liquid glass" ----------------------- */
+  /* L'écran résultat est désormais plus haut que la vue : il défile depuis
+     le haut (centré, le haut serait coupé) et rien ne se tasse. */
+  .quiz-screen.quiz-result {
+    justify-content: flex-start;
+    padding-bottom: 72px;
+  }
+
+  .quiz-result > * {
+    flex-shrink: 0;
+  }
+
+  .dash[hidden] {
+    display: none;
+  }
+
+  .dash {
+    position: relative;
+    isolation: isolate;
+    text-align: left;
+    margin: 0 0 32px;
+  }
+
+  /* Fond liquide : 3 nappes floues qui ondulent sous le verre. */
+  .dash__liquid {
+    position: absolute;
+    inset: -24px 0 0;
+    z-index: -1;
+    overflow: hidden;
+    border-radius: 32px;
+    pointer-events: none;
+  }
+
+  .dash__blob {
+    position: absolute;
+    width: 260px;
+    height: 260px;
+    filter: blur(46px);
+    opacity: 0.55;
+    border-radius: 42% 58% 63% 37% / 41% 44% 56% 59%;
+    animation: dash-liquid 16s ease-in-out infinite alternate;
+  }
+
+  .dash__blob--1 {
+    top: -40px;
+    left: -60px;
+    background: #0047FF;
+  }
+
+  .dash__blob--2 {
+    top: 180px;
+    right: -80px;
+    background: #00C48C;
+    opacity: 0.32;
+    animation-duration: 19s;
+    animation-delay: -6s;
+  }
+
+  .dash__blob--3 {
+    top: 460px;
+    left: 10%;
+    background: #7B4DFF;
+    opacity: 0.35;
+    animation-duration: 22s;
+    animation-delay: -11s;
+  }
+
+  @keyframes dash-liquid {
+    0% { transform: translate(0, 0) rotate(0deg) scale(1); border-radius: 42% 58% 63% 37% / 41% 44% 56% 59%; }
+    50% { transform: translate(40px, 30px) rotate(60deg) scale(1.15); border-radius: 63% 37% 45% 55% / 55% 62% 38% 45%; }
+    100% { transform: translate(-20px, 60px) rotate(120deg) scale(0.95); border-radius: 38% 62% 56% 44% / 48% 35% 65% 52%; }
+  }
+
+  /* Verre : translucide, flou + saturation, liseré lumineux en haut,
+     reflet spéculaire en diagonale. */
+  .glass {
+    position: relative;
+    border-radius: 24px;
+    background: linear-gradient(145deg, rgba(255, 255, 255, 0.11), rgba(255, 255, 255, 0.025));
+    border: 1px solid rgba(255, 255, 255, 0.13);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.28),
+      inset 0 -1px 0 rgba(255, 255, 255, 0.04),
+      0 24px 48px -28px rgba(0, 0, 0, 0.9);
+    -webkit-backdrop-filter: blur(24px) saturate(180%);
+    backdrop-filter: blur(24px) saturate(180%);
+  }
+
+  .glass::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    background: radial-gradient(120% 70% at 0% 0%, rgba(255, 255, 255, 0.14), transparent 55%);
+    pointer-events: none;
+  }
+
+  .glass-chip {
+    display: inline-flex;
+    align-items: center;
+    padding: 4px 10px;
+    border-radius: 999px;
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--paper-soft);
+    background: rgba(255, 255, 255, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    white-space: nowrap;
+  }
+
+  /* Entrée en cascade avec ressort. */
+  .dash-in {
+    opacity: 0;
+    transform: translateY(16px) scale(0.97);
+  }
+
+  .quiz-screen.is-active .dash-in {
+    animation: dash-in 700ms cubic-bezier(0.34, 1.45, 0.64, 1) forwards;
+    animation-delay: calc(var(--d) * 90ms + 150ms);
+  }
+
+  @keyframes dash-in {
+    to { opacity: 1; transform: none; }
+  }
+
+  .dash__head {
+    margin: 0 0 14px;
+  }
+
+  .dash__eyebrow {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    font-size: 12px;
+    font-weight: 800;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--cobalt-soft);
+  }
+
+  .dash__live {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: var(--verified-green);
+    box-shadow: 0 0 0 0 rgba(0, 196, 140, 0.6);
+    animation: dash-live 2s ease-out infinite;
+  }
+
+  @keyframes dash-live {
+    0% { box-shadow: 0 0 0 0 rgba(0, 196, 140, 0.6); }
+    100% { box-shadow: 0 0 0 9px rgba(0, 196, 140, 0); }
+  }
+
+  .dash__title {
+    margin: 6px 0 0;
+    font-size: clamp(26px, 7vw, 32px);
+    font-weight: 800;
+    letter-spacing: -0.02em;
+    line-height: 1.15;
+    color: var(--paper-soft);
+  }
+
+  .dash__hero {
+    padding: 18px 18px 12px;
+    margin-bottom: 12px;
+  }
+
+  .dash__row {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+  }
+
+  .dash__label {
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--steel);
+  }
+
+  .dash__hint {
+    font-size: 11px;
+    color: var(--steel);
+    opacity: 0.8;
+  }
+
+  .dash__value {
+    position: relative;
+    display: flex;
+    align-items: baseline;
+    gap: 6px;
+    margin: 8px 0 2px;
+    font-size: clamp(46px, 13vw, 60px);
+    font-weight: 800;
+    letter-spacing: -0.035em;
+    line-height: 1;
+    color: #fff;
+    font-variant-numeric: tabular-nums;
+    text-shadow: 0 0 34px rgba(61, 123, 255, 0.55);
+  }
+
+  .dash__unit {
+    font-size: 17px;
+    font-weight: 700;
+    letter-spacing: 0;
+    color: var(--steel);
+    text-shadow: none;
+  }
+
+  .dash__sub {
+    position: relative;
+    margin: 6px 0 10px;
+    font-size: 13px;
+    line-height: 1.45;
+    color: var(--steel);
+  }
+
+  .dash__sub strong {
+    color: var(--paper-soft);
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* Courbe : aire + ligne révélées par un masque, curseur au doigt. */
+  .dash-chart {
+    position: relative;
+    touch-action: pan-y;
+    cursor: crosshair;
+    user-select: none;
+    -webkit-user-select: none;
+  }
+
+  .dash-chart__svg {
+    display: block;
+    width: 100%;
+    height: auto;
+    overflow: visible;
+  }
+
+  .dash-chart__grid line {
+    stroke: rgba(255, 255, 255, 0.07);
+    stroke-dasharray: 3 5;
+  }
+
+  .dash-chart__line {
+    stroke-width: 3;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    filter: drop-shadow(0 4px 10px rgba(61, 123, 255, 0.6));
+  }
+
+  .dash-chart__scrub {
+    stroke: rgba(255, 255, 255, 0.35);
+    stroke-width: 1;
+    opacity: 0;
+    transition: opacity 160ms ease;
+  }
+
+  .dash-chart__dot {
+    fill: #fff;
+    stroke: #00C48C;
+    stroke-width: 3;
+    opacity: 0;
+    filter: drop-shadow(0 0 8px rgba(0, 196, 140, 0.9));
+    transition: opacity 260ms ease;
+  }
+
+  .dash-chart.is-ready .dash-chart__dot {
+    opacity: 1;
+  }
+
+  .dash-chart.is-scrubbing .dash-chart__scrub {
+    opacity: 1;
+  }
+
+  .dash-chart__tip {
+    position: absolute;
+    top: -6px;
+    left: 0;
+    padding: 6px 10px;
+    border-radius: 12px;
+    font-size: 12px;
+    font-weight: 700;
+    line-height: 1.35;
+    white-space: nowrap;
+    color: #fff;
+    background: rgba(20, 26, 40, 0.75);
+    border: 1px solid rgba(255, 255, 255, 0.16);
+    -webkit-backdrop-filter: blur(14px);
+    backdrop-filter: blur(14px);
+    box-shadow: 0 10px 24px -12px rgba(0, 0, 0, 0.9);
+    pointer-events: none;
+    opacity: 0;
+    transform: translate(-50%, -100%) scale(0.9);
+    transition: opacity 160ms ease, transform 220ms cubic-bezier(0.34, 1.56, 0.64, 1);
+  }
+
+  .dash-chart.is-scrubbing .dash-chart__tip {
+    opacity: 1;
+    transform: translate(-50%, -100%) scale(1);
+  }
+
+  .dash-chart__tip span {
+    display: block;
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--steel);
+  }
+
+  .dash-chart__axis {
+    display: flex;
+    justify-content: space-between;
+    margin-top: 4px;
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--steel);
+  }
+
+  .dash__tiles {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 10px;
+    margin-bottom: 12px;
+  }
+
+  .dash-tile {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    padding: 12px 12px 14px;
+    border-radius: 20px;
+  }
+
+  .dash-tile__icon {
+    font-size: 18px;
+    margin-bottom: 4px;
+  }
+
+  .dash-tile__value {
+    position: relative;
+    font-size: 22px;
+    font-weight: 800;
+    letter-spacing: -0.02em;
+    color: #fff;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .dash-tile__label {
+    position: relative;
+    font-size: 11px;
+    line-height: 1.3;
+    color: var(--steel);
+  }
+
+  /* Leviers : interrupteurs iOS + contrôle segmenté à pastille liquide. */
+  .dash-levers {
+    padding: 16px 14px 14px;
+    margin-bottom: 12px;
+  }
+
+  .dash-lever {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    width: 100%;
+    margin-top: 10px;
+    padding: 10px 12px;
+    border-radius: 16px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    background: rgba(255, 255, 255, 0.04);
+    color: var(--paper-soft);
+    font-family: inherit;
+    text-align: left;
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+    transition: transform 260ms cubic-bezier(0.34, 1.56, 0.64, 1), background 200ms ease, border-color 200ms ease;
+  }
+
+  button.dash-lever:active {
+    transform: scale(0.97);
+  }
+
+  .dash-lever[aria-checked="true"] {
+    background: rgba(0, 196, 140, 0.08);
+    border-color: rgba(0, 196, 140, 0.3);
+  }
+
+  .dash-lever.is-locked {
+    cursor: default;
+  }
+
+  .dash-lever__icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    width: 36px;
+    height: 36px;
+    border-radius: 11px;
+    font-size: 18px;
+    background: rgba(255, 255, 255, 0.08);
+  }
+
+  .dash-lever__text {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-width: 0;
+    font-size: 12px;
+    color: var(--steel);
+  }
+
+  .dash-lever__text strong {
+    font-size: 15px;
+    color: var(--paper-soft);
+  }
+
+  .ios-switch {
+    position: relative;
+    flex-shrink: 0;
+    width: 51px;
+    height: 31px;
+    border-radius: 999px;
+    background: rgba(120, 120, 128, 0.36);
+    transition: background 250ms ease;
+  }
+
+  .ios-switch::after {
+    content: "";
+    position: absolute;
+    top: 2px;
+    left: 2px;
+    width: 27px;
+    height: 27px;
+    border-radius: 50%;
+    background: #fff;
+    box-shadow: 0 3px 8px rgba(0, 0, 0, 0.25), 0 1px 1px rgba(0, 0, 0, 0.16);
+    transition: transform 380ms cubic-bezier(0.34, 1.56, 0.64, 1), width 200ms ease;
+  }
+
+  .ios-switch.is-on,
+  .dash-lever[aria-checked="true"] .ios-switch {
+    background: #34C759;
+  }
+
+  .ios-switch.is-on::after,
+  .dash-lever[aria-checked="true"] .ios-switch::after {
+    transform: translateX(20px);
+  }
+
+  /* Pouce qui s'étire pendant l'appui, comme sur iOS. */
+  button.dash-lever:active .ios-switch::after {
+    width: 33px;
+  }
+
+  button.dash-lever[aria-checked="true"]:active .ios-switch::after {
+    transform: translateX(14px);
+  }
+
+  .dash-lever.is-locked .ios-switch {
+    opacity: 0.55;
+  }
+
+  .dash__row--seg {
+    margin-top: 16px;
+    margin-bottom: 8px;
+  }
+
+  .ios-seg {
+    position: relative;
+    display: grid;
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+    padding: 3px;
+    border-radius: 12px;
+    background: rgba(118, 118, 128, 0.24);
+  }
+
+  .ios-seg__pill {
+    position: absolute;
+    top: 3px;
+    bottom: 3px;
+    left: 3px;
+    width: calc((100% - 6px) / 6);
+    border-radius: 9px;
+    background: rgba(255, 255, 255, 0.22);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    box-shadow: 0 3px 10px rgba(0, 0, 0, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.3);
+    -webkit-backdrop-filter: blur(10px);
+    backdrop-filter: blur(10px);
+    transition: transform 460ms cubic-bezier(0.34, 1.4, 0.64, 1);
+  }
+
+  .ios-seg__btn {
+    position: relative;
+    z-index: 1;
+    padding: 8px 0;
+    border: none;
+    background: none;
+    color: var(--steel);
+    font-family: inherit;
+    font-size: 12px;
+    font-weight: 700;
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+    transition: color 200ms ease;
+  }
+
+  .ios-seg__btn[aria-checked="true"] {
+    color: #fff;
+  }
+
+  .dash-assume {
+    padding: 0;
+    margin-bottom: 4px;
+  }
+
+  .dash-assume summary {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 15px 16px;
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--paper-soft);
+    cursor: pointer;
+    list-style: none;
+  }
+
+  .dash-assume summary::-webkit-details-marker {
+    display: none;
+  }
+
+  .dash-assume__chev {
+    width: 9px;
+    height: 9px;
+    border-right: 2px solid var(--steel);
+    border-bottom: 2px solid var(--steel);
+    transform: rotate(45deg);
+    transition: transform 300ms cubic-bezier(0.34, 1.56, 0.64, 1);
+  }
+
+  .dash-assume[open] .dash-assume__chev {
+    transform: rotate(225deg);
+  }
+
+  .dash-assume__list {
+    position: relative;
+    margin: 0;
+    padding: 0 16px 0 34px;
+    font-size: 13px;
+    line-height: 1.55;
+    color: var(--paper-soft);
+  }
+
+  .dash-assume__list li {
+    margin-bottom: 4px;
+  }
+
+  .dash-assume__note {
+    position: relative;
+    margin: 8px 16px 16px;
+    font-size: 12px;
+    line-height: 1.5;
+    color: var(--steel);
+  }
+
+  /* Le concept généré, sous le tableau de bord. */
+  .dash + .quiz-result__concept-eyebrow {
+    text-align: center;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .dash__blob,
+    .dash__live { animation: none; }
+    .quiz-screen.is-active .dash-in,
+    .dash-in { animation: none; opacity: 1; transform: none; }
+    .ios-switch::after,
+    .ios-seg__pill,
+    .dash-lever,
+    .dash-chart__tip { transition: none; }
+  }
+
   .quiz-screen.quiz-intro {
     justify-content: center;
     text-align: center;
@@ -6764,8 +7349,7 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
         answers.matchCount = 1;
         persistQuizAnswers();
 
-        var titleEl = document.getElementById("quiz-result-title");
-        titleEl.textContent = "Ton concept a été généré.";
+        revealDashboard();
 
         var metaParts = [];
         var sectorText = sectorSummary();
@@ -7443,6 +8027,339 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
           if (i < p.months) bar.style.height = Math.max(10, Math.round((p.series[i] / max) * 100)) + "%";
         });
       }
+
+      // ---- Phase 7 : tableau de bord (révélation de la projection) --------
+      // Même computeProjection que l'aperçu flouté. Les leviers et
+      // l'horizon simulent un scénario (dashScenario) : answers n'est jamais
+      // modifié, le concept généré reste basé sur les vraies réponses.
+      var DASH_W = 320;
+      var DASH_TOP = 18;
+      var DASH_BASE = 124;
+      var dashScenario = null;
+      var dashShown = null;
+      var dashCurrent = null;
+      var dashTweenFrame = null;
+      var dashScrubIndex = -1;
+      var dashConfettiDone = false;
+      var confettiLoading = null;
+
+      function dashFmt(n) {
+        return Math.round(n).toLocaleString("fr-FR");
+      }
+
+      function firstClientWeek(p) {
+        for (var m = 1; m <= 12; m += 1) {
+          var newClients = Math.floor(p.views * Math.min(1, m / 3) * p.conversion);
+          if (newClients >= 1) return Math.max(1, Math.round((m - 1) * 4.33 + 4.33 / newClients));
+        }
+        return null;
+      }
+
+      function dashProjection() {
+        var ans = {};
+        for (var k in answers) {
+          if (Object.prototype.hasOwnProperty.call(answers, k)) ans[k] = answers[k];
+        }
+        ans.influenceurs = dashScenario.influenceurs ? "oui" : "non";
+        ans.clippers = dashScenario.clippers ? "oui" : "non";
+        ans.delai = String(dashScenario.months);
+        var p = computeProjection(ans);
+        p.points = [0].concat(p.series);
+        p.firstWeek = firstClientWeek(p);
+        return p;
+      }
+
+      function dashCoords(points) {
+        var max = Math.max.apply(null, points.concat([1])) * 1.08;
+        var n = points.length;
+        return points.map(function (v, i) {
+          return [n > 1 ? (i / (n - 1)) * DASH_W : 0, DASH_BASE - (v / max) * (DASH_BASE - DASH_TOP)];
+        });
+      }
+
+      // Courbe lissée (Catmull-Rom -> Bézier), points de contrôle bornés à
+      // la ligne de base pour ne jamais plonger sous zéro.
+      function dashSmoothPath(pts) {
+        var d = "M" + pts[0][0].toFixed(1) + "," + pts[0][1].toFixed(1);
+        for (var i = 0; i < pts.length - 1; i += 1) {
+          var p0 = pts[i - 1] || pts[i];
+          var p1 = pts[i];
+          var p2 = pts[i + 1];
+          var p3 = pts[i + 2] || p2;
+          var c1x = p1[0] + (p2[0] - p0[0]) / 6;
+          var c1y = Math.min(DASH_BASE, p1[1] + (p2[1] - p0[1]) / 6);
+          var c2x = p2[0] - (p3[0] - p1[0]) / 6;
+          var c2y = Math.min(DASH_BASE, p2[1] - (p3[1] - p1[1]) / 6);
+          d += " C" + c1x.toFixed(1) + "," + c1y.toFixed(1) + " " + c2x.toFixed(1) + "," + c2y.toFixed(1) + " " + p2[0].toFixed(1) + "," + p2[1].toFixed(1);
+        }
+        return d;
+      }
+
+      function dashDrawChart(points) {
+        var pts = dashCoords(points);
+        var line = dashSmoothPath(pts);
+        document.getElementById("dash-line").setAttribute("d", line);
+        document.getElementById("dash-area").setAttribute("d", line + " L" + DASH_W + "," + DASH_BASE + " L0," + DASH_BASE + " Z");
+        var idx = dashScrubIndex >= 0 && dashScrubIndex < pts.length ? dashScrubIndex : pts.length - 1;
+        var dot = document.getElementById("dash-dot");
+        dot.setAttribute("cx", pts[idx][0].toFixed(1));
+        dot.setAttribute("cy", pts[idx][1].toFixed(1));
+        return pts;
+      }
+
+      // Rééchantillonne une courbe sur n points (morphing fluide quand
+      // l'horizon change le nombre de mois).
+      function dashResample(points, n) {
+        if (points.length === n) return points.slice();
+        var out = [];
+        for (var i = 0; i < n; i += 1) {
+          var x = n > 1 ? (i / (n - 1)) * (points.length - 1) : 0;
+          var lo = Math.floor(x);
+          var hi = Math.min(points.length - 1, lo + 1);
+          out.push(points[lo] + (points[hi] - points[lo]) * (x - lo));
+        }
+        return out;
+      }
+
+      function dashRenderStatic(p) {
+        document.getElementById("dash-horizon").textContent = "à " + p.months + " mois";
+        var axis = document.getElementById("dash-axis");
+        axis.innerHTML = "";
+        var labels = ["Auj."];
+        for (var m = 1; m <= p.months; m += 1) labels.push("M" + m);
+        labels.forEach(function (t) {
+          var span = document.createElement("span");
+          span.textContent = t;
+          axis.appendChild(span);
+        });
+        document.getElementById("dash-first").textContent = p.firstWeek ? "Sem. " + p.firstWeek : "—";
+        var list = document.getElementById("dash-assume-list");
+        list.innerHTML = "";
+        [
+          "Vues par mois une fois lancé : " + dashFmt(p.views) + " (selon ton temps, tes plateformes et tes leviers)",
+          "Montée en charge : un tiers des vues au mois 1, deux tiers au mois 2, plein régime au mois 3",
+          "Conversion vue → client payant : " + (p.conversion * 100).toLocaleString("fr-FR") + " %",
+          "Prix de ton SaaS : " + p.price + " €/mois",
+          "Résiliation : " + Math.round(p.churn * 100) + " % des clients chaque mois",
+          "Revenu arrondi à la dizaine inférieure"
+        ].forEach(function (t) {
+          var li = document.createElement("li");
+          li.textContent = t;
+          list.appendChild(li);
+        });
+      }
+
+      function dashSetNumbers(mrr, clients, views) {
+        document.getElementById("dash-mrr").textContent = dashFmt(mrr);
+        document.getElementById("dash-year").textContent = dashFmt(mrr * 12) + " €";
+        document.getElementById("dash-clients").textContent = dashFmt(clients);
+        document.getElementById("dash-views").textContent = dashFmt(views);
+      }
+
+      function dashUpdate(opts) {
+        opts = opts || {};
+        var p = dashProjection();
+        dashCurrent = p;
+        dashRenderStatic(p);
+        var from = dashShown;
+        var startPoints = from ? dashResample(from.points, p.points.length) : p.points.map(function () {
+          return 0;
+        });
+        var startMrr = from ? from.mrr : 0;
+        var startClients = from ? from.clients : 0;
+        var startViews = from ? from.views : 0;
+        var duration = reduceMotion ? 0 : opts.reveal ? 1700 : 650;
+        var clipRect = document.getElementById("dash-clip-rect");
+        if (dashTweenFrame) window.cancelAnimationFrame(dashTweenFrame);
+        var t0 = null;
+
+        function frame(now) {
+          if (t0 === null) t0 = now;
+          var k = duration ? Math.min(1, (now - t0) / duration) : 1;
+          var e = 1 - Math.pow(1 - k, 3);
+          var pts = p.points.map(function (v, i) {
+            return startPoints[i] + (v - startPoints[i]) * e;
+          });
+          var mrr = startMrr + (p.mrr - startMrr) * e;
+          var clients = startClients + (p.clients - startClients) * e;
+          var views = startViews + (p.views - startViews) * e;
+          dashShown = { points: pts, mrr: mrr, clients: clients, views: views };
+          clipRect.setAttribute("width", String(opts.reveal ? DASH_W * Math.min(1, e * 1.15) : DASH_W));
+          dashDrawChart(pts);
+          dashSetNumbers(mrr, clients, views);
+          if (k < 1) {
+            dashTweenFrame = window.requestAnimationFrame(frame);
+            return;
+          }
+          dashTweenFrame = null;
+          if (opts.onDone) opts.onDone();
+        }
+
+        dashTweenFrame = window.requestAnimationFrame(frame);
+      }
+
+      function dashSyncControls() {
+        Array.prototype.forEach.call(document.querySelectorAll("[data-lever]"), function (btn) {
+          btn.setAttribute("aria-checked", dashScenario[btn.getAttribute("data-lever")] ? "true" : "false");
+        });
+        Array.prototype.forEach.call(document.querySelectorAll(".ios-seg__btn"), function (b) {
+          b.setAttribute("aria-checked", Number(b.getAttribute("data-months")) === dashScenario.months ? "true" : "false");
+        });
+        var pill = document.getElementById("dash-seg-pill");
+        if (pill) pill.style.transform = "translateX(" + (dashScenario.months - 1) * 100 + "%)";
+      }
+
+      function loadConfetti(cb) {
+        if (window.confetti) {
+          cb();
+          return;
+        }
+        if (!confettiLoading) {
+          confettiLoading = [];
+          var script = document.createElement("script");
+          script.src = "https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.3/dist/confetti.browser.min.js";
+          script.async = true;
+          script.onload = function () {
+            var queue = confettiLoading;
+            confettiLoading = null;
+            queue.forEach(function (fn) {
+              fn();
+            });
+          };
+          document.head.appendChild(script);
+        }
+        confettiLoading.push(cb);
+      }
+
+      function fireConfetti() {
+        if (reduceMotion) return;
+        loadConfetti(function () {
+          var c = window.confetti;
+          if (!c) return;
+          var colors = ["#0047FF", "#3D7BFF", "#00C48C", "#FFFFFF"];
+          c({ particleCount: 90, spread: 75, startVelocity: 42, origin: { y: 0.35 }, colors: colors, zIndex: 9999, disableForReducedMotion: true });
+          window.setTimeout(function () {
+            c({ particleCount: 50, angle: 60, spread: 60, origin: { x: 0, y: 0.65 }, colors: colors, zIndex: 9999, disableForReducedMotion: true });
+            c({ particleCount: 50, angle: 120, spread: 60, origin: { x: 1, y: 0.65 }, colors: colors, zIndex: 9999, disableForReducedMotion: true });
+          }, 260);
+        });
+      }
+
+      function revealDashboard() {
+        var dash = document.getElementById("dash");
+        if (!dash) return;
+        // Jamais de projection pour un mineur (normalement déjà sorti du
+        // parcours à l'écran âge -- ceinture et bretelles).
+        if (answers.age === "moins_18") {
+          dash.hidden = true;
+          return;
+        }
+        dash.hidden = false;
+        dashScenario = {
+          influenceurs: answers.influenceurs === "oui",
+          clippers: answers.clippers === "oui",
+          months: Math.min(6, Math.max(1, parseInt(answers.delai, 10) || 3))
+        };
+        dashShown = null;
+        dashScrubIndex = -1;
+        var chart = document.getElementById("dash-chart");
+        chart.classList.remove("is-ready", "is-scrubbing");
+        document.getElementById("dash-clip-rect").setAttribute("width", "0");
+        dashSetNumbers(0, 0, 0);
+        var name = typeof answers.nomProjet === "string" ? answers.nomProjet.trim() : "";
+        document.getElementById("quiz-result-title").textContent = name || "Ton projet";
+        dashSyncControls();
+        if (!dashConfettiDone && !reduceMotion) loadConfetti(function () {});
+        window.setTimeout(function () {
+          dashUpdate({
+            reveal: true,
+            onDone: function () {
+              chart.classList.add("is-ready");
+              try {
+                if (navigator.vibrate) navigator.vibrate([12, 40, 12, 40, 30]);
+              } catch (err) {
+                /* repli silencieux (iOS) */
+              }
+              if (!dashConfettiDone) {
+                dashConfettiDone = true;
+                fireConfetti();
+              }
+            }
+          });
+        }, reduceMotion ? 0 : 650);
+        trackEvent("dashboard_revealed", {});
+      }
+
+      (function initDashboard() {
+        var dash = document.getElementById("dash");
+        var chart = document.getElementById("dash-chart");
+        if (!dash || !chart) return;
+
+        dash.addEventListener("click", function (e) {
+          if (!dashScenario) return;
+          var lever = e.target.closest("[data-lever]");
+          if (lever) {
+            var key = lever.getAttribute("data-lever");
+            dashScenario[key] = !dashScenario[key];
+            haptic();
+            dashSyncControls();
+            dashUpdate();
+            trackEvent("dashboard_lever", { lever: key, on: dashScenario[key] });
+            return;
+          }
+          var seg = e.target.closest(".ios-seg__btn");
+          if (seg) {
+            var months = Number(seg.getAttribute("data-months"));
+            if (months === dashScenario.months) return;
+            dashScenario.months = months;
+            haptic();
+            dashSyncControls();
+            dashUpdate();
+          }
+        });
+
+        // Curseur au doigt sur la courbe, façon app Bourse d'iOS.
+        function scrubAt(clientX) {
+          if (!dashShown || !dashCurrent || dashTweenFrame) return;
+          var rect = chart.getBoundingClientRect();
+          var ratio = Math.min(1, Math.max(0, (clientX - rect.left) / rect.width));
+          var n = dashShown.points.length;
+          var idx = Math.round(ratio * (n - 1));
+          if (idx !== dashScrubIndex) haptic();
+          dashScrubIndex = idx;
+          var pts = dashDrawChart(dashShown.points);
+          var x = pts[idx][0];
+          var scrub = document.getElementById("dash-scrub");
+          scrub.setAttribute("x1", x.toFixed(1));
+          scrub.setAttribute("x2", x.toFixed(1));
+          var value = dashShown.points[idx];
+          var tip = document.getElementById("dash-tip");
+          tip.textContent = dashFmt(value) + " €/mois";
+          var sub = document.createElement("span");
+          sub.textContent = idx === 0 ? "Aujourd'hui" : "Mois " + idx + " · " + dashFmt(value / dashCurrent.price) + " clients";
+          tip.appendChild(sub);
+          tip.style.left = Math.min(84, Math.max(16, (x / DASH_W) * 100)) + "%";
+          chart.classList.add("is-scrubbing");
+        }
+
+        function endScrub() {
+          dashScrubIndex = -1;
+          chart.classList.remove("is-scrubbing");
+          if (dashShown && !dashTweenFrame) dashDrawChart(dashShown.points);
+        }
+
+        chart.addEventListener("pointerdown", function (e) {
+          scrubAt(e.clientX);
+        });
+        chart.addEventListener("pointermove", function (e) {
+          if (e.pointerType === "mouse" || chart.classList.contains("is-scrubbing")) scrubAt(e.clientX);
+        });
+        chart.addEventListener("pointerup", function (e) {
+          if (e.pointerType !== "mouse") endScrub();
+        });
+        chart.addEventListener("pointerleave", endScrub);
+        chart.addEventListener("pointercancel", endScrub);
+      })();
 
       // Repli pour les navigateurs sans overflow: clip (voir .quiz-stage).
       stage.addEventListener("scroll", function () {
@@ -9543,7 +10460,111 @@ function renderQuizOverlay({ quiz, pricing, stripeLink }) {
       ${questionScreens}
 
       <div class="quiz-screen quiz-result" data-screen="result" data-step-name="resultat">
-        <h2 class="quiz-question-title" id="quiz-result-title">Ton concept a été généré.</h2>
+        <!-- Phase 7 (Reveal) : tableau de bord "liquid glass". Chiffres =
+             computeProjection (fourchette basse, hypothèses affichées), les
+             leviers ne font que simuler (answers n'est jamais modifié). -->
+        <section class="dash" id="dash" aria-label="Ta projection">
+          <div class="dash__liquid" aria-hidden="true">
+            <span class="dash__blob dash__blob--1"></span>
+            <span class="dash__blob dash__blob--2"></span>
+            <span class="dash__blob dash__blob--3"></span>
+          </div>
+          <div class="dash__head dash-in" style="--d:0">
+            <span class="dash__eyebrow"><span class="dash__live" aria-hidden="true"></span>Ton tableau de bord</span>
+            <h2 class="dash__title" id="quiz-result-title">Ton projet</h2>
+          </div>
+
+          <div class="glass dash__hero dash-in" style="--d:1">
+            <div class="dash__row">
+              <span class="dash__label">Revenu mensuel estimé <span id="dash-horizon">à 3 mois</span></span>
+              <span class="glass-chip">Fourchette basse</span>
+            </div>
+            <p class="dash__value"><span id="dash-mrr">0</span><span class="dash__unit">€/mois</span></p>
+            <p class="dash__sub">Soit <strong id="dash-year">0 €</strong> sur un an à ce rythme. Estimation non garantie.</p>
+            <div class="dash-chart" id="dash-chart">
+              <svg class="dash-chart__svg" viewBox="0 0 320 140" aria-hidden="true">
+                <defs>
+                  <linearGradient id="dash-area-grad" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stop-color="#3D7BFF" stop-opacity="0.5"/>
+                    <stop offset="100%" stop-color="#3D7BFF" stop-opacity="0"/>
+                  </linearGradient>
+                  <linearGradient id="dash-line-grad" x1="0" y1="0" x2="1" y2="0">
+                    <stop offset="0%" stop-color="#7FA8FF"/>
+                    <stop offset="100%" stop-color="#00C48C"/>
+                  </linearGradient>
+                  <clipPath id="dash-clip"><rect id="dash-clip-rect" x="0" y="0" width="0" height="140"/></clipPath>
+                </defs>
+                <g class="dash-chart__grid">
+                  <line x1="0" x2="320" y1="40" y2="40"/>
+                  <line x1="0" x2="320" y1="76" y2="76"/>
+                  <line x1="0" x2="320" y1="112" y2="112"/>
+                </g>
+                <g clip-path="url(#dash-clip)">
+                  <path id="dash-area" fill="url(#dash-area-grad)"/>
+                  <path id="dash-line" class="dash-chart__line" fill="none" stroke="url(#dash-line-grad)"/>
+                </g>
+                <line id="dash-scrub" class="dash-chart__scrub" x1="0" x2="0" y1="0" y2="130"/>
+                <circle id="dash-dot" class="dash-chart__dot" r="5.5" cx="320" cy="20"/>
+              </svg>
+              <div class="dash-chart__tip" id="dash-tip"></div>
+              <div class="dash-chart__axis" id="dash-axis"></div>
+            </div>
+          </div>
+
+          <div class="dash__tiles">
+            <div class="glass dash-tile dash-in" style="--d:2">
+              <span class="dash-tile__icon" aria-hidden="true">👥</span>
+              <span class="dash-tile__value" id="dash-clients">0</span>
+              <span class="dash-tile__label">clients payants</span>
+            </div>
+            <div class="glass dash-tile dash-in" style="--d:3">
+              <span class="dash-tile__icon" aria-hidden="true">👀</span>
+              <span class="dash-tile__value" id="dash-views">0</span>
+              <span class="dash-tile__label">vues par mois</span>
+            </div>
+            <div class="glass dash-tile dash-in" style="--d:4">
+              <span class="dash-tile__icon" aria-hidden="true">🎯</span>
+              <span class="dash-tile__value" id="dash-first">—</span>
+              <span class="dash-tile__label">1er client estimé</span>
+            </div>
+          </div>
+
+          <div class="glass dash-levers dash-in" style="--d:5">
+            <div class="dash__row">
+              <span class="dash__label">Tes leviers</span>
+              <span class="dash__hint">Touche pour simuler</span>
+            </div>
+            <div class="dash-lever is-locked">
+              <span class="dash-lever__icon" aria-hidden="true">🚀</span>
+              <span class="dash-lever__text"><strong>Ton produit</strong><span>La base : ton SaaS en ligne</span></span>
+              <span class="ios-switch is-on" aria-hidden="true"></span>
+            </div>
+            <button type="button" class="dash-lever" data-lever="influenceurs" role="switch" aria-checked="false">
+              <span class="dash-lever__icon" aria-hidden="true">📣</span>
+              <span class="dash-lever__text"><strong>Influenceurs</strong><span>+30 % de vues</span></span>
+              <span class="ios-switch" aria-hidden="true"></span>
+            </button>
+            <button type="button" class="dash-lever" data-lever="clippers" role="switch" aria-checked="false">
+              <span class="dash-lever__icon" aria-hidden="true">✂️</span>
+              <span class="dash-lever__text"><strong>Clippers</strong><span>+50 % de vues</span></span>
+              <span class="ios-switch" aria-hidden="true"></span>
+            </button>
+            <div class="dash__row dash__row--seg">
+              <span class="dash__label">Horizon</span>
+            </div>
+            <div class="ios-seg" id="dash-seg" role="radiogroup" aria-label="Horizon de la projection">
+              <span class="ios-seg__pill" id="dash-seg-pill" aria-hidden="true"></span>
+              ${[1, 2, 3, 4, 5, 6].map((m) => `<button type="button" class="ios-seg__btn" role="radio" aria-checked="false" data-months="${m}">${m} mois</button>`).join("")}
+            </div>
+          </div>
+
+          <details class="glass dash-assume dash-in" style="--d:6">
+            <summary>Comment on calcule<span class="dash-assume__chev" aria-hidden="true"></span></summary>
+            <ul class="dash-assume__list" id="dash-assume-list"></ul>
+            <p class="dash-assume__note">Projection basse et prudente, pas une promesse : tes résultats dépendront de ton exécution, de ton marché et de ton produit.</p>
+          </details>
+        </section>
+
         <p class="quiz-result__concept-eyebrow" id="quiz-concept-eyebrow">Concept généré pour toi</p>
         <div class="quiz-result__concept-name" id="quiz-concept-name">…</div>
         <p class="quiz-result__concept-tagline" id="quiz-concept-tagline"></p>
