@@ -8357,7 +8357,7 @@ function renderQuizOverlay({ quiz, pricing, stripeLink }) {
         <a class="result-bonus-chapter" href="/compte">
           <span class="result-bonus-chapter__eyebrow">Chapitre bonus, gratuit</span>
           <span class="result-bonus-chapter__title">Ton profil entrepreneur</span>
-          <span class="result-bonus-chapter__text">9 questions courtes, un profil généré pour toi — disponible depuis ton dossier une fois ton accès débloqué.</span>
+          <span class="result-bonus-chapter__text">9 questions courtes, un profil généré pour toi — disponible gratuitement depuis ton dossier.</span>
         </a>
 
         <div class="payment-faq">
@@ -11589,12 +11589,74 @@ html, body {
   text-decoration: none;
 }
 
+/* Concept d'un compte non payé : nom et accroche visibles, le reste
+   verrouillé, un seul appel à l'action vers le paiement. */
+.dossier-locked-list {
+  list-style: none;
+  margin: 4px 0 16px;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.dossier-locked-list li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--color-steel);
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.dossier-unlock-cta {
+  display: block;
+  text-align: center;
+  font-size: 14px;
+  font-weight: 700;
+  color: #fff;
+  background: var(--color-cobalt);
+  border-radius: 999px;
+  padding: 12px 18px;
+  text-decoration: none;
+  box-shadow: 0 12px 30px -14px rgba(0, 71, 255, 0.8);
+}
+
+.dossier-unlock-cta:hover {
+  background: var(--color-cobalt-dark);
+}
+
+.dossier__actions {
+  display: flex;
+  justify-content: center;
+  gap: 24px;
+  margin-top: 32px;
+  padding-top: 20px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.dossier__action-link {
+  background: none;
+  border: none;
+  padding: 0;
+  font-family: inherit;
+  font-size: 13px;
+  color: var(--color-steel);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+
+.dossier__action-link:hover {
+  color: var(--color-paper-soft);
+}
+
 /* Chapitre bonus -- même traitement visuel que son équivalent sur l'écran
    résultat du quiz (result-bonus-chapter), adapté aux tokens --color-*
-   de /compte. Module gratuit en soi, mais /compte lui-même n'est
-   accessible qu'après paiement (voir check() dans comptePage()) -- de
-   facto réservé aux comptes payés par la position du lien, pas par une
-   condition explicite ici. */
+   de /compte. Gratuit, accessible à tout compte connecté. */
 .dossier-bonus-chapter {
   display: block;
   margin-top: 24px;
@@ -12766,7 +12828,7 @@ function comptePage() {
           </button>
           <div class="dossier__user-dropdown" id="user-dropdown">
             <a class="dossier__user-dropdown-item" id="admin-link-btn" href="/admin" style="display:none;">Accéder à l'admin</a>
-            <button type="button" class="dossier__user-dropdown-item" id="manage-subscription-btn">Gérer mon abonnement</button>
+            <button type="button" class="dossier__user-dropdown-item" id="manage-subscription-btn" style="display:none;">Gérer mon abonnement</button>
             <button type="button" class="dossier__user-dropdown-item" id="resend-access-btn" style="display:none;">Renvoyer mon accès par email</button>
             <button type="button" class="dossier__user-dropdown-item" id="signout-btn">Se déconnecter</button>
             <button type="button" class="dossier__user-dropdown-item is-danger" id="delete-account-btn">Supprimer mon compte</button>
@@ -12794,10 +12856,27 @@ function comptePage() {
         </div>
       </div>
 
+      <!-- Compte non payé : nom + accroche du concept (déjà visibles
+           gratuitement sur l'écran résultat), le reste verrouillé, et un
+           seul appel à l'action vers le paiement. Jamais le contenu payant. -->
+      <div class="dossier__project" id="dossier-project-locked" style="display:none">
+        <h2 class="dossier__project-title">Mon concept</h2>
+        <div class="dossier-project-card dossier-project-card--locked">
+          <p class="dossier-project-card__concept" id="locked-concept-name"></p>
+          <p class="dossier-project-card__meta" id="locked-concept-tagline"></p>
+          <ul class="dossier-locked-list">
+            <li>${ICON_LOCK} Description complète du concept</li>
+            <li>${ICON_LOCK} Cible et canaux d'acquisition</li>
+            <li>${ICON_LOCK} Direction artistique (palette, logo)</li>
+          </ul>
+          <a class="dossier-unlock-cta" href="/?resume=result">Débloquer mon concept complet</a>
+        </div>
+      </div>
+
       <div class="dossier__project" id="dossier-project-empty" style="display:none">
         <h2 class="dossier__project-title">Mon concept</h2>
-        <p class="dossier-project-empty__text">Ton concept n'est pas encore généré.</p>
-        <a class="dossier-project-empty__cta" href="/succes">Voir mes résultats &rarr;</a>
+        <p class="dossier-project-empty__text" id="dossier-empty-text">Ton concept n'est pas encore généré.</p>
+        <a class="dossier-project-empty__cta" id="dossier-empty-cta" href="/succes">Voir mes résultats &rarr;</a>
       </div>
 
       <a class="dossier-bonus-chapter" href="/profil-entrepreneur">
@@ -12805,6 +12884,11 @@ function comptePage() {
         <span class="dossier-bonus-chapter__title">Ton profil entrepreneur</span>
         <span class="dossier-bonus-chapter__text">9 questions courtes, un profil généré rien que pour toi.</span>
       </a>
+
+      <div class="dossier__actions">
+        <a class="dossier__action-link" href="/">Retour à l'accueil</a>
+        <button type="button" class="dossier__action-link" id="signout-btn-bottom">Se déconnecter</button>
+      </div>
     </div>
   </div>
   <div class="dossier-toast" id="dossier-toast" role="status" aria-live="polite"></div>
@@ -12915,9 +12999,7 @@ function comptePage() {
           key: "qualified",
           status: hasAnswers ? "done" : "current",
           label: "Profil qualifié",
-          meta: hasAnswers
-            ? (profile.match_count ? profile.match_count + " SaaS correspondent à ce profil." : "Réponses enregistrées.")
-            : "Termine le quiz pour qualifier ton profil."
+          meta: hasAnswers ? "Réponses enregistrées, concept généré." : "Termine le quiz pour qualifier ton profil."
         });
 
         items.push({
@@ -12926,7 +13008,7 @@ function comptePage() {
           label: paid ? "Accès débloqué" : "Accès en attente",
           meta: paid
             ? "Le " + formatDateFr(profile.paid_at)
-            : "Le paiement débloque l'accès à la base complète."
+            : "Ton abonnement débloque ton concept complet."
         });
 
         items.push({
@@ -13008,6 +13090,12 @@ function comptePage() {
 
         var resendBtn = document.getElementById("resend-access-btn");
         if (resendBtn) resendBtn.style.display = "block";
+        document.getElementById("manage-subscription-btn").style.display = "block";
+
+        // La carte verrouillée laisse place au concept complet, sans reload.
+        document.getElementById("dossier-project-locked").style.display = "none";
+        document.getElementById("dossier-project-empty").style.display = "none";
+        loadGeneratedConcept(window.ColdTrendSupabase, profile.id, profile);
       }
 
       function showToast(message) {
@@ -13048,10 +13136,10 @@ function comptePage() {
           var age = profile ? daysSince(profile.created_at || Date.now()) : 0;
           return age < 1
             ? "Ton dossier vient de s'ouvrir."
-            : (profile && profile.match_count ? profile.match_count + " SaaS trouvés pour toi, toujours disponibles." : "Ton profil est enregistré, à toi de le débloquer.");
+            : (profile && profile.match_count ? "Ton concept t'attend, à toi de le débloquer." : "Ton profil est enregistré, termine ton quiz.");
         }
         var sincePaid = daysSince(profile.paid_at);
-        return sincePaid < 2 ? "Accès confirmé — bienvenue dans la base." : "Ton accès est actif depuis " + sincePaid + " jours.";
+        return sincePaid < 2 ? "Accès confirmé — bienvenue." : "Ton accès est actif depuis " + sincePaid + " jours.";
       }
 
       async function check() {
@@ -13071,35 +13159,21 @@ function comptePage() {
 
         var profileRes = await supabase
           .from("profiles")
-          .select("intention, budget, temps, secteur, deja_cherche, match_count, paid_at, created_at, prenom, is_admin")
+          .select("intention, budget, temps, secteur, deja_cherche, match_count, paid_at, created_at, prenom, is_admin, stripe_customer_id")
           .eq("id", user.id)
           .single();
         var profile = profileRes.data || {};
         if (!profile.created_at) profile.created_at = user.created_at;
 
-        // Pas de dossier a montrer tant que le quiz n'est pas qualifie --
-        // renvoie vers la reprise (ecran de transition dedie) plutot que
-        // d'afficher un /compte vide. Une fois le quiz termine (match_count
-        // renseigne par persistQuizAnswers) mais sans paiement, renvoie vers
-        // l'ecran de resultat/paiement au lieu de laisser un /compte sans
-        // contenu ni CTA. Voir resumeQuizFromRecoveryLink /
-        // resumeToResultScreen dans page().
-        // Un compte admin n'a jamais de dossier a completer -- il n'est pas
-        // cense passer le quiz, donc ces deux redirections ne le concernent
-        // jamais, quel que soit l'etat reel de son funnel/paiement.
-        if (!profile.is_admin) {
-          if (profile.match_count === null || profile.match_count === undefined) {
-            window.location.replace("/?resume=quiz");
-            return;
-          }
-          if (!profile.paid_at) {
-            window.location.replace("/?resume=result");
-            return;
-          }
-        }
-
+        // Le dossier est accessible à tout compte connecté, payé ou non
+        // (plus de redirection vers le quiz ou le paiement) : l'état du
+        // compte décide seulement de ce qui est affiché et verrouillé, voir
+        // loadGeneratedConcept().
         if (profile.is_admin) {
           document.getElementById("admin-link-btn").style.display = "block";
+        }
+        if (profile.paid_at || profile.stripe_customer_id) {
+          document.getElementById("manage-subscription-btn").style.display = "block";
         }
 
         document.getElementById("dossier-day").textContent = "Jour " + (daysSince(profile.created_at) + 1);
@@ -13141,16 +13215,42 @@ function comptePage() {
           document.getElementById("resend-access-btn").style.display = "block";
         }
 
-        loadGeneratedConcept(supabase, user.id, profile.paid_at);
+        loadGeneratedConcept(supabase, user.id, profile);
       }
 
-      // Pivot : /compte n'affiche plus une fiche réelle sélectionnée
-      // (selected_projects, retiré ici -- table encore en base mais plus
-      // lue côté client) mais le concept généré par utilisateur, mis en
-      // cache dans user_concepts (RLS : lecture limitée à son propre id).
-      async function loadGeneratedConcept(supabase, userId, paidAt) {
-        if (!paidAt) {
-          document.getElementById("dossier-project-empty").style.display = "";
+      function showEmptyConcept(text, ctaLabel, ctaHref) {
+        document.getElementById("dossier-empty-text").textContent = text;
+        var cta = document.getElementById("dossier-empty-cta");
+        cta.textContent = ctaLabel;
+        cta.setAttribute("href", ctaHref);
+        document.getElementById("dossier-project-empty").style.display = "";
+      }
+
+      // Concept généré par utilisateur, mis en cache dans user_concepts
+      // (RLS : lecture limitée à son propre id). Trois cas :
+      // - quiz pas terminé -> reprendre le quiz ;
+      // - quiz terminé, pas payé -> nom + accroche + reste verrouillé ;
+      // - payé -> carte complète avec lien vers le concept.
+      async function loadGeneratedConcept(supabase, userId, profile) {
+        var quizDone = profile.match_count !== null && profile.match_count !== undefined;
+        if (!quizDone) {
+          showEmptyConcept("Termine ton quiz pour générer ton concept.", "Reprendre mon quiz →", "/?resume=quiz");
+          return;
+        }
+        if (!profile.paid_at) {
+          try {
+            var lockedRes = await supabase.from("user_concepts").select("concept_name, tagline").eq("user_id", userId).maybeSingle();
+            if (!lockedRes.data) {
+              showEmptyConcept("Ton concept t'attend sur ton écran résultat.", "Voir mon résultat →", "/?resume=result");
+              return;
+            }
+            document.getElementById("locked-concept-name").textContent = lockedRes.data.concept_name;
+            document.getElementById("locked-concept-tagline").textContent = lockedRes.data.tagline;
+            document.getElementById("dossier-project-locked").style.display = "";
+          } catch (err) {
+            console.error("[compte] échec du chargement du concept :", err);
+            showEmptyConcept("Ton concept t'attend sur ton écran résultat.", "Voir mon résultat →", "/?resume=result");
+          }
           return;
         }
         try {
@@ -13192,10 +13292,12 @@ function comptePage() {
         }
       });
 
-      document.getElementById("signout-btn").addEventListener("click", async function () {
+      async function signOut() {
         await window.ColdTrendSupabase.auth.signOut();
         window.location.href = "/connexion";
-      });
+      }
+      document.getElementById("signout-btn").addEventListener("click", signOut);
+      document.getElementById("signout-btn-bottom").addEventListener("click", signOut);
 
       async function callEdgeFunction(name) {
         var supabase = window.ColdTrendSupabase;
