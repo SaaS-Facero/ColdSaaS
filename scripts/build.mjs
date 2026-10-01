@@ -39,6 +39,13 @@ function loadTestimonials() {
 }
 const TESTIMONIALS = loadTestimonials();
 
+// Nombre d'inscrits affiché (hero + écran "Tu n'es pas le seul") --
+// chiffre déclaré par l'exploitant le 2026-10-01, toutes sources
+// d'inscription confondues. Ce n'est PAS une donnée lue dans Supabase : à
+// mettre à jour à la main, et le libellé doit rester "inscrits".
+const SIGNUPS_COUNT = 2300;
+const SIGNUPS_LABEL = SIGNUPS_COUNT.toLocaleString("fr-FR");
+
 // Toute config sensible/par-environnement se lit depuis process.env — jamais
 // en dur. Le second membre de chaque `??` n'est qu'un filet de sécurité pour
 // que le build ne plante pas si une variable manque en dev local ; en
@@ -488,8 +495,7 @@ const quiz = {
       stepName: "miroir",
       type: "mirror",
       title: "Tu n'es pas le seul à te lancer.",
-      subtext: "concepts de SaaS déjà générés avec ColdTrend.",
-      earlyText: "Tu fais partie des premiers à construire ton projet avec ColdTrend. Ton concept sera taillé pour toi, pas recyclé."
+      subtext: "personnes se sont déjà inscrites sur ColdTrend."
     },
     {
       // Phase Situation, écran 4 -- fusion "comment tu gagnes ta vie" +
@@ -3878,6 +3884,30 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
       rgba(255, 255, 255, 0.03);
   }
 
+  .pause-vision {
+    margin: 26px 0 0;
+  }
+
+  .pause-vision__row {
+    display: flex;
+    justify-content: center;
+    gap: 10px;
+  }
+
+  .pause-vision__img {
+    width: 64px;
+    height: 64px;
+    border-radius: 14px;
+    object-fit: cover;
+    border: 1px solid rgba(138, 143, 152, 0.2);
+  }
+
+  .pause-vision__caption {
+    margin: 10px 0 0;
+    font-size: 13px;
+    color: var(--steel);
+  }
+
   /* Témoignages -- verre dépoli léger, marquee lent, pause au survol, au
      focus et au toucher (classe .is-paused posée en JS). */
   .pause-testimonials {
@@ -5038,10 +5068,7 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
             <button type="button" class="btn btn--primary" id="hero-quiz-btn">${hero.ctaPrimary}</button>
             <a class="btn btn--secondary" href="#faq-title">${hero.ctaSecondary}</a>
           </div>
-          <!-- Masqué tant que le vrai nombre de concepts générés
-               (social_proof_stats) n'atteint pas 100 : jamais un chiffre
-               inventé. Rempli côté client, arrondi à la centaine inférieure. -->
-          <div class="hero__social-proof" id="hero-social-proof" hidden>
+          <div class="hero__social-proof" id="hero-social-proof">
             <div class="hero__social-proof-avatars" aria-hidden="true">
               <span class="hero__avatar" style="background:#7B8794">A</span>
               <span class="hero__avatar" style="background:#8A6FD9">M</span>
@@ -5049,7 +5076,7 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
               <span class="hero__avatar" style="background:#C97B4A">L</span>
               <span class="hero__avatar" style="background:#5A7FB8">R</span>
             </div>
-            <span class="hero__social-proof-text" id="hero-social-proof-text"></span>
+            <span class="hero__social-proof-text" id="hero-social-proof-text">+${SIGNUPS_LABEL} inscrits sur ColdTrend</span>
           </div>
         </div>
 
@@ -6095,37 +6122,6 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
           if (progress < 1) window.requestAnimationFrame(step);
         }
         window.requestAnimationFrame(step);
-      }
-
-      // Preuve sociale réelle : nombre total de concepts générés, lu via
-      // social_proof_stats (total agrégé uniquement, jamais une ligne).
-      // Arrondi à la centaine inférieure, affiché seulement à partir de
-      // 100 -- en dessous, le hero n'affiche rien et l'écran 3 garde son
-      // texte "tu fais partie des premiers".
-      function loadSocialProof() {
-        var supabase = window.ColdTrendSupabase;
-        if (!supabase) return;
-        supabase.rpc("social_proof_stats").then(function (res) {
-          var n = res && res.data && typeof res.data.concepts === "number" ? res.data.concepts : 0;
-          var rounded = Math.floor(n / 100) * 100;
-          if (rounded < 100) return;
-          var label = rounded.toLocaleString("fr-FR");
-          var heroEl = document.getElementById("hero-social-proof");
-          if (heroEl) {
-            document.getElementById("hero-social-proof-text").textContent = "+" + label + " concepts générés avec ColdTrend";
-            heroEl.hidden = false;
-          }
-          document.getElementById("quiz-pause-number").setAttribute("data-target", String(rounded));
-          document.getElementById("pause-avatars-more").textContent = "+" + label;
-          document.getElementById("pause-stat").hidden = false;
-          document.getElementById("pause-early").hidden = true;
-        });
-      }
-
-      if (window.ColdTrendSupabase) {
-        loadSocialProof();
-      } else {
-        document.addEventListener("coldtrend:supabase-ready", loadSocialProof, { once: true });
       }
 
       // Carrousel de témoignages : pause au toucher (en plus du survol, géré
@@ -8163,12 +8159,10 @@ function renderQuizQuestionScreen(question, index) {
   }
 
   if (question.type === "mirror") {
-    // Écran "Tu n'es pas le seul" -- uniquement des données réelles :
-    // - compteur = vrai nombre de concepts générés (social_proof_stats,
-    //   arrondi à la centaine inférieure), affiché seulement à partir de
-    //   100 ; en dessous, le texte "premiers" dit la vérité ;
-    // - avatars = silhouettes neutres (jamais la photo de quelqu'un qui
-    //   n'est pas client), affichés avec le compteur ;
+    // Écran "Tu n'es pas le seul" :
+    // - compteur = SIGNUPS_COUNT (inscrits, chiffre déclaré), count-up ;
+    // - avatars = silhouettes neutres (jamais la photo de quelqu'un
+    //   présenté comme client) ;
     // - témoignages = data/testimonials.json, consentement obligatoire,
     //   carrousel seulement à partir de 2 entrées valides.
     const esc = (v) =>
@@ -8196,15 +8190,22 @@ function renderQuizQuestionScreen(question, index) {
     return `<div class="quiz-screen quiz-mirror" data-screen="question" data-index="${index}" data-id="${question.id}" data-step-name="${question.stepName}"${skipAttrs}>
           <div class="pause-content">
             <h2 class="pause-title">${question.title}</h2>
-            <div class="pause-stat" id="pause-stat" hidden>
+            <div class="pause-stat" id="pause-stat">
               <div class="pause-number-wrap">
                 <div class="pause-glow" aria-hidden="true"></div>
-                <div class="pause-number" id="quiz-pause-number" data-target="0">0</div>
+                <div class="pause-number" id="quiz-pause-number" data-target="${SIGNUPS_COUNT}">${SIGNUPS_LABEL}</div>
               </div>
               <p class="pause-subtext">${question.subtext}</p>
-              <div class="pause-avatars" aria-hidden="true">${avatars}<span class="pause-avatars__more" id="pause-avatars-more"></span></div>
+              <div class="pause-avatars" aria-hidden="true">${avatars}<span class="pause-avatars__more">+${SIGNUPS_LABEL}</span></div>
             </div>
-            <p class="pause-early" id="pause-early">${question.earlyText}</p>
+            <!-- Photos d'ambiance (libres de droits) : présentées comme
+                 l'objectif visé, jamais comme des clients ni des résultats. -->
+            <figure class="pause-vision">
+              <div class="pause-vision__row">
+                ${[1, 2, 3, 4].map((n) => `<img class="pause-vision__img" src="/lifestyle/vision-${n}.webp" alt="" width="64" height="64" loading="lazy" decoding="async" />`).join("")}
+              </div>
+              <figcaption class="pause-vision__caption">Le genre de vie que tu vises.</figcaption>
+            </figure>
             ${testimonialsBlock}
           </div>
           <div class="quiz-footer quiz-footer--sticky">
