@@ -2339,8 +2339,18 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
     display: none;
   }
 
+  .quiz-freetext .quiz-text-input {
+    flex: 1;
+    min-width: 0;
+  }
+
+  /* Le bouton du champ libre garde sa taille naturelle (la règle
+     générique des .quiz-next le passe en pleine largeur). */
   .quiz-freetext .btn {
-    flex-shrink: 0;
+    flex: 0 0 auto;
+    width: auto;
+    padding-left: 18px;
+    padding-right: 18px;
   }
 
   /* Mot du titre qui tourne (1 mois, 2 mois...) jusqu'au choix du délai. */
@@ -2395,6 +2405,10 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
     display: flex;
     flex-direction: column;
     gap: 12px;
+  }
+
+  .audit-steps[hidden] {
+    display: none;
   }
 
   .audit-step {
