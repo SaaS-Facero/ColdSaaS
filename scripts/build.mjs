@@ -391,8 +391,12 @@ const quiz = {
     high: "20 000 € – 50 000 €",
     undecided: "pas encore fixé"
   },
+  // low/mid/high : tranches actuelles du quiz. midlow/midhigh/full restent
+  // pour afficher correctement les profils déjà en base (admin, compte).
   timeLabels: {
     low: "moins de 5h/sem.",
+    mid: "5–15h/sem.",
+    high: "plus de 15h/sem.",
     midlow: "5–10h/sem.",
     midhigh: "10–20h/sem.",
     full: "temps plein"
@@ -459,114 +463,211 @@ const quiz = {
       pauseValue: 2300
     },
     {
-      // Écran "intention" (Racheter/Copier) retiré du parcours visible --
-      // intention prend désormais "creation" par défaut, en interne, sans
-      // écran dédié. Bascule possible vers "rachat" uniquement via le lien
-      // discret sur l'écran résultat (voir #result-intention-toggle), qui
-      // retague profiles.intention et régénère le concept en conséquence.
-      // "autre" n'ouvre pas de champ libre (le moteur d'avance auto du quiz
-      // ne gère pas de sous-flux texte sans casser le pattern clic ->
-      // avance immédiate) : elle reste sélectionnable telle quelle.
+      // Phase Situation, écran 4 -- fusion "comment tu gagnes ta vie" +
+      // "revenus mensuels" : deux groupes sur le même écran, avance auto
+      // quand les deux sont répondus. "autre" ouvre un champ libre validé
+      // à la main (pas d'avance auto tant qu'il est vide).
       id: "situation",
       stepName: "situation",
       chapter: 1,
       chapterLabel: "Ta situation",
       chapterIcon: "situation",
       title: "Aujourd'hui, tu gagnes ta vie comment ?",
-      type: "single",
-      options: [
-        { value: "salarie", label: "Salarié", hint: "Tu as un revenu stable, tu explores en parallèle." },
-        { value: "independant", label: "Indépendant", hint: "Tu es déjà seul aux commandes de ton activité." },
-        { value: "etudiant", label: "Étudiant", hint: "Tu as du temps mais pas encore de revenu fixe." },
+      type: "groups",
+      groups: [
         {
-          value: "activite_en_ligne",
-          label: "J'ai déjà une activité en ligne",
-          hint: "Tu connais déjà les bases, tu cherches ta prochaine idée."
+          field: "situation",
+          options: [
+            { value: "etudiant", label: "Étudiant", emoji: "🎓" },
+            { value: "salarie", label: "Salarié", emoji: "💼" },
+            { value: "independant", label: "Freelance ou indépendant", emoji: "🧑‍💻" },
+            { value: "sans_activite", label: "Sans activité pour l'instant", emoji: "🌱" },
+            { value: "business_en_ligne", label: "Déjà un business en ligne", emoji: "📈" }
+          ]
         },
-        { value: "autre", label: "Autre", hint: "Ta situation ne rentre pas dans une case toute faite." }
+        {
+          field: "revenus",
+          label: "Et tes revenus par mois ?",
+          compact: true,
+          options: [
+            { value: "zero", label: "Rien pour l'instant" },
+            { value: "100_1000", label: "100 – 1 000 €" },
+            { value: "1000_5000", label: "1 000 – 5 000 €" },
+            { value: "5000_10000", label: "5 000 – 10 000 €" },
+            { value: "autre", label: "Ma réponse n'est pas là", freeText: { placeholder: "Écris ta réponse", maxLength: 60 } }
+          ]
+        }
       ]
     },
     {
+      // Écran 5 -- fusion "depuis combien de temps tu fais du SaaS" + "où
+      // tu en es" : le "depuis combien de temps" passe sur l'écran 5b,
+      // affiché seulement si quelque chose a déjà été lancé.
       id: "passif",
       stepName: "passif",
       chapter: 1,
       chapterLabel: "Ton parcours",
       chapterIcon: "passif",
-      title: "Tu en es où avec le business en ligne ?",
+      title: "Tu en es où avec le business ?",
+      subtext: "On part de là où tu en es vraiment.",
       type: "single",
       options: [
-        { value: "jamais_lance", label: "Je n'ai jamais rien lancé", hint: "Premier projet, aucune expérience à corriger." },
-        {
-          value: "lance_abandonne",
-          label: "J'ai lancé, puis abandonné",
-          hint: "Tu sais déjà à quoi ressemble le moment où on décroche."
-        },
-        { value: "deja_vendu", label: "J'ai déjà vendu quelque chose", hint: "Tu as déjà validé que tu peux convertir." },
-        {
-          value: "ca_tourne",
-          label: "J'ai déjà un truc qui tourne",
-          hint: "Tu cherches à diversifier, pas à repartir de zéro."
-        }
+        { value: "jamais_lance", label: "Je n'ai jamais rien lancé", emoji: "🌱", hint: "Premier projet, rien à désapprendre." },
+        { value: "lance_abandonne", label: "J'ai lancé, puis abandonné", emoji: "🔁", hint: "Tu sais déjà où ça coince." },
+        { value: "ca_tourne", label: "J'ai déjà un truc qui tourne", emoji: "⚙️", hint: "Tu cherches à aller plus loin." }
       ]
     },
     {
+      id: "anciennete",
+      stepName: "anciennete",
+      chapter: 1,
+      chapterLabel: "Ton parcours",
+      chapterIcon: "passif",
+      title: "Ça fait combien de temps que tu t'y es mis ?",
+      type: "single",
+      skipIf: { field: "passif", equals: "jamais_lance" },
+      options: [
+        { value: "moins_1_an", label: "Moins d'un an" },
+        { value: "1_2_ans", label: "Entre 1 et 2 ans" },
+        { value: "plus_2_ans", label: "Plus de 2 ans" }
+      ]
+    },
+    {
+      id: "plateformes",
+      stepName: "plateformes",
+      chapter: 1,
+      chapterLabel: "Ta présence en ligne",
+      chapterIcon: "acquisition",
+      title: "Tu postes sur combien de plateformes ?",
+      subtext: "TikTok, Insta, YouTube… on compte tout.",
+      type: "single",
+      options: [
+        { value: "aucune", label: "Aucune pour l'instant", emoji: "🙈" },
+        { value: "1", label: "Une seule", emoji: "📱" },
+        { value: "2", label: "Deux", emoji: "📱" },
+        { value: "3", label: "Trois", emoji: "📱" },
+        { value: "4_plus", label: "Quatre ou plus", emoji: "🔥" }
+      ]
+    },
+    {
+      id: "saasEnLigne",
+      stepName: "saas-en-ligne",
+      chapter: 1,
+      chapterLabel: "Ton projet",
+      chapterIcon: "objectif",
+      title: "Tu as déjà un SaaS en ligne ?",
+      type: "single",
+      options: [
+        { value: "oui", label: "Oui", emoji: "✅", hint: "On te l'analyse gratuitement juste après." },
+        { value: "non", label: "Non, pas encore", emoji: "✨", hint: "Aucun souci, c'est justement le but." }
+      ]
+    },
+    {
+      // Écran 7b -- audit gratuit (réciprocité) : uniquement si un SaaS
+      // existe déjà. Analyse réelle de la page via analyze-site, jamais un
+      // résultat inventé côté client.
+      id: "auditSite",
+      stepName: "audit-site",
+      chapter: 1,
+      chapterLabel: "Ton audit offert",
+      chapterIcon: "recherche",
+      title: "Donne-nous l'adresse de ton SaaS",
+      subtext: "Audit offert : forces, défauts et axes d'amélioration.",
+      type: "audit",
+      skipIf: { field: "saasEnLigne", equals: "non" }
+    },
+    {
+      // Phase Introspection, écran 8 -- fusion "rêve ultime" + "tu
+      // cherches quoi".
+      id: "reve",
+      stepName: "reve",
+      chapter: 2,
+      chapterLabel: "Ton rêve",
+      chapterIcon: "objectif",
+      title: "C'est quoi ton rêve ultime ?",
+      subtext: "Choisis tout ce qui te parle.",
+      type: "multi",
+      options: [
+        { value: "liberte", label: "Être libre de mon temps", emoji: "🕊️" },
+        { value: "quitter_job", label: "Quitter mon job", emoji: "🚪" },
+        { value: "nomade", label: "Bosser d'où je veux", emoji: "🌍" },
+        { value: "famille", label: "Mettre ma famille à l'abri", emoji: "🏡" },
+        { value: "independance", label: "Ne dépendre de personne", emoji: "💪" },
+        { value: "creer", label: "Créer un truc qui me ressemble", emoji: "🎨" }
+      ]
+    },
+    {
+      // Écran 9 -- fusion "ce qui t'empêche d'atteindre ton rêve" + "ce qui
+      // t'a arrêté jusqu'ici".
+      id: "blocage",
+      stepName: "blocage",
+      chapter: 2,
+      chapterLabel: "Tes freins",
+      chapterIcon: "recherche",
+      title: "Qu'est-ce qui t'a bloqué jusqu'ici ?",
+      subtext: "Sois honnête, personne ne juge.",
+      type: "multi",
+      options: [
+        { value: "par_ou_commencer", label: "Je ne sais pas par où commencer", emoji: "🧭" },
+        { value: "pas_idee", label: "Je n'ai pas la bonne idée", emoji: "💭" },
+        { value: "peur_argent", label: "Peur de perdre de l'argent", emoji: "💸" },
+        { value: "pas_temps", label: "Pas assez de temps", emoji: "⏳" },
+        { value: "technique", label: "Je ne sais pas coder", emoji: "🛠️" },
+        { value: "motivation", label: "Je lâche vite", emoji: "🔋" }
+      ]
+    },
+    {
+      id: "enervement",
+      stepName: "enervement",
+      chapter: 2,
+      chapterLabel: "Ta situation actuelle",
+      chapterIcon: "situation",
+      title: "Qu'est-ce qui t'énerve le plus aujourd'hui ?",
+      type: "single",
+      options: [
+        { value: "patron", label: "Dépendre d'un patron", emoji: "😤" },
+        { value: "fins_de_mois", label: "Les fins de mois serrées", emoji: "🧾" },
+        { value: "tourner_en_rond", label: "Tourner en rond", emoji: "🌀" },
+        { value: "autres_avancent", label: "Voir les autres avancer sans moi", emoji: "👀" },
+        { value: "temps_perdu", label: "Perdre mon temps au travail", emoji: "⌛" }
+      ]
+    },
+    {
+      // Lignes rouges -- transmises à generate-user-concept, qui ne doit
+      // jamais proposer un concept qui les franchit.
+      id: "lignesRouges",
+      stepName: "lignes-rouges",
+      chapter: 2,
+      chapterLabel: "Tes limites",
+      chapterIcon: "recherche",
+      title: "Qu'est-ce que tu refuses de faire, même pour l'argent ?",
+      subtext: "On en tient compte, sans compromis.",
+      type: "multi",
+      options: [
+        { value: "formations", label: "Vendre des formations bidon", emoji: "🚫" },
+        { value: "argent_facile", label: "Promettre de l'argent facile", emoji: "🎰" },
+        { value: "visage", label: "Montrer mon visage", emoji: "🙈" },
+        { value: "demarchage", label: "Faire du démarchage agressif", emoji: "📞" },
+        { value: "dropshipping", label: "Faire du dropshipping", emoji: "📦" },
+        { value: "aucune", label: "Rien de tout ça ne me gêne", emoji: "🤷" }
+      ]
+    },
+    {
+      // "Pros ou particuliers" -- id "secteur" conservé (colonne
+      // profiles.secteur, tableau) : la réponse unique est stockée en
+      // tableau d'un élément côté client.
       id: "secteur",
       stepName: "secteur",
-      chapter: 1,
-      chapterLabel: "Ton secteur",
+      chapter: 2,
+      chapterLabel: "Ta cible",
       chapterIcon: "secteur",
-      title: "Tu vises plutôt les entreprises ou les particuliers ?",
-      subtext: "Certains concepts touchent les deux, le canal d'acquisition s'adapte selon ton choix.",
-      type: "multi",
-      optionStyle: "card",
-      options: [
-        { value: "b2b", label: "B2B", hint: "tu vends à des entreprises" },
-        { value: "b2c", label: "B2C", hint: "tu vends à des particuliers" },
-        { value: "both", label: "Les deux", hint: "peu importe le client tant que ça marche" }
-      ]
-    },
-    {
-      id: "budget",
-      stepName: "budget",
-      chapter: 1,
-      chapterLabel: "Ton budget",
-      chapterIcon: "budget",
-      // skipIf retiré : sans écran "intention", plus aucun cas ne le
-      // déclenchait (l'ancienne condition dépendait de la réponse "copier"
-      // à cet écran) -- budget reste pertinent quel que soit intention.
-      title: "Pour orienter le concept vers un budget de démarrage réaliste.",
+      title: "Tu préfères vendre à qui ?",
       type: "single",
       options: [
-        {
-          value: "low",
-          label: "Moins de 5 000 €",
-          followup: "La plupart démarrent avec moins que prévu — ça affine le tri, ça n'exclut de rien."
-        },
-        { value: "mid", label: "5 000 – 20 000 €" },
-        { value: "high", label: "20 000 – 50 000 €" },
-        {
-          value: "undecided",
-          label: "Je regarde, pas encore de budget fixé",
-          followup: "La plupart démarrent avec moins que prévu — ça affine le tri, ça n'exclut de rien."
-        }
+        { value: "b2b", label: "Aux professionnels", emoji: "🏢", hint: "Des entreprises qui paient pour gagner du temps." },
+        { value: "b2c", label: "Aux particuliers", emoji: "🙋", hint: "Des gens comme toi, en direct." },
+        { value: "both", label: "Les deux me vont", emoji: "🤝" }
       ]
-    },
-    {
-      // Objectif transitoire, comme situation/passif : jamais persisté dans
-      // profiles (pas de migration), transmis à generate-user-concept dans
-      // le corps de la requête. Reste en fin de chapitre 1, juste avant
-      // l'écran de pause.
-      id: "objectifRevenu",
-      stepName: "objectif-revenu",
-      chapter: 1,
-      chapterLabel: "Ton objectif",
-      chapterIcon: "objectif",
-      title: "Combien de revenu tu vises, à terme ?",
-      subtext: "Dis-nous où tu veux aller, on construit le concept autour de ça.",
-      type: "slider",
-      min: 0,
-      max: 20000,
-      step: 5
     },
     {
       id: "temps",
@@ -574,82 +675,61 @@ const quiz = {
       chapter: 2,
       chapterLabel: "Ton temps",
       chapterIcon: "temps",
-      title: "Combien d'heures par semaine tu peux vraiment y consacrer ?",
-      subtext: "Pas besoin de tout plaquer. La plupart de nos utilisateurs démarrent à côté d'un job.",
+      title: "Tu peux y consacrer combien d'heures par semaine ?",
+      subtext: "On cale le plan sur ton vrai temps.",
+      echoSubtext: "Avec {plateformes}, on cale le plan sur ton vrai temps.",
       type: "single",
       options: [
-        { value: "low", label: "Moins de 5h" },
-        { value: "midlow", label: "5–10h" },
-        { value: "midhigh", label: "10–20h" },
-        { value: "full", label: "Temps plein" }
+        { value: "low", label: "Moins de 5h", emoji: "🕐" },
+        { value: "mid", label: "5 à 15h", emoji: "🕒" },
+        { value: "high", label: "Plus de 15h", emoji: "🕘" }
       ]
     },
     {
-      // Intention déclarée, jamais commentée qualitativement ("ambitieux",
-      // "réaliste") ni transformée en estimation de probabilité de
-      // réussite -- juste réutilisée factuellement par generate-user-concept
-      // pour orienter le ton/les canaux suggérés (voir buildPrompt côté
-      // edge function).
-      id: "delaiRevenus",
-      stepName: "delai-revenus",
+      // Écran 14 -- fusion objectif de revenu + délai ("d'ici quand").
+      // Transitoires (jamais en base), transmis à generate-user-concept.
+      // Le mot du titre tourne (1 mois, 2 mois...) tant qu'aucun délai
+      // n'est choisi, puis se fige sur le délai choisi.
+      id: "objectifRevenu",
+      stepName: "objectif-revenu",
       chapter: 2,
-      chapterLabel: "Ton délai",
-      chapterIcon: "delai",
-      title: "En combien de temps souhaites-tu générer tes premiers revenus ?",
-      subtext: "Dis-nous ton rythme, on adapte les canaux suggérés en conséquence.",
-      type: "single",
-      options: [
-        { value: "des_que_possible", label: "Dès que possible" },
-        { value: "3_mois", label: "Dans les 3 prochains mois" },
-        { value: "6_mois", label: "Dans les 6 prochains mois" },
-        { value: "pas_de_delai", label: "Pas de délai précis en tête" }
-      ]
+      chapterLabel: "Ton objectif",
+      chapterIcon: "objectif",
+      title: "Combien veux-tu gagner par mois",
+      titleRotator: ["1 mois", "2 mois", "3 mois", "4 mois", "5 mois"],
+      subtext: "Dis-nous où tu veux aller, on construit autour.",
+      echoSubtext: "Pour {attente}, fixe ton cap. On construit autour.",
+      type: "slider",
+      min: 0,
+      max: 50000,
+      step: 100,
+      chips: {
+        field: "delai",
+        label: "D'ici combien de temps ?",
+        options: [
+          { value: "1", label: "1 mois" },
+          { value: "2", label: "2 mois" },
+          { value: "3", label: "3 mois" },
+          { value: "4", label: "4 mois" },
+          { value: "5", label: "5 mois" },
+          { value: "6", label: "6 mois" }
+        ]
+      }
     },
     {
-      // "coldtrend_video" en tête de liste + glow discret (highlight),
-      // jamais sans son badge "Bientôt disponible" à taille lisible --
-      // garde-fou explicite du brief, vérifié visuellement avant livraison.
-      id: "acquisition",
-      stepName: "acquisition",
+      // Effet IKEA -- le nom choisi est réutilisé jusqu'au paiement
+      // ("On assemble {nomProjet}"). Transitoire, jamais en base.
+      id: "nomProjet",
+      stepName: "nom-projet",
       chapter: 2,
-      chapterLabel: "Ton acquisition",
-      chapterIcon: "acquisition",
-      title: "Comment souhaites-tu faire ton acquisition client ?",
-      type: "single",
-      options: [
-        {
-          value: "coldtrend_video",
-          label: "Créer mes vidéos directement via ColdTrend",
-          hint: "Tu ne veux pas filmer toi-même ? Décris ton produit, la vidéo se génère depuis ton espace — bientôt disponible.",
-          badge: "Bientôt disponible",
-          highlight: true
-        },
-        { value: "organique", label: "Organique", hint: "Tu veux construire une audience ? On te propose une direction adaptée." },
-        { value: "pub_payante", label: "Publicité payante", hint: "Tu préfères payer pour la visibilité ? On l'intègre dans les canaux suggérés." },
-        { value: "clippers", label: "Clippers", hint: "Tu veux t'appuyer sur des créateurs ? On en tient compte dans le concept." },
-        { value: "ne_sait_pas", label: "Je ne sais pas encore", hint: "Pas de direction en tête ? On te propose ce qui correspond le mieux à ton profil." }
-      ]
-    },
-    {
-      id: "dejaCherche",
-      stepName: "frustration",
-      chapter: 2,
-      chapterLabel: "Ta recherche",
-      chapterIcon: "recherche",
-      title: "Tu as déjà passé des heures sur des listes d'idées génériques, sans rien trouver de crédible ?",
-      type: "single",
-      options: [
-        {
-          value: "yes",
-          label: "Oui, exactement ça",
-          followup: "On sait. C'est littéralement pour ça que ColdTrend existe : un concept pensé pour ton profil, pas une liste générique de plus."
-        },
-        {
-          value: "no",
-          label: "Pas encore, c'est ma première recherche",
-          followup: "Alors autant commencer avec un concept construit sur ton profil plutôt qu'avec des idées sorties d'un prompt générique — tu gagnes le détour."
-        }
-      ]
+      chapterLabel: "Ton projet",
+      chapterIcon: "objectif",
+      title: "Donne un nom à ton projet",
+      subtext: "Même provisoire. On le construit avec toi.",
+      type: "text",
+      placeholder: "Ex : Projet Liberté",
+      maxLength: 40,
+      cta: "C'est mon projet"
     },
     {
       // Dernière étape avant le résultat (déplacée depuis le tout début du
@@ -1851,6 +1931,13 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
     gap: 6px;
   }
 
+  /* Goal-gradient : les segments du premier chapitre sont plus larges --
+     chaque réponse du début fait avancer la barre plus vite, la seconde
+     moitié avance plus lentement. */
+  .quiz-progress__group[data-chapter="1"] {
+    flex: 1.7;
+  }
+
   .quiz-progress__group-gap {
     width: 10px;
     flex-shrink: 0;
@@ -2191,6 +2278,224 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
     flex-shrink: 0;
     font-size: 24px;
     line-height: 1;
+  }
+
+  /* Second groupe d'un écran (revenus) et puces de délai : format
+     compact en ligne plutôt qu'une pile de grandes cartes. */
+  .quiz-group-label {
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--paper-soft);
+    margin: 22px 0 10px;
+  }
+
+  .quiz-options.quiz-options--chips {
+    flex-direction: row;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .quiz-options--chips .quiz-option {
+    padding: 10px 14px;
+    border-radius: 999px;
+    font-size: 14px;
+  }
+
+  .quiz-options--chips .quiz-option__check {
+    display: none;
+  }
+
+  .quiz-text-input {
+    width: 100%;
+    padding: 13px 16px;
+    border-radius: 14px;
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    background: rgba(255, 255, 255, 0.04);
+    color: var(--paper-soft);
+    font-family: inherit;
+    font-size: 15px;
+  }
+
+  .quiz-text-input:focus {
+    outline: none;
+    border-color: var(--cobalt);
+    box-shadow: 0 0 0 3px rgba(0, 71, 255, 0.25);
+  }
+
+  .quiz-text-input--big {
+    font-size: 20px;
+    font-weight: 700;
+    padding: 16px 18px;
+    margin-top: 8px;
+  }
+
+  .quiz-freetext {
+    display: flex;
+    gap: 8px;
+    margin-top: 10px;
+  }
+
+  .quiz-freetext[hidden] {
+    display: none;
+  }
+
+  .quiz-freetext .btn {
+    flex-shrink: 0;
+  }
+
+  /* Mot du titre qui tourne (1 mois, 2 mois...) jusqu'au choix du délai. */
+  .quiz-title-rotator {
+    display: inline-block;
+    color: var(--cobalt);
+    transition: opacity 160ms ease, transform 160ms ease;
+  }
+
+  .quiz-title-rotator.is-swapping {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+
+  .quiz-title-rotator.is-fixed {
+    text-shadow: 0 0 18px rgba(0, 71, 255, 0.6);
+  }
+
+  .quiz-skip-link {
+    display: block;
+    margin: 12px auto 0;
+    background: none;
+    border: none;
+    color: var(--steel);
+    font-family: inherit;
+    font-size: 13px;
+    text-decoration: underline;
+    cursor: pointer;
+  }
+
+  .quiz-skip-link[hidden] {
+    display: none;
+  }
+
+  /* Audit offert -- étapes cochées une à une, puis résultats en cascade. */
+  .audit-run-btn {
+    margin-top: 12px;
+    gap: 8px;
+    box-shadow: 0 0 0 1px rgba(0, 71, 255, 0.4), 0 14px 34px -14px rgba(0, 71, 255, 0.8);
+  }
+
+  .audit-error {
+    margin: 10px 0 0;
+    font-size: 13px;
+    color: #ff6b6b;
+  }
+
+  .audit-steps {
+    list-style: none;
+    margin: 16px 0 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .audit-step {
+    position: relative;
+    padding-left: 30px;
+    font-size: 15px;
+    color: var(--steel);
+    transition: color 200ms ease;
+  }
+
+  .audit-step::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    top: 2px;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    border: 2px solid rgba(255, 255, 255, 0.18);
+  }
+
+  .audit-step.is-active {
+    color: var(--paper-soft);
+  }
+
+  .audit-step.is-active::before {
+    border-color: var(--cobalt);
+    border-top-color: transparent;
+    animation: audit-spin 800ms linear infinite;
+  }
+
+  .audit-step.is-done {
+    color: var(--paper-soft);
+  }
+
+  .audit-step.is-done::before {
+    border-color: var(--verified-green);
+    background: var(--verified-green);
+  }
+
+  @keyframes audit-spin {
+    to { transform: rotate(360deg); }
+  }
+
+  .audit-results__summary {
+    font-size: 15px;
+    line-height: 1.5;
+    color: var(--paper-soft);
+    margin: 16px 0;
+  }
+
+  .audit-block {
+    border-radius: 14px;
+    padding: 14px 16px;
+    margin-bottom: 10px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    background: rgba(255, 255, 255, 0.03);
+  }
+
+  .audit-block--forces { border-color: rgba(0, 196, 140, 0.35); }
+  .audit-block--defauts { border-color: rgba(255, 107, 107, 0.3); }
+  .audit-block--axes { border-color: rgba(0, 71, 255, 0.45); box-shadow: 0 10px 30px -18px rgba(0, 71, 255, 0.8); }
+
+  .audit-block__title {
+    font-size: 13px;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    margin: 0 0 8px;
+    color: var(--paper-soft);
+  }
+
+  .audit-block ul {
+    margin: 0;
+    padding-left: 18px;
+  }
+
+  .audit-block li {
+    font-size: 14px;
+    line-height: 1.5;
+    color: var(--paper-soft);
+    margin-bottom: 4px;
+    opacity: 0;
+    animation: audit-item-in 420ms cubic-bezier(0.34, 1.4, 0.64, 1) forwards;
+  }
+
+  @keyframes audit-item-in {
+    from { opacity: 0; transform: translateY(8px); }
+    to { opacity: 1; transform: none; }
+  }
+
+  .audit-results__note {
+    font-size: 12px;
+    color: var(--steel);
+    margin: 6px 0 0;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .audit-step.is-active::before { animation: none; }
+    .audit-block li { animation: none; opacity: 1; }
+    .quiz-title-rotator { transition: none; }
   }
 
   .quiz-minor-exit {
@@ -5155,7 +5460,6 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
       }
 
       var SECTOR_LABELS = ${JSON.stringify(quiz.sectorLabels)};
-      var BUDGET_LABELS = ${JSON.stringify(quiz.budgetLabels)};
       var TIME_LABELS = ${JSON.stringify(quiz.timeLabels)};
       // Backslashes doublés : ce script vit dans un template literal Node,
       // un "\s" simple y devient "s" à la génération (bug constaté en prod :
@@ -5173,7 +5477,11 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
       ];
 
       function formatRevenueValue(v) {
-        return v >= 20000 ? "20 000 € et plus / mois" : Number(v).toLocaleString("fr-FR") + " € / mois";
+        var input = document.getElementById("revenue-slider-input");
+        var max = input ? Number(input.max) : 50000;
+        return v >= max
+          ? max.toLocaleString("fr-FR") + " € et plus / mois"
+          : Number(v).toLocaleString("fr-FR") + " € / mois";
       }
 
       function revenueBadgeLabel(v) {
@@ -5264,23 +5572,18 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
       // intention retiré de TAG_ORDER : plus d'écran dédié à rouvrir en
       // édition (voir enterEditMode()), donc plus de chip cliquable pour ce
       // champ -- la valeur reste interne (défaut "creation").
-      var DEJA_CHERCHE_LABELS = { yes: "Déjà cherché", no: "Nouvelle recherche" };
       var QUESTION_LABELS = {
-        budget: "Budget",
         temps: "Temps",
-        secteur: "Secteur",
-        dejaCherche: "Recherche"
+        secteur: "Cible"
       };
       // Ordre d'affichage fixe des tags, indépendant de l'ordre dans lequel
       // les questions ont été répondues.
-      var TAG_ORDER = ["budget", "temps", "secteur", "dejaCherche"];
+      var TAG_ORDER = ["secteur", "temps"];
 
       function tagValueLabel(id) {
         var value = answers[id];
         if (value === undefined) return null;
-        if (id === "budget") return BUDGET_LABELS[value] || value;
         if (id === "temps") return TIME_LABELS[value] || value;
-        if (id === "dejaCherche") return DEJA_CHERCHE_LABELS[value] || value;
         if (id === "secteur") {
           return (value || []).map(function (v) { return SECTOR_LABELS[v] || v; }).join(" + ") || null;
         }
@@ -5390,14 +5693,32 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
         }
 
         if (id === "objectifRevenu") {
-          // Le slider a toujours une valeur (position par défaut au milieu
-          // de la plage) -- contrairement aux écrans à options, rien à
-          // cocher pour que ce soit "répondu" : toujours activé.
+          // Le slider a toujours une valeur ; il ne manque que le délai.
+          nextBtn.disabled = !answers.delai;
+          return;
+        }
+
+        if (id === "nomProjet") {
+          nextBtn.disabled = !(answers.nomProjet && answers.nomProjet.trim().length >= 2);
+          return;
+        }
+
+        if (id === "auditSite") {
           nextBtn.disabled = false;
           return;
         }
 
+        if (id === "situation") {
+          // Seul bouton de cet écran : "Valider" du champ libre revenus.
+          nextBtn.disabled = !(answers.situation && answers.revenusAutre && answers.revenusAutre.trim());
+          return;
+        }
+
         var optionsWrap = screenEl.querySelector("[data-quiz-options]");
+        if (!optionsWrap) {
+          nextBtn.disabled = false;
+          return;
+        }
         var type = optionsWrap.getAttribute("data-type");
         if (type === "multi") {
           nextBtn.disabled = !(answers[id] && answers[id].length > 0);
@@ -5439,6 +5760,8 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
         var exitTo = direction === "back" ? 24 : -24;
 
         applyEcho(nextEl);
+        if (nextEl.getAttribute("data-id") === "objectifRevenu") startTitleRotator();
+        else stopTitleRotator();
 
         nextEl.style.transition = "none";
         nextEl.style.opacity = "0";
@@ -5540,12 +5863,23 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
       // dans le corps de la requête plutôt qu'en base.
       function fetchGeneratedConcept(ans, cb, forceRegenerate) {
         callEdgeFunctionAuthed("generate-user-concept", {
-          situation: ans.situation || null,
-          passif: ans.passif || null,
+          attente: ans.attente || null,
           age: ans.age || null,
+          situation: ans.situation || null,
+          revenus: ans.revenus || null,
+          revenusAutre: ans.revenusAutre || null,
+          passif: ans.passif || null,
+          anciennete: ans.anciennete || null,
+          plateformes: ans.plateformes || null,
+          saasUrl: ans.saasUrl || null,
+          auditResume: ans.auditResume || null,
+          reve: ans.reve || [],
+          blocage: ans.blocage || [],
+          enervement: ans.enervement || null,
+          lignesRouges: ans.lignesRouges || [],
           objectifRevenu: typeof ans.objectifRevenu === "number" ? ans.objectifRevenu : null,
-          delaiRevenus: ans.delaiRevenus || null,
-          acquisition: ans.acquisition || null,
+          delai: ans.delai || null,
+          nomProjet: ans.nomProjet || null,
           forceRegenerate: !!forceRegenerate
         })
           .then(function (res) {
@@ -5684,8 +6018,7 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
         var metaParts = [];
         var sectorText = sectorSummary();
         if (sectorText) metaParts.push(sectorText);
-        if (answers.budget) metaParts.push("budget " + (BUDGET_LABELS[answers.budget] || answers.budget));
-        if (answers.temps) metaParts.push((TIME_LABELS[answers.temps] || answers.temps) + " par semaine");
+        if (answers.temps) metaParts.push(TIME_LABELS[answers.temps] || answers.temps);
         document.getElementById("quiz-result-meta").textContent = metaParts.join(" · ");
 
         renderConceptTeaser(answers.concept || null);
@@ -6035,6 +6368,13 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
           premiers_euros: "générer tes premiers euros",
           idee_gagnante: "trouver ton idée gagnante",
           saas_en_ligne: "mettre ton SaaS en ligne"
+        },
+        plateformes: {
+          aucune: "zéro plateforme pour l'instant",
+          "1": "une plateforme",
+          "2": "deux plateformes",
+          "3": "trois plateformes",
+          "4_plus": "quatre plateformes ou plus"
         }
       };
 
@@ -6060,6 +6400,230 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
         } catch (err) {
           /* repli silencieux */
         }
+      }
+
+      // ---- Champ libre ("Ma réponse n'est pas là") -----------------------
+      function syncFreeText(screenEl, field, value) {
+        var box = screenEl.querySelector('[data-freetext-for="' + field + '"]');
+        if (!box) return;
+        var isOther = value === "autre";
+        box.hidden = !isOther;
+        if (isOther) {
+          var input = box.querySelector("input");
+          if (input) {
+            input.value = answers[field + "Autre"] || "";
+            window.setTimeout(function () {
+              input.focus();
+            }, 60);
+          }
+        } else {
+          delete answers[field + "Autre"];
+        }
+        updateNextEnabled(screenEl);
+      }
+
+      // Écran à plusieurs groupes : avance auto seulement quand chaque
+      // groupe est répondu, et jamais si un champ libre reste à valider.
+      function allGroupsAnswered(screenEl) {
+        var wraps = screenEl.querySelectorAll("[data-quiz-options]");
+        for (var i = 0; i < wraps.length; i += 1) {
+          var field = wraps[i].getAttribute("data-field");
+          var v = answers[field];
+          if (v === undefined) return false;
+          if (v === "autre" && screenEl.querySelector('[data-freetext-for="' + field + '"]')) return false;
+        }
+        return true;
+      }
+
+      // ---- Titre à mot tournant (objectif + délai) -----------------------
+      var titleRotatorTimer = null;
+
+      function stopTitleRotator() {
+        if (titleRotatorTimer) {
+          window.clearInterval(titleRotatorTimer);
+          titleRotatorTimer = null;
+        }
+      }
+
+      function updateTitleRotator() {
+        var el = document.getElementById("quiz-title-rotator");
+        if (!el || !answers.delai) return;
+        stopTitleRotator();
+        el.classList.remove("is-swapping");
+        el.textContent = answers.delai + " mois";
+        el.classList.add("is-fixed");
+      }
+
+      function startTitleRotator() {
+        stopTitleRotator();
+        var el = document.getElementById("quiz-title-rotator");
+        if (!el) return;
+        if (answers.delai) {
+          updateTitleRotator();
+          return;
+        }
+        if (reduceMotion) return;
+        var words = JSON.parse(el.getAttribute("data-words") || "[]");
+        var i = 0;
+        titleRotatorTimer = window.setInterval(function () {
+          i = (i + 1) % words.length;
+          el.classList.add("is-swapping");
+          window.setTimeout(function () {
+            el.textContent = words[i];
+            el.classList.remove("is-swapping");
+          }, 160);
+        }, 1300);
+      }
+
+      // ---- Audit gratuit du SaaS existant (écran 7b) ---------------------
+      // Analyse réelle côté serveur (analyze-site) ; les étapes cochées ne
+      // font qu'habiller l'attente, avec une durée minimale pour que
+      // l'effet "on analyse vraiment ton site" ait le temps d'exister.
+      var auditInProgress = false;
+
+      function normalizeAuditUrl(raw) {
+        var v = (raw || "").trim();
+        if (!v) return null;
+        if (!/^https?:[/][/]/i.test(v)) v = "https://" + v;
+        try {
+          var u = new URL(v);
+          if (u.hostname.indexOf(".") === -1) return null;
+          return u.toString();
+        } catch (err) {
+          return null;
+        }
+      }
+
+      function resetAuditScreen() {
+        auditInProgress = false;
+        var form = document.getElementById("audit-form");
+        if (!form) return;
+        form.hidden = false;
+        document.getElementById("audit-error").hidden = true;
+        document.getElementById("audit-steps").hidden = true;
+        document.getElementById("audit-results").hidden = true;
+        document.getElementById("audit-continue-btn").hidden = true;
+        document.getElementById("audit-skip-btn").hidden = false;
+        document.getElementById("audit-url-input").value = "";
+      }
+
+      function showAuditError(message) {
+        auditInProgress = false;
+        document.getElementById("audit-steps").hidden = true;
+        document.getElementById("audit-form").hidden = false;
+        var errorEl = document.getElementById("audit-error");
+        errorEl.textContent = message;
+        errorEl.hidden = false;
+      }
+
+      function fillAuditList(listId, items) {
+        var list = document.getElementById(listId);
+        list.innerHTML = "";
+        (items || []).forEach(function (text, i) {
+          var li = document.createElement("li");
+          li.textContent = text;
+          li.style.animationDelay = i * 120 + "ms";
+          list.appendChild(li);
+        });
+      }
+
+      function renderAuditResults(result) {
+        document.getElementById("audit-steps").hidden = true;
+        document.getElementById("audit-summary").textContent = result.resume || "";
+        fillAuditList("audit-forces", result.forces);
+        fillAuditList("audit-defauts", result.defauts);
+        fillAuditList("audit-axes", result.axes);
+        document.getElementById("audit-results").hidden = false;
+        document.getElementById("audit-continue-btn").hidden = false;
+        document.getElementById("audit-skip-btn").hidden = true;
+        answers.auditResume = result.resume || null;
+        haptic();
+        trackEvent("audit_completed", {});
+      }
+
+      function runAudit() {
+        if (auditInProgress) return;
+        var input = document.getElementById("audit-url-input");
+        var url = normalizeAuditUrl(input.value);
+        if (!url) {
+          showAuditError("Cette adresse ne semble pas valide.");
+          return;
+        }
+        var supabase = window.ColdTrendSupabase;
+        if (!supabase) {
+          showAuditError("Analyse indisponible pour le moment.");
+          return;
+        }
+        auditInProgress = true;
+        answers.saasUrl = url;
+        haptic();
+        document.getElementById("audit-error").hidden = true;
+        document.getElementById("audit-form").hidden = true;
+
+        var stepsEl = document.getElementById("audit-steps");
+        var steps = stepsEl.querySelectorAll(".audit-step");
+        Array.prototype.forEach.call(steps, function (s) {
+          s.classList.remove("is-done", "is-active");
+        });
+        stepsEl.hidden = false;
+        var stepIndex = 0;
+        steps[0].classList.add("is-active");
+        var stepTimer = window.setInterval(function () {
+          if (stepIndex >= steps.length - 1) return;
+          steps[stepIndex].classList.remove("is-active");
+          steps[stepIndex].classList.add("is-done");
+          stepIndex += 1;
+          steps[stepIndex].classList.add("is-active");
+        }, 1100);
+
+        var minDelay = new Promise(function (resolve) {
+          window.setTimeout(resolve, reduceMotion ? 0 : 4400);
+        });
+        var request = fetch(supabase.supabaseUrl + "/functions/v1/analyze-site", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", apikey: supabase.supabaseKey },
+          body: JSON.stringify({ url: url })
+        }).then(function (res) {
+          return res.json();
+        });
+
+        Promise.all([request, minDelay])
+          .then(function (out) {
+            window.clearInterval(stepTimer);
+            var result = out[0];
+            if (!result || result.error) {
+              showAuditError((result && result.error) || "L'analyse a échoué, réessaie.");
+              return;
+            }
+            Array.prototype.forEach.call(steps, function (s) {
+              s.classList.remove("is-active");
+              s.classList.add("is-done");
+            });
+            window.setTimeout(function () {
+              renderAuditResults(result);
+            }, reduceMotion ? 0 : 350);
+          })
+          .catch(function () {
+            window.clearInterval(stepTimer);
+            showAuditError("L'analyse a échoué, réessaie.");
+          });
+      }
+
+      function resetCustomScreens() {
+        stopTitleRotator();
+        var rotator = document.getElementById("quiz-title-rotator");
+        if (rotator) {
+          var words = JSON.parse(rotator.getAttribute("data-words") || "[]");
+          rotator.textContent = words[0] || "";
+          rotator.classList.remove("is-fixed", "is-swapping");
+        }
+        stage.querySelectorAll("[data-text-field], .quiz-freetext input").forEach(function (input) {
+          input.value = "";
+        });
+        stage.querySelectorAll(".quiz-freetext").forEach(function (box) {
+          box.hidden = true;
+        });
+        resetAuditScreen();
       }
 
       function goForwardFromQuestion() {
@@ -6304,10 +6868,8 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
               .from("profiles")
               .update({
                 intention: answers.intention || null,
-                budget: answers.budget || null,
                 temps: answers.temps || null,
                 secteur: answers.secteur || [],
-                deja_cherche: answers.dejaCherche === "yes",
                 // Pivot : match_count reste la colonne DB historique (pas de
                 // migration pour ce détail), mais sa sémantique n'est plus un
                 // vrai comptage de fiches correspondantes -- juste un flag
@@ -6353,10 +6915,8 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
               .from("profiles")
               .update({
                 intention: answers.intention || null,
-                budget: answers.budget || null,
                 temps: answers.temps || null,
                 secteur: answers.secteur || [],
-                deja_cherche: answers.dejaCherche === "yes" ? true : answers.dejaCherche === "no" ? false : null,
                 funnel_last_step: stepIndex
               })
               .eq("id", user.id);
@@ -6386,25 +6946,23 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
               }
               updateRevenueSlider();
             }
-            return;
+            updateTitleRotator();
           }
-          if (id === "auth" || answers[id] === undefined) return;
-          var optionsWrap = screenEl.querySelector("[data-quiz-options]");
-          if (!optionsWrap) return;
-          var type = optionsWrap.getAttribute("data-type");
-          var selectedValues = type === "multi" ? answers[id] || [] : [answers[id]];
-          Array.prototype.forEach.call(optionsWrap.querySelectorAll(".quiz-option"), function (btn) {
-            btn.classList.toggle("is-selected", selectedValues.indexOf(btn.getAttribute("data-value")) !== -1);
+          if (id === "auth") return;
+          // Chaque groupe d'options de l'écran (plusieurs sur "situation",
+          // puces de délai sous le slider) a sa propre clé de réponse.
+          Array.prototype.forEach.call(screenEl.querySelectorAll("[data-quiz-options]"), function (optionsWrap) {
+            var field = optionsWrap.getAttribute("data-field") || id;
+            var value = answers[field];
+            if (value === undefined) return;
+            var selectedValues = Array.isArray(value) ? value : [value];
+            Array.prototype.forEach.call(optionsWrap.querySelectorAll(".quiz-option"), function (btn) {
+              btn.classList.toggle("is-selected", selectedValues.indexOf(btn.getAttribute("data-value")) !== -1);
+            });
+            if (value === "autre") syncFreeText(screenEl, field, value);
           });
-          if (id === "dejaCherche" && answers.dejaCherche) {
-            var selectedBtn = optionsWrap.querySelector('.quiz-option[data-value="' + answers.dejaCherche + '"]');
-            var followupEl3 = document.getElementById("quiz-followup");
-            var followupText2 = selectedBtn ? selectedBtn.getAttribute("data-followup") : null;
-            if (followupEl3 && followupText2) {
-              followupEl3.textContent = followupText2;
-              followupEl3.classList.add("is-visible");
-            }
-          }
+          var textInput = screenEl.querySelector("[data-text-field]");
+          if (textInput && typeof answers[id] === "string") textInput.value = answers[id];
           updateNextEnabled(screenEl);
         });
         renderTags();
@@ -6613,11 +7171,8 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
                   return findNextQuestionIndex(0);
                 }
                 answers.intention = profile.intention || "creation";
-                answers.budget = profile.budget || undefined;
                 answers.temps = profile.temps || undefined;
                 answers.secteur = profile.secteur || undefined;
-                if (profile.deja_cherche === true) answers.dejaCherche = "yes";
-                else if (profile.deja_cherche === false) answers.dejaCherche = "no";
                 navHistory = buildNavHistoryUpTo(lastStep);
                 restoreAnswersUI();
                 updateBackVisibility();
@@ -6634,6 +7189,7 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
         answers = { intention: "creation" };
         ageGatePending = true;
         pendingQuizEvents = [];
+        resetCustomScreens();
         navHistory = [];
         currentQuestionIndex = 0;
         currentScreenEl = null;
@@ -6727,6 +7283,7 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
       }
 
       function closeQuiz() {
+        stopTitleRotator();
         if (overlay.classList.contains("is-open") && !reachedResult && currentScreenEl) {
           var stepName = currentScreenEl.getAttribute("data-step-name") || "inconnu";
           trackEvent("funnel_abandoned", { last_step: stepName });
@@ -6744,8 +7301,10 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
         if (optBtn) {
           haptic();
           var screenEl = optBtn.closest(".quiz-screen");
-          var id = screenEl.getAttribute("data-id");
-          var optionsWrap = screenEl.querySelector("[data-quiz-options]");
+          // Le groupe de l'option cliquée (un écran peut en avoir plusieurs) ;
+          // sa clé de réponse = data-field, sinon l'id de l'écran.
+          var optionsWrap = optBtn.closest("[data-quiz-options]");
+          var id = optionsWrap.getAttribute("data-field") || screenEl.getAttribute("data-id");
           var type = optionsWrap.getAttribute("data-type");
           var value = optBtn.getAttribute("data-value");
 
@@ -6761,10 +7320,14 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
             }
             answers[id] = selected;
           } else {
-            answers[id] = value;
+            // secteur reste un tableau (colonne profiles.secteur), même si
+            // l'écran est maintenant à choix unique.
+            answers[id] = id === "secteur" ? [value] : value;
             Array.prototype.forEach.call(optionsWrap.querySelectorAll(".quiz-option"), function (b) {
               b.classList.toggle("is-selected", b === optBtn);
             });
+            syncFreeText(screenEl, id, value);
+            if (id === "delai") updateTitleRotator();
 
             if (id === "dejaCherche" || id === "budget") {
               var followupEl2 = document.getElementById("quiz-followup");
@@ -6796,6 +7359,8 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
             window.clearTimeout(multiAdvanceTimer);
             multiAdvanceTimer = null;
           }
+          if (optionsWrap.hasAttribute("data-no-advance")) return;
+          if (screenEl.hasAttribute("data-groups") && !allGroupsAnswered(screenEl)) return;
           if (type === "multi") {
             // Ne programme l'avance que s'il reste au moins une selection --
             // decocher la derniere case ne doit jamais faire avancer avec
@@ -6839,6 +7404,16 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
           return;
         }
 
+        if (e.target.closest("#audit-run-btn")) {
+          runAudit();
+          return;
+        }
+
+        if (e.target.closest("#audit-skip-btn")) {
+          goForwardFromQuestion();
+          return;
+        }
+
         var durationCard = e.target.closest(".duration-card");
         if (durationCard) {
           selectedDuration = parseInt(durationCard.getAttribute("data-duration"), 10);
@@ -6860,6 +7435,15 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
 
       stage.addEventListener("input", function (e) {
         if (e.target.id === "quiz-auth-email" || e.target.id === "quiz-auth-password") {
+          updateNextEnabled(e.target.closest(".quiz-screen"));
+        }
+        var textField = e.target.getAttribute("data-text-field");
+        if (textField) {
+          answers[textField] = e.target.value;
+          updateNextEnabled(e.target.closest(".quiz-screen"));
+        }
+        if (e.target.id && e.target.id.indexOf("quiz-freetext-") === 0) {
+          answers[e.target.id.slice("quiz-freetext-".length) + "Autre"] = e.target.value;
           updateNextEnabled(e.target.closest(".quiz-screen"));
         }
         if (e.target.id === "revenue-slider-input") {
@@ -6888,6 +7472,21 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
           e.preventDefault();
           var submitBtn = document.getElementById("quiz-auth-submit");
           if (submitBtn && !submitBtn.disabled) submitBtn.click();
+          return;
+        }
+        if (e.target.id === "audit-url-input") {
+          e.preventDefault();
+          runAudit();
+          return;
+        }
+        var isFreeText = (e.target.id || "").indexOf("quiz-freetext-") === 0;
+        if (isFreeText || e.target.hasAttribute("data-text-field")) {
+          var scope = isFreeText ? e.target.parentNode : e.target.closest(".quiz-screen");
+          var nextBtn = scope.querySelector(".quiz-next");
+          if (nextBtn && !nextBtn.disabled) {
+            e.preventDefault();
+            goForwardFromQuestion();
+          }
         }
       });
 
@@ -7260,6 +7859,25 @@ function renderQuizOption(opt) {
               </button>`;
 }
 
+// Groupe d'options supplémentaire sur un écran (écran "groups", puces de
+// délai sous le slider). data-field = clé de réponse du groupe ; sans lui,
+// le moteur client utilise l'id de l'écran. data-no-advance : choisir une
+// option n'avance jamais seul (bouton Continuer à la place).
+function renderOptionGroup(group, { noAdvance = false, extraClass = "" } = {}) {
+  const freeTextOpt = group.options.find((opt) => opt.freeText);
+  const freeTextBlock = freeTextOpt
+    ? `<div class="quiz-freetext" data-freetext-for="${group.field}" hidden>
+                <input type="text" class="quiz-text-input" id="quiz-freetext-${group.field}" maxlength="${freeTextOpt.freeText.maxLength}" placeholder="${freeTextOpt.freeText.placeholder}" autocomplete="off" />
+                <button class="btn btn--primary quiz-next" type="button" disabled>Valider</button>
+              </div>`
+    : "";
+  return `${group.label ? `<p class="quiz-group-label">${group.label}</p>` : ""}
+            <div class="quiz-options${extraClass ? " " + extraClass : ""}" data-quiz-options data-type="single" data-field="${group.field}"${noAdvance ? " data-no-advance" : ""}>
+              ${group.options.map(renderQuizOption).join("\n              ")}
+            </div>
+            ${freeTextBlock}`;
+}
+
 function renderQuizOptions(question) {
   const type = question.type === "multi" ? "multi" : "single";
   return `<div class="quiz-options" data-quiz-options data-type="${type}">
@@ -7522,10 +8140,19 @@ function renderQuizQuestionScreen(question, index) {
     // démarre à zéro laisse croire à une réponse déjà donnée ("aucun
     // objectif"), alors qu'aucune interaction n'a encore eu lieu.
     const initial = Math.round((question.min + question.max) / 2 / question.step) * question.step;
+    // 5 repères régulièrement espacés, calculés depuis min/max plutôt
+    // qu'écrits en dur (la plage a changé : 0 - 50 000 €).
+    const ticks = Array.from({ length: 5 }, (_, i) => question.min + ((question.max - question.min) * i) / 4)
+      .map((v) => `<span class="revenue-slider__tick">${v.toLocaleString("fr-FR")} €</span>`)
+      .join("\n              ");
+    const sliderTitle = question.titleRotator
+      ? `${question.title}, d'ici <span class="quiz-title-rotator" id="quiz-title-rotator" data-words='${JSON.stringify(question.titleRotator)}'>${question.titleRotator[0]}</span> ?`
+      : question.title;
+    const sliderEcho = question.echoSubtext ? ` data-echo="${question.echoSubtext.replace(/"/g, "&quot;")}"` : "";
     return `<div class="quiz-screen" data-screen="question" data-index="${index}" data-id="${question.id}" data-step-name="${question.stepName}"${skipAttrs}${question.chapter ? ` data-chapter="${question.chapter}"` : ""}>
           ${renderChapterHeader(question)}
-          <h2 class="quiz-question-title">${question.title}</h2>
-          ${question.subtext ? `<p class="quiz-subtext">${question.subtext}</p>` : ""}
+          <h2 class="quiz-question-title">${sliderTitle}</h2>
+          ${question.subtext ? `<p class="quiz-subtext"${sliderEcho}>${question.subtext}</p>` : ""}
           <div class="revenue-slider">
             <div class="revenue-slider-bg" aria-hidden="true">
               <svg class="revenue-slider-bg__coin" width="40" height="40" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -7542,17 +8169,68 @@ function renderQuizQuestionScreen(question, index) {
               <input type="range" class="revenue-slider__input" id="revenue-slider-input" min="${question.min}" max="${question.max}" step="${question.step}" value="${initial}" aria-label="${question.title}" />
             </div>
             <div class="revenue-slider__ticks">
-              <span class="revenue-slider__tick">0 €</span>
-              <span class="revenue-slider__tick">5 000 €</span>
-              <span class="revenue-slider__tick">10 000 €</span>
-              <span class="revenue-slider__tick">15 000 €</span>
-              <span class="revenue-slider__tick">20 000 €</span>
+              ${ticks}
             </div>
             <p class="revenue-slider__math" id="revenue-slider-math"></p>
           </div>
-          <p class="revenue-slider__note">Ça nous aide à orienter le concept vers un modèle économique cohérent avec ton objectif.</p>
+          ${question.chips ? renderOptionGroup(question.chips, { noAdvance: true, extraClass: "quiz-options--chips" }) : ""}
           <div class="quiz-footer">
             <button class="btn btn--primary quiz-next" type="button">Continuer</button>
+          </div>
+        </div>`;
+  }
+
+  const chapterDataAttr = question.chapter ? ` data-chapter="${question.chapter}"` : "";
+
+  if (question.type === "groups") {
+    return `<div class="quiz-screen" data-screen="question" data-index="${index}" data-id="${question.id}" data-step-name="${question.stepName}" data-groups="${question.groups.length}"${skipAttrs}${chapterDataAttr}>
+          ${renderChapterHeader(question)}
+          <h2 class="quiz-question-title">${question.title}</h2>
+          ${question.groups.map((group) => renderOptionGroup(group, { extraClass: group.compact ? "quiz-options--chips" : "" })).join("\n          ")}
+        </div>`;
+  }
+
+  if (question.type === "text") {
+    return `<div class="quiz-screen" data-screen="question" data-index="${index}" data-id="${question.id}" data-step-name="${question.stepName}"${skipAttrs}${chapterDataAttr}>
+          ${renderChapterHeader(question)}
+          <h2 class="quiz-question-title">${question.title}</h2>
+          ${question.subtext ? `<p class="quiz-subtext">${question.subtext}</p>` : ""}
+          <input type="text" class="quiz-text-input quiz-text-input--big" id="quiz-text-${question.id}" data-text-field="${question.id}" maxlength="${question.maxLength}" placeholder="${question.placeholder}" autocomplete="off" />
+          <div class="quiz-footer">
+            <button class="btn btn--primary quiz-next" type="button" disabled>${question.cta || "Continuer"}</button>
+          </div>
+        </div>`;
+  }
+
+  if (question.type === "audit") {
+    // Trois états dans le même écran : saisie de l'URL, analyse en cours
+    // (étapes cochées une à une), résultats. "Passer" reste toujours
+    // disponible -- l'audit est un cadeau, jamais un passage obligé.
+    return `<div class="quiz-screen quiz-audit" data-screen="question" data-index="${index}" data-id="${question.id}" data-step-name="${question.stepName}"${skipAttrs}${chapterDataAttr}>
+          ${renderChapterHeader(question)}
+          <h2 class="quiz-question-title">${question.title}</h2>
+          <p class="quiz-subtext">${question.subtext}</p>
+          <div class="audit-form" id="audit-form">
+            <input type="url" class="quiz-text-input quiz-text-input--big" id="audit-url-input" placeholder="https://monsaas.com" autocomplete="url" inputmode="url" />
+            <button class="btn btn--primary btn--full audit-run-btn" id="audit-run-btn" type="button">${ICON_SHIELD} Lancer l'analyse gratuite</button>
+            <p class="audit-error" id="audit-error" hidden></p>
+          </div>
+          <ul class="audit-steps" id="audit-steps" hidden>
+            <li class="audit-step" data-audit-step="0">Lecture de ta page d'accueil</li>
+            <li class="audit-step" data-audit-step="1">Analyse de ta proposition de valeur</li>
+            <li class="audit-step" data-audit-step="2">Repérage des points de friction</li>
+            <li class="audit-step" data-audit-step="3">Rédaction de tes axes d'amélioration</li>
+          </ul>
+          <div class="audit-results" id="audit-results" hidden>
+            <p class="audit-results__summary" id="audit-summary"></p>
+            <div class="audit-block audit-block--forces"><p class="audit-block__title">Ce qui marche</p><ul id="audit-forces"></ul></div>
+            <div class="audit-block audit-block--defauts"><p class="audit-block__title">Ce qui freine</p><ul id="audit-defauts"></ul></div>
+            <div class="audit-block audit-block--axes"><p class="audit-block__title">Tes axes d'amélioration</p><ul id="audit-axes"></ul></div>
+            <p class="audit-results__note">Analyse générée par IA à partir de ta page publique. À prendre comme une piste, pas un verdict.</p>
+          </div>
+          <div class="quiz-footer">
+            <button class="btn btn--primary quiz-next" id="audit-continue-btn" type="button" hidden>Continuer</button>
+            <button class="quiz-skip-link" id="audit-skip-btn" type="button">Passer cette étape</button>
           </div>
         </div>`;
   }
