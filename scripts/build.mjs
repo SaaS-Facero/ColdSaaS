@@ -6707,6 +6707,71 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
        d'auth pour toute l'app, quel que soit le point d'entrée. -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="/js/supabase-client.js"></script>
+  <!-- Mode Vidéo (admin) -- AVANT auth-state.js, qui lit window.ColdTrendDemo
+       pour afficher le header d'un visiteur ("Se connecter") pendant le
+       tournage. Le cookie ct_vm n'est qu'un drapeau d'armement posé depuis
+       /admin ou /compte : il ne donne aucun droit. Le mode démo n'est actif
+       que si generate-demo-concept confirme côté serveur que la session
+       Supabase courante a profiles.role = 'admin'. Sans cookie : aucune
+       requête, ready est résolu tout de suite à false. -->
+  <script>
+    (function () {
+      var COOKIE_NAME = "ct_vm";
+      var MAX_AGE = 60 * 60 * 24 * 30; // 30 jours, renouvelé à chaque vérification réussie
+      var armed = document.cookie.split("; ").indexOf(COOKIE_NAME + "=1") !== -1;
+
+      function writeCookie(value, maxAge) {
+        document.cookie =
+          COOKIE_NAME + "=" + value + "; Path=/; Max-Age=" + maxAge + "; SameSite=Lax" +
+          (window.location.protocol === "https:" ? "; Secure" : "");
+      }
+
+      function verifyOnServer() {
+        var supabase = window.ColdTrendSupabase;
+        if (!supabase) return Promise.resolve(false);
+        return supabase.auth.getSession().then(function (res) {
+          var token = res.data.session ? res.data.session.access_token : null;
+          if (!token) return false;
+          return fetch(supabase.supabaseUrl + "/functions/v1/generate-demo-concept", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              apikey: supabase.supabaseKey,
+              Authorization: "Bearer " + token
+            },
+            body: JSON.stringify({ check: true })
+          }).then(function (r) {
+            // 403 = compte connecté mais pas admin : le drapeau ne lui sert
+            // à rien, on le retire. 401 (déconnecté) le garde : l'admin
+            // peut se reconnecter sans réarmer.
+            if (r.status === 403) writeCookie("", 0);
+            if (!r.ok) return false;
+            return r.json().then(function (body) {
+              return !!(body && body.ok === true);
+            });
+          });
+        });
+      }
+
+      var ready = armed
+        ? verifyOnServer().then(
+            function (ok) {
+              if (ok) writeCookie("1", MAX_AGE);
+              return ok;
+            },
+            // Réseau en échec : quiz public normal (repli sûr).
+            function () {
+              return false;
+            }
+          )
+        : Promise.resolve(false);
+
+      // Lu par auth-state.js, le suivi des pages vues et le quiz. Modifier
+      // cet objet dans la console ne donne accès à rien : le concept de
+      // démo et le contrôle d'accès restent côté serveur.
+      window.ColdTrendDemo = { armed: armed, ready: ready };
+    })();
+  </script>
   <script src="/js/auth-state.js"></script>
 
   <!-- Pages vues -- 100% maison (funnel_events, voir migration 0003), pas
@@ -6737,10 +6802,22 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
             console.warn("[ColdTrend] page_view a échoué :", err);
           });
       }
+      // Mode Vidéo : la page vue d'un tournage n'est jamais envoyée. Pour un
+      // visiteur normal, ready est déjà résolu à false : envoi immédiat.
+      function trackPageViewUnlessDemo() {
+        var demo = window.ColdTrendDemo;
+        if (!demo) {
+          trackPageView();
+          return;
+        }
+        demo.ready.then(function (active) {
+          if (!active) trackPageView();
+        });
+      }
       if (window.ColdTrendSupabase) {
-        trackPageView();
+        trackPageViewUnlessDemo();
       } else {
-        document.addEventListener("coldtrend:supabase-ready", trackPageView, { once: true });
+        document.addEventListener("coldtrend:supabase-ready", trackPageViewUnlessDemo, { once: true });
       }
     })();
   </script>
@@ -7079,7 +7156,26 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
       var ageGatePending = false;
       var pendingQuizEvents = [];
 
+      // ---- Mode Vidéo (admin) : état ---------------------------------------
+      // demoGate vient du script d'armement (voir <head>) ; DEMO_CONFIG de
+      // demo.config.json au build. demoMode ne passe à true qu'après la
+      // confirmation serveur du rôle admin. demoPending : cookie présent,
+      // réponse pas encore arrivée -- les évènements attendent le verdict.
+      var DEMO_CONFIG = ${JSON.stringify(DEMO_CONFIG)};
+      var demoGate = window.ColdTrendDemo || { armed: false, ready: Promise.resolve(false) };
+      var demoMode = false;
+      var demoPending = demoGate.armed;
+
       function trackEvent(name, props, variant) {
+        // Mode Vidéo : rien ne part dans funnel_events, la session de
+        // tournage n'existe pas pour les statistiques.
+        if (demoMode) return;
+        if (demoPending) {
+          demoGate.ready.then(function (active) {
+            if (!active) trackEvent(name, props, variant);
+          });
+          return;
+        }
         if (ageGatePending) {
           pendingQuizEvents.push([name, props, variant]);
           return;
@@ -7323,6 +7419,12 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
       function isSkipped(index) {
         var el = questionScreens[index];
         if (!el) return false;
+        // Mode Vidéo : seuls les écrans de la séquence de démo existent
+        // (questions configurées + objectifRevenu + assemblage). Tout le
+        // reste -- âge, nom du projet, engagement, porte d'inscription --
+        // est sauté par le même mécanisme que les skipIf publics, donc la
+        // navigation, le bouton Retour et la barre de progression suivent.
+        if (demoMode) return DEMO_CONFIG.sequence.indexOf(el.getAttribute("data-id")) === -1;
         var field = el.getAttribute("data-skip-field");
         if (!field) return false;
         return answers[field] === el.getAttribute("data-skip-equals");
@@ -7436,7 +7538,11 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
       }
 
       function resetScreensVisualState() {
-        allScreens.forEach(function (el) {
+        // L'écran pont (#quiz-bridge) n'est pas dans allScreens : sans ça, une
+        // réouverture (ou la touche R du Mode Vidéo) faite pendant qu'il est
+        // affiché le laisserait visible sous la première question.
+        var screensToReset = bridgeScreen ? allScreens.concat([bridgeScreen]) : allScreens;
+        screensToReset.forEach(function (el) {
           el.classList.remove("is-active");
           el.style.transition = "none";
           el.style.opacity = "0";
@@ -7444,7 +7550,7 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
           el.style.pointerEvents = "none";
         });
         void stage.offsetWidth;
-        allScreens.forEach(function (el) {
+        screensToReset.forEach(function (el) {
           el.style.transition = "";
         });
       }
@@ -7604,6 +7710,28 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
           });
       }
 
+      // Mode Vidéo : même contrat que fetchGeneratedConcept (cb(concept|null)),
+      // mais via generate-demo-concept -- vrai LLM, rôle admin revérifié à
+      // chaque appel, cache par combinaison de réponses (demo_concepts,
+      // is_demo = true), aucune ligne user_concepts ni profiles. Seuls les
+      // champs que la fonction sait lire sont envoyés ; elle refiltre de
+      // toute façon par liste blanche.
+      var DEMO_CONCEPT_FIELDS = ["attente", "temps", "secteur", "reve", "plateformes", "blocage", "lignesRouges", "influenceurs", "clippers"];
+
+      function fetchDemoConcept(ans, cb) {
+        var picked = {};
+        DEMO_CONCEPT_FIELDS.forEach(function (field) {
+          if (ans[field] !== undefined) picked[field] = ans[field];
+        });
+        callEdgeFunctionAuthed("generate-demo-concept", { answers: picked })
+          .then(function (res) {
+            cb(res && res.concept ? res.concept : null);
+          })
+          .catch(function () {
+            cb(null);
+          });
+      }
+
       // Lien discret "tu cherches plutôt à racheter ?" -- retague
       // profiles.intention côté client (même pattern que persistQuizAnswers,
       // RLS déjà en place pour l'update de sa propre ligne), puis régénère
@@ -7615,6 +7743,8 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
         var statusEl = document.getElementById("result-intention-toggle-status");
         var supabase = window.ColdTrendSupabase;
         if (!supabase || !btn) return;
+        // Mode Vidéo : ce lien écrirait profiles.intention de l'admin.
+        if (demoMode) return;
 
         btn.disabled = true;
         if (statusEl) statusEl.textContent = "Régénération du concept en cours…";
@@ -7737,8 +7867,11 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
         // ce pivot) mais sa sémantique change : elle marque juste "quiz
         // complété", plus un vrai comptage de fiches correspondantes.
         answers.matchCount = 1;
-        persistQuizAnswers();
+        persistQuizAnswers(); // no-op en Mode Vidéo
 
+        // Projection : même revealDashboard() et même computeProjection()
+        // que le public (formule déterministe, fourchette basse, mention
+        // "Estimation non garantie"), y compris en Mode Vidéo.
         revealDashboard();
 
         var metaParts = [];
@@ -7755,17 +7888,24 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
         // l'appel partait sans session, échouait en silence et aucun
         // concept n'était jamais généré pour les nouveaux comptes.
         // Une seconde tentative couvre un échec ponctuel du modèle.
+        // runId : une réponse arrivée après une réinitialisation (touche R du
+        // Mode Vidéo, ou fermeture/réouverture du quiz) n'écrase jamais
+        // l'écran de la prise suivante.
+        var runId = quizRunId;
+        var fetchConcept = demoMode ? fetchDemoConcept : fetchGeneratedConcept;
         var pendingAuth = authResolutionPromise || Promise.resolve(true);
         pendingAuth.then(function () {
-          fetchGeneratedConcept(answers, function (concept) {
+          fetchConcept(answers, function (concept) {
+            if (runId !== quizRunId) return;
             if (concept) {
               answers.concept = concept;
               renderConceptTeaser(concept);
               return;
             }
             window.setTimeout(function () {
-              fetchGeneratedConcept(answers, function (retried) {
-                if (!retried) return;
+              if (runId !== quizRunId) return;
+              fetchConcept(answers, function (retried) {
+                if (!retried || runId !== quizRunId) return;
                 answers.concept = retried;
                 renderConceptTeaser(retried);
               });
@@ -7803,7 +7943,9 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
       function initDurationCards() {
         var stored = null;
         try {
-          stored = window.localStorage.getItem(DURATION_STORAGE_KEY);
+          // Mode Vidéo : toujours l'écran d'une première visite (pas de
+          // bandeau "Reprends là où tu en étais" à la 2e prise).
+          stored = demoMode ? null : window.localStorage.getItem(DURATION_STORAGE_KEY);
         } catch (err) {
           stored = null;
         }
@@ -7955,6 +8097,9 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
 
       function handleFinalizePayment() {
         if (isFinalizingPayment) return;
+        // Mode Vidéo : l'écran des offres est le vrai, mais aucune Checkout
+        // Session Stripe n'est créée pour un tournage (le bouton ne fait rien).
+        if (demoMode) return;
         var payBtn = document.getElementById("quiz-pay-btn");
         if (!payBtn) return;
         var errorEl = document.getElementById("payment-error");
@@ -9237,7 +9382,9 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
       var QUIZ_DRAFT_KEY = "coldtrend_quiz_draft_v2";
 
       function saveDraftLocally() {
-        if (ageGatePending) return;
+        // Mode Vidéo : jamais de brouillon (il écraserait celui du compte
+        // admin et rouvrirait la prise suivante au milieu du parcours).
+        if (ageGatePending || demoMode) return;
         try {
           window.localStorage.setItem(
             QUIZ_DRAFT_KEY,
@@ -9276,7 +9423,8 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
       // questions suivantes) pour être sûr d'avoir une session valide.
       function persistQuizAnswers() {
         var supabase = window.ColdTrendSupabase;
-        if (!supabase) return;
+        // Mode Vidéo : aucune écriture dans profiles.
+        if (!supabase || demoMode) return;
         var pending = authResolutionPromise || Promise.resolve(true);
         pending
           .then(function () {
@@ -9321,7 +9469,9 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
       // possible — sans ça, funnel_last_step ne reflète jamais l'état réel
       // tant que le quiz n'est pas fini.
       function persistProgress(stepIndex) {
-        if (ageGatePending) return;
+        // Mode Vidéo : aucune écriture dans profiles (funnel_last_step
+        // alimente les relances d'abandon).
+        if (ageGatePending || demoMode) return;
         var supabase = window.ColdTrendSupabase;
         if (!supabase) return;
         var pending = authResolutionPromise || Promise.resolve(true);
@@ -9606,7 +9756,21 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
           });
       }
 
+      // Attend le verdict du Mode Vidéo avant d'ouvrir : déjà résolu pour un
+      // visiteur (pas de cookie, aucune requête), et en pratique résolu
+      // bien avant le clic de l'admin (vérification lancée au chargement).
       function openQuiz() {
+        demoGate.ready.then(function () {
+          openQuizNow();
+        });
+      }
+
+      // Incrémenté à chaque ouverture : invalide les réponses réseau d'une
+      // prise précédente (voir goToResult).
+      var quizRunId = 0;
+
+      function openQuizNow() {
+        quizRunId += 1;
         answers = { intention: "creation" };
         ageGatePending = true;
         pendingQuizEvents = [];
@@ -9672,7 +9836,10 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
         setProgress(0, true);
         updateBackVisibility();
 
-        determineStartIndex().then(function (startIndex) {
+        // Mode Vidéo : toujours une première visite -- ni brouillon local ni
+        // reprise depuis profiles (et donc pas de badge "Connecté").
+        var startPromise = demoMode ? Promise.resolve(findNextQuestionIndex(-1)) : determineStartIndex();
+        startPromise.then(function (startIndex) {
           // Jamais de reprise au-delà de l'écran d'âge sans âge majeur
           // connu : l'âge n'est pas stocké en base, donc une reprise depuis
           // profiles repasse toujours par l'intention puis l'âge.
@@ -9683,7 +9850,12 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
               break;
             }
           }
-          if (isAdultAge(answers.age)) {
+          if (demoMode) {
+            // Pas d'écran âge en démo (question non configurable) : rien à
+            // retenir, trackEvent ignore de toute façon tout en démo.
+            ageGatePending = false;
+            pendingQuizEvents = [];
+          } else if (isAdultAge(answers.age)) {
             clearAgeGate();
           } else if (ageIndex !== -1 && startIndex > ageIndex) {
             startIndex = answers.attente ? ageIndex : 0;
@@ -9847,6 +10019,7 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
         if (durationCard) {
           selectedDuration = parseInt(durationCard.getAttribute("data-duration"), 10);
           updateDurationCardsUI();
+          if (demoMode) return;
           try {
             window.localStorage.setItem(DURATION_STORAGE_KEY, String(selectedDuration));
           } catch (err) {
@@ -10217,6 +10390,164 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
           document.addEventListener("coldtrend:supabase-ready", tryResume, { once: true });
         }
       })();
+
+      // ---- Mode Vidéo (admin) : activation et outils de tournage ----------
+      // Rien de visible : pas de badge, pas de paramètre d'URL, pas de
+      // changement de titre. Les seuls effets sont la séquence d'écrans, la
+      // coupure du suivi et les deux touches ci-dessous.
+
+      // Barre de progression : les segments des questions sautées sont
+      // masqués, la barre se remplit donc entièrement sur le parcours court
+      // (sinon 4 segments sur 15 à la fin de la vidéo).
+      function applyDemoProgressBar() {
+        var chapterScreens = questionScreens.filter(function (el) {
+          return el.hasAttribute("data-chapter");
+        });
+        progressSegs.forEach(function (seg, i) {
+          var screenEl = chapterScreens[i];
+          var keep = screenEl && DEMO_CONFIG.sequence.indexOf(screenEl.getAttribute("data-id")) !== -1;
+          seg.style.display = keep ? "" : "none";
+        });
+        Array.prototype.forEach.call(document.querySelectorAll("#quiz-progress .quiz-progress__group"), function (group) {
+          var visible = Array.prototype.some.call(group.querySelectorAll(".quiz-progress__seg"), function (seg) {
+            return seg.style.display !== "none";
+          });
+          group.style.display = visible ? "" : "none";
+          var gap = group.nextElementSibling;
+          if (!visible && gap && gap.classList.contains("quiz-progress__group-gap")) gap.style.display = "none";
+        });
+      }
+
+      // Ralenti ×1,3 (demo.config.json : slowMotion / slowMotionFactor).
+      // Une seule échelle de temps pour tout ce qui bouge, pour que le
+      // ralenti reste fidèle au rythme public :
+      //   - animations et transitions CSS : playbackRate des Web Animations
+      //     (balayage à chaque frame, les nouvelles sont prises au vol) ;
+      //   - minuteries JS (avance auto, étapes d'assemblage, mois rotatifs,
+      //     pop-ups) : setTimeout / setInterval allongés ;
+      //   - tweens requestAnimationFrame (tableau de bord, compteurs) :
+      //     horloge virtuelle qui avance 1,3 fois moins vite.
+      // Installé uniquement après confirmation admin ; à 1 c'est neutre.
+      var timeScale = 1;
+
+      function installDemoTimeScale() {
+        var realSetTimeout = window.setTimeout;
+        var realSetInterval = window.setInterval;
+        var realRaf = window.requestAnimationFrame;
+
+        window.setTimeout = function (fn, ms) {
+          var args = Array.prototype.slice.call(arguments, 2);
+          return realSetTimeout.apply(window, [fn, (Number(ms) || 0) * timeScale].concat(args));
+        };
+        window.setInterval = function (fn, ms) {
+          var args = Array.prototype.slice.call(arguments, 2);
+          return realSetInterval.apply(window, [fn, (Number(ms) || 0) * timeScale].concat(args));
+        };
+
+        // Horloge virtuelle continue : basculer le ralenti en pleine
+        // animation ne fait jamais sauter un tween.
+        var realLast = null;
+        var virtualNow = 0;
+        window.requestAnimationFrame = function (cb) {
+          return realRaf.call(window, function (t) {
+            if (realLast === null) {
+              realLast = t;
+              virtualNow = t;
+            } else if (t > realLast) {
+              virtualNow += (t - realLast) / timeScale;
+              realLast = t;
+            }
+            cb(virtualNow);
+          });
+        };
+
+        function syncCssAnimations() {
+          if (!document.getAnimations) return;
+          var rate = 1 / timeScale;
+          document.getAnimations().forEach(function (anim) {
+            if (anim.playbackRate !== rate) {
+              try {
+                anim.playbackRate = rate;
+              } catch (err) {
+                /* animation déjà détruite : rien à faire */
+              }
+            }
+          });
+        }
+        (function sweep() {
+          syncCssAnimations();
+          realRaf.call(window, sweep);
+        })();
+      }
+
+      function setSlowMotion(on) {
+        timeScale = on ? DEMO_CONFIG.slowFactor : 1;
+        // Seul retour : la console (rien à l'écran pendant le tournage).
+        console.info("[Mode Vidéo] ralenti " + (on ? "×" + DEMO_CONFIG.slowFactor : "désactivé"));
+      }
+
+      // R : réinitialise tout pour une nouvelle prise -- quiz fermé, accueil
+      // en haut de page, réponses, confettis et réponses réseau en attente
+      // oubliés. La prise repart du vrai point d'entrée (clic sur le CTA).
+      function restartDemoTake() {
+        quizRunId += 1;
+        if (multiAdvanceTimer) {
+          window.clearTimeout(multiAdvanceTimer);
+          multiAdvanceTimer = null;
+        }
+        if (dashTweenFrame) {
+          window.cancelAnimationFrame(dashTweenFrame);
+          dashTweenFrame = null;
+        }
+        if (promoCountdownInterval) {
+          window.clearInterval(promoCountdownInterval);
+          promoCountdownInterval = null;
+        }
+        closeQuiz();
+        answers = { intention: "creation" };
+        // Slider objectif de revenus remis à sa valeur de rendu serveur,
+        // comme pour un visiteur qui arrive.
+        var revenueInput = document.getElementById("revenue-slider-input");
+        if (revenueInput) {
+          revenueInput.value = revenueInput.defaultValue;
+          updateRevenueSlider();
+        }
+        dashConfettiDone = false;
+        transitionInProgress = false;
+        resetCustomScreens();
+        resetScreensVisualState();
+        currentScreenEl = null;
+        window.scrollTo(0, 0);
+      }
+
+      function initDemoMode() {
+        applyDemoProgressBar();
+        installDemoTimeScale();
+        setSlowMotion(DEMO_CONFIG.slowMotion);
+        var slowOn = DEMO_CONFIG.slowMotion;
+
+        document.addEventListener("keydown", function (e) {
+          // Jamais sur Ctrl+R / Cmd+R (rechargement) ni pendant une saisie.
+          if (e.ctrlKey || e.metaKey || e.altKey || e.repeat) return;
+          var target = e.target;
+          if (target && (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable)) return;
+          var key = (e.key || "").toLowerCase();
+          if (key === "r") {
+            e.preventDefault();
+            restartDemoTake();
+          } else if (key === "l") {
+            e.preventDefault();
+            slowOn = !slowOn;
+            setSlowMotion(slowOn);
+          }
+        });
+      }
+
+      demoGate.ready.then(function (active) {
+        demoMode = !!active;
+        demoPending = false;
+        if (demoMode) initDemoMode();
+      });
 
       document.addEventListener("keydown", function (e) {
         if (e.key === "Escape" && overlay.classList.contains("is-open")) closeQuiz();
@@ -14433,7 +14764,7 @@ html, body {
   margin-bottom: 24px;
 }
 
-/* Raccourci vers le Mode Vidéo (/demo), poussé à droite du header. */
+/* Mode Vidéo (arme le cookie ct_vm), poussé à droite du header. */
 .admin-demo-btn {
   margin-left: auto;
   align-self: center;
@@ -14451,6 +14782,31 @@ html, body {
 .admin-demo-btn:focus-visible {
   filter: brightness(1.12);
 }
+
+.admin-demo-btn { border: 0; cursor: pointer; font-family: inherit; }
+
+.admin-demo {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.admin-demo .admin-demo-btn { margin-left: 0; }
+
+.admin-demo-off {
+  border: 1px solid currentColor;
+  background: transparent;
+  color: inherit;
+  border-radius: 10px;
+  padding: 7px 12px;
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+  opacity: 0.75;
+}
+
+.admin-demo-off[hidden] { display: none; }
 
 .admin-title {
   font-size: 22px;
@@ -14760,10 +15116,15 @@ function authStateJs() {
 // le petit lien "Se connecter" / prénom du brand-bar cohérent partout, à
 // partir du même état de session Supabase.
 (function () {
+  // Mode Vidéo (accueil uniquement, voir window.ColdTrendDemo dans page()) :
+  // tant que le mode est armé ou actif, le header montre ce que voit un
+  // visiteur ("Se connecter"), jamais le "Mon dossier" de l'admin qui filme.
+  var forceVisitor = false;
+
   function apply(user) {
     var slots = document.querySelectorAll("[data-auth-slot]");
     if (!slots.length) return;
-    var isRealUser = user && !user.is_anonymous;
+    var isRealUser = !forceVisitor && user && !user.is_anonymous;
     // Jamais l'email en clair dans un header/nav visible en permanence --
     // libelle generique coherent avec le vocabulaire "dossier" deja utilise
     // sur /compte (timeline "Dossier ouvert", etc.), quel que soit
@@ -14781,9 +15142,24 @@ function authStateJs() {
       document.addEventListener("coldtrend:supabase-ready", boot, { once: true });
       return;
     }
-    window.ColdTrendSupabase.auth.getSession().then(function (res) {
-      apply(res.data.session ? res.data.session.user : null);
-    });
+    function refresh() {
+      window.ColdTrendSupabase.auth.getSession().then(function (res) {
+        apply(res.data.session ? res.data.session.user : null);
+      });
+    }
+    var demo = window.ColdTrendDemo;
+    if (demo && demo.armed) {
+      // Visiteur d'office pendant la vérification serveur (pas de
+      // "Mon dossier" qui clignote à l'image), puis vrai état si le mode
+      // démo est refusé.
+      forceVisitor = true;
+      demo.ready.then(function (active) {
+        if (active) return;
+        forceVisitor = false;
+        refresh();
+      });
+    }
+    refresh();
     window.ColdTrendSupabase.auth.onAuthStateChange(function (_event, session) {
       apply(session ? session.user : null);
     });
@@ -15498,6 +15874,20 @@ function reinitialiserMotDePassePage() {
   });
 }
 
+// Mode Vidéo : armement depuis /admin et /compte. Même cookie que le
+// script d'activation de page() (ct_vm, 30 jours). Ce cookie n'est qu'un
+// drapeau : l'accueil revérifie profiles.role côté serveur avant d'activer
+// quoi que ce soit. Injecté tel quel dans le JS client des deux pages.
+const VIDEO_MODE_CLIENT_JS = `
+      function videoModeArmed() {
+        return document.cookie.split("; ").indexOf("ct_vm=1") !== -1;
+      }
+      function setVideoMode(on) {
+        document.cookie =
+          "ct_vm=" + (on ? "1" : "") + "; Path=/; Max-Age=" + (on ? 60 * 60 * 24 * 30 : 0) + "; SameSite=Lax" +
+          (window.location.protocol === "https:" ? "; Secure" : "");
+      }`;
+
 function comptePage() {
   // /compte n'affiche pas des données, il raconte une progression : le
   // "dossier" de la personne, dans le même univers vérification/preuve que
@@ -15525,7 +15915,8 @@ function comptePage() {
           </button>
           <div class="dossier__user-dropdown" id="user-dropdown">
             <a class="dossier__user-dropdown-item" id="admin-link-btn" href="/admin" style="display:none;">Accéder à l'admin</a>
-            <a class="dossier__user-dropdown-item" id="demo-link-btn" href="/demo" style="display:none;">🎬 Mode Vidéo</a>
+            <button type="button" class="dossier__user-dropdown-item" id="demo-link-btn" style="display:none;">🎬 Mode Vidéo</button>
+            <button type="button" class="dossier__user-dropdown-item" id="demo-off-btn" style="display:none;">Quitter le Mode Vidéo</button>
             <button type="button" class="dossier__user-dropdown-item" id="manage-subscription-btn" style="display:none;">Gérer mon abonnement</button>
             <button type="button" class="dossier__user-dropdown-item" id="resend-access-btn" style="display:none;">Renvoyer mon accès par email</button>
             <button type="button" class="dossier__user-dropdown-item" id="signout-btn">Se déconnecter</button>
@@ -15868,10 +16259,11 @@ function comptePage() {
         // compte décide seulement de ce qui est affiché et verrouillé, voir
         // loadGeneratedConcept().
         if (profile.is_admin) {
-          // Simple raccourci d'affichage : /demo revérifie le rôle côté
-          // serveur (generate-demo-concept) avant d'afficher quoi que ce soit.
+          // Simple raccourci d'affichage : l'accueil revérifie le rôle côté
+          // serveur (generate-demo-concept) avant d'activer le Mode Vidéo.
           document.getElementById("admin-link-btn").style.display = "block";
           document.getElementById("demo-link-btn").style.display = "block";
+          if (videoModeArmed()) document.getElementById("demo-off-btn").style.display = "block";
         }
         if (profile.paid_at || profile.stripe_customer_id) {
           document.getElementById("manage-subscription-btn").style.display = "block";
@@ -16000,6 +16392,18 @@ function comptePage() {
       document.getElementById("signout-btn").addEventListener("click", signOut);
       document.getElementById("signout-btn-bottom").addEventListener("click", signOut);
 
+      // Mode Vidéo : arme puis ouvre l'accueil public (URL normale, aucun
+      // paramètre) ; "Quitter" retire le drapeau et rend le quiz public.
+      ${VIDEO_MODE_CLIENT_JS}
+      document.getElementById("demo-link-btn").addEventListener("click", function () {
+        setVideoMode(true);
+        window.location.href = "/";
+      });
+      document.getElementById("demo-off-btn").addEventListener("click", function () {
+        setVideoMode(false);
+        document.getElementById("demo-off-btn").style.display = "none";
+      });
+
       async function callEdgeFunction(name) {
         var supabase = window.ColdTrendSupabase;
         var sessionRes = await supabase.auth.getSession();
@@ -16098,7 +16502,12 @@ function adminPage() {
       <a class="auth-brand" href="/">${brand.name}</a>
       <h1 class="admin-title">Back-office</h1>
       <span class="admin-count" id="admin-count"></span>
-      <a class="admin-demo-btn" href="/demo">🎬 Mode Vidéo</a>
+      <!-- Mode Vidéo : arme le cookie ct_vm puis ouvre l'accueil public.
+           L'activation réelle est revérifiée côté serveur sur l'accueil. -->
+      <span class="admin-demo">
+        <button type="button" class="admin-demo-btn" id="video-mode-on">🎬 Mode Vidéo</button>
+        <button type="button" class="admin-demo-off" id="video-mode-off" hidden>Désactiver</button>
+      </span>
     </header>
 
     <section class="admin-campaign admin-analytics" aria-label="Pages vues" id="analytics-section">
@@ -16238,6 +16647,25 @@ function adminPage() {
   </div>
   <script>
     (function () {
+      // Mode Vidéo : arme le cookie puis ouvre l'accueil public dans le même
+      // onglet. "Désactiver" rend le quiz public à ce navigateur. La page
+      // admin n'est de toute façon affichée qu'aux admins (voir plus bas),
+      // et l'accueil revérifie le rôle côté serveur.
+      ${VIDEO_MODE_CLIENT_JS}
+      (function initVideoModeButtons() {
+        var onBtn = document.getElementById("video-mode-on");
+        var offBtn = document.getElementById("video-mode-off");
+        if (!onBtn || !offBtn) return;
+        offBtn.hidden = !videoModeArmed();
+        onBtn.addEventListener("click", function () {
+          setVideoMode(true);
+          window.location.href = "/";
+        });
+        offBtn.addEventListener("click", function () {
+          setVideoMode(false);
+          offBtn.hidden = true;
+        });
+      })();
       var SECTOR_LABELS = ${JSON.stringify(quiz.sectorLabels)};
       var BUDGET_LABELS = ${JSON.stringify(quiz.budgetLabels)};
       var TIME_LABELS = ${JSON.stringify(quiz.timeLabels)};
@@ -16634,22 +17062,34 @@ function writeBuiltFile(filePath, contents) {
 }
 
 // ---------------------------------------------------------------------------
-// /demo — Mode Vidéo (tournage TikTok/Insta), réservé aux admins.
+// Mode Vidéo (tournage TikTok/Insta), réservé aux admins.
 //
-// - Accès : la page n'affiche RIEN tant que generate-demo-concept n'a pas
-//   confirmé côté serveur que la session est celle d'un admin (profiles.role
-//   relu avec le rôle service). Sans session ou sans rôle admin : retour
-//   immédiat à l'accueil. Le HTML lui-même ne contient aucune donnée.
-// - Parcours : questions de demo.config.json (reprises de quiz.questions,
-//   mêmes libellés), puis "On assemble ton projet" avec les 2 pop-ups, puis
-//   le concept généré par le vrai LLM (cache par combinaison de réponses).
-// - Rien de collecté : pas de trackEvent, pas de page_view, pas de Crisp,
-//   aucune écriture dans profiles / user_concepts / funnel_events.
-// - Aucune projection de revenus, aucun témoignage.
-// - Tournage : cadre 9:16 centré (tailles en cqw, identiques quelle que
-//   soit la taille de l'écran), aucun bouton retour / croix / avatar.
-//   Raccourcis : R relancer, L ralenti x1,3, F plein écran.
+// Plus de page dédiée : la vidéo montre le VRAI site (coldtrend.com, même
+// HTML, même onglet, même titre, même URL publique). Le mode démo n'est
+// qu'un état du quiz de page() :
+//   - armement : cookie ct_vm=1 posé depuis /admin ou /compte (bouton
+//     "Mode Vidéo"). Le cookie seul ne donne RIEN : il déclenche seulement
+//     une vérification serveur (generate-demo-concept { check: true }, qui
+//     relit profiles.role avec le rôle service). Pas admin ou pas connecté
+//     = quiz public normal, avec suivi normal.
+//   - parcours : les questions de demo.config.json + objectifRevenu (slider
+//     et mois rotatifs) + assemblage (2 pop-ups), puis l'écran résultat et
+//     les offres réels. Mêmes écrans DOM, mêmes animations : seul
+//     isSkipped() change.
+//   - intégrité : aucun évènement funnel_events, aucune écriture profiles,
+//     aucun brouillon localStorage, pas de Checkout Stripe. Le concept vient
+//     du vrai LLM (generate-demo-concept, cache demo_concepts is_demo=true).
+//   - tournage : R réinitialise, L bascule le ralenti (×1,3 par défaut).
+//
+// Ce bloc ne fait que lire et valider demo.config.json au build : un id
+// inconnu bloque le build plutôt qu'une démo cassée découverte en filmant.
 // ---------------------------------------------------------------------------
+
+// Questions autorisées : celles que generate-demo-concept sait transmettre
+// au LLM (sa liste blanche LABELS). objectifRevenu et assemblage sont
+// toujours ajoutés, ils ne se configurent pas.
+const DEMO_ALLOWED_QUESTIONS = ["attente", "temps", "secteur", "reve", "plateformes", "blocage", "lignesRouges"];
+
 function loadDemoConfig() {
   let raw = {};
   try {
@@ -16658,844 +17098,28 @@ function loadDemoConfig() {
     console.warn("[build] demo.config.json illisible, configuration par défaut :", err.message);
   }
   const ids = Array.isArray(raw.questions) && raw.questions.length ? raw.questions : ["attente", "temps", "secteur", "reve"];
-  // Build bloqué si un id n'existe pas ou n'est pas une question à options :
-  // mieux qu'une démo cassée découverte au moment de filmer.
-  const questions = ids.map((id) => {
+  ids.forEach((id) => {
     const q = quiz.questions.find((x) => x.id === id);
-    if (!q || (q.type !== "single" && q.type !== "multi")) {
-      throw new Error(`[demo.config.json] question "${id}" inconnue ou sans options (types single/multi uniquement).`);
+    if (!q || !DEMO_ALLOWED_QUESTIONS.includes(id) || (q.type !== "single" && q.type !== "multi")) {
+      throw new Error(`[demo.config.json] question "${id}" non autorisée. Ids possibles : ${DEMO_ALLOWED_QUESTIONS.join(", ")}.`);
     }
-    return {
-      id: q.id,
-      title: q.title,
-      subtext: q.subtext || "",
-      type: q.type,
-      options: q.options.map((o) => ({ value: o.value, label: o.label, emoji: o.emoji || "" }))
-    };
   });
-  const assembling = quiz.questions.find((x) => x.id === "assemblage");
+  for (const fixed of ["objectifRevenu", "assemblage"]) {
+    if (!quiz.questions.some((x) => x.id === fixed)) {
+      throw new Error(`[demo.config.json] écran "${fixed}" introuvable dans quiz.questions.`);
+    }
+  }
   const factor = Number(raw.slowMotionFactor);
   return {
-    questions,
-    steps: assembling.steps,
-    slogans: assembling.slogans,
-    popups: assembling.popups,
+    // Écrans affichés en mode démo. L'ordre réel est celui du quiz public
+    // (ordre DOM), comme pour un vrai visiteur.
+    sequence: Array.from(new Set(ids)).concat(["objectifRevenu", "assemblage"]),
     slowMotion: raw.slowMotion === true,
     slowFactor: factor >= 1 && factor <= 3 ? factor : 1.3
   };
 }
 
-function demoPage() {
-  const config = loadDemoConfig();
-  const c = brand.colors;
-  return `<!doctype html>
-<html lang="fr">
-<head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-  <meta name="robots" content="noindex, nofollow" />
-  <title>${brand.name}</title>
-  <style>
-    :root {
-      --cobalt: ${c.cobalt};
-      --cobalt-soft: ${c.cobaltSoft};
-      --green: ${c.verifiedGreen};
-      --steel: ${c.steel};
-      --ink: ${c.ink};
-      --paper: #F2F4F8;
-      --slow: 1;
-    }
-
-    * { box-sizing: border-box; }
-
-    html, body {
-      margin: 0;
-      height: 100%;
-      background: #000;
-      color: var(--paper);
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Inter, Arial, sans-serif;
-      overflow: hidden;
-      -webkit-font-smoothing: antialiased;
-      cursor: default;
-    }
-
-    /* Cadre 9:16 centré, bandes noires autour sur un écran horizontal. */
-    .d-frame {
-      position: absolute;
-      top: 50%;
-      left: 50%;
-      width: min(100vw, calc(100dvh * 9 / 16));
-      height: min(100dvh, calc(100vw * 16 / 9));
-      transform: translate(-50%, -50%);
-      overflow: hidden;
-      background: var(--ink);
-      container-type: size;
-    }
-
-    .d-frame[hidden] { display: none; }
-
-    .d-liquid { position: absolute; inset: 0; pointer-events: none; }
-
-    .d-blob {
-      position: absolute;
-      width: 80cqw;
-      height: 80cqw;
-      filter: blur(14cqw);
-      opacity: 0.5;
-      border-radius: 42% 58% 63% 37% / 41% 44% 56% 59%;
-      animation: d-liquid calc(16s * var(--slow)) ease-in-out infinite alternate;
-    }
-
-    .d-blob--1 { top: -20cqw; left: -25cqw; background: var(--cobalt); }
-    .d-blob--2 { bottom: -20cqw; right: -30cqw; background: var(--green); opacity: 0.28; animation-delay: -7s; }
-    .d-blob--3 { top: 45%; left: 20%; background: #7B4DFF; opacity: 0.3; animation-delay: -12s; }
-
-    @keyframes d-liquid {
-      0% { transform: translate(0, 0) rotate(0deg) scale(1); }
-      50% { transform: translate(10cqw, 8cqw) rotate(60deg) scale(1.15); }
-      100% { transform: translate(-6cqw, 14cqw) rotate(120deg) scale(0.95); }
-    }
-
-    .d-brand {
-      position: absolute;
-      top: 6cqw;
-      left: 0;
-      right: 0;
-      z-index: 2;
-      text-align: center;
-      font-size: 4.2cqw;
-      font-weight: 800;
-      letter-spacing: 0.02em;
-      opacity: 0.9;
-    }
-
-    .d-progress {
-      position: absolute;
-      top: 14cqw;
-      left: 7cqw;
-      right: 7cqw;
-      z-index: 2;
-      display: flex;
-      gap: 1.6cqw;
-    }
-
-    .d-progress[hidden] { display: none; }
-
-    .d-progress span {
-      flex: 1;
-      height: 1.1cqw;
-      border-radius: 99px;
-      background: rgba(255, 255, 255, 0.15);
-      overflow: hidden;
-    }
-
-    .d-progress span::after {
-      content: "";
-      display: block;
-      height: 100%;
-      width: 0;
-      background: var(--cobalt-soft);
-      transition: width calc(500ms * var(--slow)) ease;
-    }
-
-    .d-progress span.is-done::after { width: 100%; }
-
-    .d-stage {
-      position: absolute;
-      inset: 22cqw 7cqw 8cqw;
-    }
-
-    .d-screen {
-      position: absolute;
-      inset: 0;
-      display: flex;
-      flex-direction: column;
-      animation: d-screen-in calc(560ms * var(--slow)) cubic-bezier(0.22, 1.2, 0.36, 1) both;
-    }
-
-    .d-screen.is-leaving {
-      animation: d-screen-out calc(260ms * var(--slow)) ease-in both;
-    }
-
-    @keyframes d-screen-in {
-      from { opacity: 0; transform: translateX(8cqw); }
-      to { opacity: 1; transform: none; }
-    }
-
-    @keyframes d-screen-out {
-      to { opacity: 0; transform: translateX(-8cqw); }
-    }
-
-    .d-title {
-      margin: 0 0 2.5cqw;
-      font-size: 8.6cqw;
-      font-weight: 800;
-      letter-spacing: -0.02em;
-      line-height: 1.12;
-    }
-
-    .d-sub {
-      margin: 0 0 5cqw;
-      font-size: 4.2cqw;
-      color: var(--steel);
-    }
-
-    .d-options {
-      display: flex;
-      flex-direction: column;
-      gap: 3cqw;
-    }
-
-    .d-option {
-      display: flex;
-      align-items: center;
-      gap: 3.5cqw;
-      width: 100%;
-      padding: 4.2cqw 4.5cqw;
-      border-radius: 5cqw;
-      border: 1px solid rgba(255, 255, 255, 0.14);
-      background: linear-gradient(145deg, rgba(255, 255, 255, 0.11), rgba(255, 255, 255, 0.03));
-      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.22);
-      -webkit-backdrop-filter: blur(20px) saturate(170%);
-      backdrop-filter: blur(20px) saturate(170%);
-      color: var(--paper);
-      font: inherit;
-      font-size: 4.6cqw;
-      font-weight: 700;
-      text-align: left;
-      cursor: pointer;
-      opacity: 0;
-      animation: d-pop calc(480ms * var(--slow)) cubic-bezier(0.34, 1.45, 0.64, 1) both;
-      animation-delay: calc((var(--i) * 80ms + 160ms) * var(--slow));
-      transition: transform calc(260ms * var(--slow)) cubic-bezier(0.34, 1.56, 0.64, 1), background 200ms ease, border-color 200ms ease;
-      -webkit-tap-highlight-color: transparent;
-    }
-
-    .d-option:active { transform: scale(0.97); }
-
-    .d-option.is-selected {
-      border-color: rgba(127, 168, 255, 0.9);
-      background: radial-gradient(120% 120% at 0% 0%, rgba(0, 71, 255, 0.45), transparent 70%), rgba(0, 71, 255, 0.16);
-      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.3), 0 0 0 1px rgba(127, 168, 255, 0.5), 0 4cqw 9cqw -4cqw rgba(0, 71, 255, 0.9);
-      transform: scale(1.02);
-    }
-
-    .d-option__emoji { font-size: 6cqw; }
-
-    @keyframes d-pop {
-      from { opacity: 0; transform: translateY(3cqw) scale(0.97); }
-      to { opacity: 1; transform: none; }
-    }
-
-    .d-cta {
-      margin-top: auto;
-      width: 100%;
-      padding: 4.4cqw;
-      border: none;
-      border-radius: 4.5cqw;
-      background: linear-gradient(135deg, #3D7BFF, var(--cobalt) 60%, #0036C4);
-      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.35), 0 4cqw 10cqw -4cqw rgba(0, 71, 255, 0.95);
-      color: #fff;
-      font: inherit;
-      font-size: 4.8cqw;
-      font-weight: 800;
-      cursor: pointer;
-      animation: d-pop calc(420ms * var(--slow)) ease both;
-    }
-
-    .d-cta[hidden] { display: none; }
-
-    /* Assemblage */
-    .d-center { text-align: center; }
-
-    .d-slogan {
-      min-height: 6cqw;
-      margin: 0 0 5cqw;
-      font-size: 4.6cqw;
-      font-weight: 700;
-      color: var(--cobalt-soft);
-      transition: opacity calc(220ms * var(--slow)) ease, transform calc(220ms * var(--slow)) ease;
-    }
-
-    .d-slogan.is-swapping { opacity: 0; transform: translateY(-1.5cqw); }
-
-    .d-bar {
-      height: 2cqw;
-      border-radius: 99px;
-      background: rgba(255, 255, 255, 0.1);
-      overflow: hidden;
-    }
-
-    .d-bar__fill {
-      height: 100%;
-      width: 0;
-      border-radius: inherit;
-      background: linear-gradient(90deg, #0033B8, var(--cobalt-soft));
-      box-shadow: 0 0 4cqw rgba(0, 71, 255, 0.8);
-      transition: width calc(900ms * var(--slow)) cubic-bezier(0.22, 1, 0.36, 1);
-    }
-
-    .d-percent {
-      margin: 2cqw 0 6cqw;
-      font-size: 3.6cqw;
-      font-weight: 700;
-      color: var(--steel);
-      font-variant-numeric: tabular-nums;
-    }
-
-    .d-steps {
-      list-style: none;
-      margin: 0;
-      padding: 0;
-      display: flex;
-      flex-direction: column;
-      gap: 4cqw;
-      text-align: left;
-    }
-
-    .d-step {
-      position: relative;
-      padding-left: 9cqw;
-      font-size: 4.4cqw;
-      color: var(--steel);
-      transition: color 200ms ease;
-    }
-
-    .d-step::before {
-      content: "";
-      position: absolute;
-      left: 0;
-      top: 0.2cqw;
-      width: 5cqw;
-      height: 5cqw;
-      border-radius: 50%;
-      border: 0.6cqw solid rgba(255, 255, 255, 0.2);
-      box-sizing: border-box;
-    }
-
-    .d-step.is-active { color: var(--paper); }
-
-    .d-step.is-active::before {
-      border-color: var(--cobalt-soft);
-      border-top-color: transparent;
-      animation: d-spin calc(800ms * var(--slow)) linear infinite;
-    }
-
-    .d-step.is-done { color: var(--paper); }
-
-    .d-step.is-done::before {
-      border-color: var(--green);
-      background: var(--green);
-      box-shadow: 0 0 3cqw rgba(0, 196, 140, 0.6);
-    }
-
-    @keyframes d-spin { to { transform: rotate(360deg); } }
-
-    /* Pop-up plein cadre */
-    .d-popup {
-      position: absolute;
-      inset: 0;
-      z-index: 10;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      padding: 7cqw;
-      background: rgba(5, 8, 15, 0.8);
-      -webkit-backdrop-filter: blur(10px);
-      backdrop-filter: blur(10px);
-      animation: d-fade calc(220ms * var(--slow)) ease-out;
-    }
-
-    .d-popup[hidden] { display: none; }
-
-    .d-popup__card {
-      width: 100%;
-      padding: 8cqw 6cqw 6cqw;
-      border-radius: 6cqw;
-      text-align: center;
-      border: 1px solid rgba(0, 71, 255, 0.45);
-      background: radial-gradient(circle at 50% 0%, rgba(0, 71, 255, 0.28), transparent 70%), var(--ink);
-      box-shadow: 0 8cqw 20cqw -8cqw rgba(0, 71, 255, 0.85);
-      animation: d-popup-in calc(460ms * var(--slow)) cubic-bezier(0.34, 1.56, 0.64, 1);
-    }
-
-    .d-popup__eyebrow {
-      margin: 0 0 2cqw;
-      font-size: 3.2cqw;
-      font-weight: 800;
-      letter-spacing: 0.08em;
-      text-transform: uppercase;
-      color: var(--cobalt-soft);
-    }
-
-    .d-popup__q { margin: 0 0 2cqw; font-size: 6.6cqw; font-weight: 800; line-height: 1.22; }
-    .d-popup__hint { margin: 0 0 6cqw; font-size: 4cqw; line-height: 1.45; color: var(--steel); }
-    .d-popup__actions { display: flex; gap: 3cqw; }
-
-    .d-popup__actions button {
-      flex: 1;
-      padding: 4cqw;
-      border-radius: 4cqw;
-      font: inherit;
-      font-size: 4.6cqw;
-      font-weight: 800;
-      cursor: pointer;
-    }
-
-    .d-yes { border: none; background: var(--cobalt); color: #fff; }
-    .d-no { border: 1px solid rgba(255, 255, 255, 0.2); background: transparent; color: var(--paper); }
-
-    @keyframes d-fade { from { opacity: 0; } }
-    @keyframes d-popup-in { from { opacity: 0; transform: scale(0.9) translateY(3cqw); } }
-
-    /* Concept */
-    .d-concept {
-      overflow-y: auto;
-      scrollbar-width: none;
-    }
-
-    .d-concept::-webkit-scrollbar { display: none; }
-
-    .d-eyebrow {
-      font-size: 3.4cqw;
-      font-weight: 800;
-      letter-spacing: 0.08em;
-      text-transform: uppercase;
-      color: var(--green);
-    }
-
-    .d-name {
-      margin: 2cqw 0 2cqw;
-      font-size: 11cqw;
-      font-weight: 800;
-      letter-spacing: -0.03em;
-      line-height: 1.05;
-      background: linear-gradient(135deg, #fff, #9DB8FF);
-      -webkit-background-clip: text;
-      background-clip: text;
-      color: transparent;
-      clip-path: inset(0 100% 0 0);
-      animation: d-reveal calc(900ms * var(--slow)) cubic-bezier(0.22, 1, 0.36, 1) 150ms forwards;
-    }
-
-    @keyframes d-reveal { to { clip-path: inset(0 0 0 0); } }
-
-    .d-tagline {
-      margin: 0 0 5cqw;
-      font-size: 4.8cqw;
-      font-weight: 600;
-      line-height: 1.35;
-      opacity: 0;
-      animation: d-pop calc(500ms * var(--slow)) ease forwards;
-      animation-delay: calc(700ms * var(--slow));
-    }
-
-    .d-card {
-      margin-bottom: 3cqw;
-      padding: 4.5cqw;
-      border-radius: 5cqw;
-      border: 1px solid rgba(255, 255, 255, 0.13);
-      background: linear-gradient(145deg, rgba(255, 255, 255, 0.1), rgba(255, 255, 255, 0.025));
-      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.24);
-      -webkit-backdrop-filter: blur(20px) saturate(170%);
-      backdrop-filter: blur(20px) saturate(170%);
-      opacity: 0;
-      animation: d-pop calc(520ms * var(--slow)) cubic-bezier(0.34, 1.4, 0.64, 1) forwards;
-      animation-delay: calc((var(--i) * 180ms + 950ms) * var(--slow));
-    }
-
-    .d-card__label {
-      margin: 0 0 1.5cqw;
-      font-size: 3.2cqw;
-      font-weight: 800;
-      letter-spacing: 0.06em;
-      text-transform: uppercase;
-      color: var(--cobalt-soft);
-    }
-
-    .d-card__text { margin: 0; font-size: 4cqw; line-height: 1.5; }
-
-    .d-error { margin: auto 0; text-align: center; font-size: 4.6cqw; color: var(--steel); }
-
-    @media (prefers-reduced-motion: reduce) {
-      *, *::before, *::after { animation-duration: 1ms !important; animation-delay: 0ms !important; transition: none !important; }
-      .d-option, .d-card, .d-tagline { opacity: 1; }
-      .d-name { clip-path: none; }
-    }
-  </style>
-</head>
-<body>
-  <main class="d-frame" id="d-frame" hidden>
-    <div class="d-liquid" aria-hidden="true">
-      <span class="d-blob d-blob--1"></span>
-      <span class="d-blob d-blob--2"></span>
-      <span class="d-blob d-blob--3"></span>
-    </div>
-    <div class="d-brand">${brand.name}</div>
-    <div class="d-progress" id="d-progress">${config.questions.map(() => "<span></span>").join("")}</div>
-    <div class="d-stage" id="d-stage"></div>
-    <div class="d-popup" id="d-popup" role="dialog" aria-modal="true" hidden>
-      <div class="d-popup__card">
-        <p class="d-popup__eyebrow">Question rapide</p>
-        <p class="d-popup__q" id="d-popup-q"></p>
-        <p class="d-popup__hint" id="d-popup-hint"></p>
-        <div class="d-popup__actions">
-          <button type="button" class="d-yes" data-answer="oui">Oui</button>
-          <button type="button" class="d-no" data-answer="non">Non</button>
-        </div>
-      </div>
-    </div>
-  </main>
-
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="/js/supabase-client.js"></script>
-  <script>
-    (function () {
-      var CONFIG = ${JSON.stringify(config)};
-      var STEP_MS = 1400;
-      var SLOGAN_MS = 2100;
-      var slow = CONFIG.slowMotion;
-      var frame = document.getElementById("d-frame");
-      var stage = document.getElementById("d-stage");
-      var progress = document.getElementById("d-progress");
-      var popup = document.getElementById("d-popup");
-      var accessToken = null;
-      var answers = {};
-      var index = 0;
-      var timers = [];
-      var runId = 0;
-      var pendingPopup = null;
-
-      // ---- Utilitaires --------------------------------------------------
-      function factor() {
-        return slow ? CONFIG.slowFactor : 1;
-      }
-
-      function applySlow() {
-        document.documentElement.style.setProperty("--slow", String(factor()));
-      }
-
-      // setTimeout ralenti par le mode lent, annulé en bloc par restart().
-      function later(fn, ms) {
-        var id = window.setTimeout(fn, ms * factor());
-        timers.push(id);
-        return id;
-      }
-
-      function clearTimers() {
-        timers.forEach(function (id) {
-          window.clearTimeout(id);
-          window.clearInterval(id);
-        });
-        timers = [];
-      }
-
-      function el(tag, className, text) {
-        var node = document.createElement(tag);
-        if (className) node.className = className;
-        if (text !== undefined) node.textContent = text;
-        return node;
-      }
-
-      function haptic(pattern) {
-        try {
-          if (navigator.vibrate) navigator.vibrate(pattern || 10);
-        } catch (err) {
-          /* iOS : pas de vibration */
-        }
-      }
-
-      function showScreen(screen) {
-        var old = stage.querySelector(".d-screen:not(.is-leaving)");
-        if (old) {
-          old.classList.add("is-leaving");
-          later(function () {
-            if (old.parentNode) old.parentNode.removeChild(old);
-          }, 260);
-        }
-        stage.appendChild(screen);
-      }
-
-      function setProgress(done) {
-        Array.prototype.forEach.call(progress.children, function (seg, i) {
-          seg.classList.toggle("is-done", i < done);
-        });
-      }
-
-      // ---- Accès admin (vérifié côté serveur) -----------------------------
-      function leave() {
-        window.location.replace("/");
-      }
-
-      function callDemo(body) {
-        var sb = window.ColdTrendSupabase;
-        return fetch(sb.supabaseUrl + "/functions/v1/generate-demo-concept", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            apikey: sb.supabaseKey,
-            Authorization: "Bearer " + accessToken
-          },
-          body: JSON.stringify(body)
-        }).then(function (res) {
-          return res.json().then(function (data) {
-            return { status: res.status, data: data };
-          });
-        });
-      }
-
-      function boot() {
-        var sb = window.ColdTrendSupabase;
-        if (!sb) return leave();
-        sb.auth.getSession().then(function (res) {
-          var session = res.data ? res.data.session : null;
-          if (!session) return leave();
-          accessToken = session.access_token;
-          return callDemo({ check: true }).then(function (out) {
-            if (out.status !== 200 || !out.data || out.data.ok !== true) return leave();
-            applySlow();
-            frame.hidden = false;
-            restart();
-          });
-        }).catch(leave);
-      }
-
-      // ---- Questions -------------------------------------------------------
-      function renderQuestion() {
-        var q = CONFIG.questions[index];
-        setProgress(index);
-        progress.hidden = false;
-        var screen = el("section", "d-screen");
-        screen.appendChild(el("h1", "d-title", q.title));
-        if (q.subtext) screen.appendChild(el("p", "d-sub", q.subtext));
-        var list = el("div", "d-options");
-        var cta = el("button", "d-cta", "Continuer");
-        cta.type = "button";
-        cta.hidden = true;
-        q.options.forEach(function (opt, i) {
-          var btn = el("button", "d-option");
-          btn.type = "button";
-          btn.style.setProperty("--i", String(i));
-          if (opt.emoji) btn.appendChild(el("span", "d-option__emoji", opt.emoji));
-          btn.appendChild(el("span", "", opt.label));
-          btn.addEventListener("click", function () {
-            haptic();
-            if (q.type === "multi") {
-              var current = answers[q.id] || [];
-              var pos = current.indexOf(opt.value);
-              if (pos === -1) current.push(opt.value);
-              else current.splice(pos, 1);
-              answers[q.id] = current;
-              btn.classList.toggle("is-selected", pos === -1);
-              cta.hidden = current.length === 0;
-              return;
-            }
-            answers[q.id] = opt.value;
-            Array.prototype.forEach.call(list.children, function (b) {
-              b.classList.remove("is-selected");
-            });
-            btn.classList.add("is-selected");
-            later(next, 450);
-          });
-          list.appendChild(btn);
-        });
-        cta.addEventListener("click", function () {
-          haptic();
-          next();
-        });
-        screen.appendChild(list);
-        screen.appendChild(cta);
-        showScreen(screen);
-      }
-
-      function next() {
-        index += 1;
-        if (index < CONFIG.questions.length) renderQuestion();
-        else runAssembly();
-      }
-
-      // ---- Assemblage + pop-ups ---------------------------------------------
-      function runAssembly() {
-        var myRun = runId;
-        setProgress(CONFIG.questions.length);
-        later(function () {
-          progress.hidden = true;
-        }, 500);
-        var screen = el("section", "d-screen d-center");
-        screen.appendChild(el("h1", "d-title", "On assemble ton projet"));
-        var slogan = el("p", "d-slogan", CONFIG.slogans[0]);
-        screen.appendChild(slogan);
-        var bar = el("div", "d-bar");
-        var fill = el("div", "d-bar__fill");
-        bar.appendChild(fill);
-        screen.appendChild(bar);
-        var percent = el("p", "d-percent", "0 %");
-        screen.appendChild(percent);
-        var list = el("ul", "d-steps");
-        var steps = CONFIG.steps.map(function (text) {
-          var li = el("li", "d-step", text);
-          list.appendChild(li);
-          return li;
-        });
-        screen.appendChild(list);
-        showScreen(screen);
-
-        var sloganIndex = 0;
-        var sloganTimer = window.setInterval(function () {
-          sloganIndex = (sloganIndex + 1) % CONFIG.slogans.length;
-          slogan.classList.add("is-swapping");
-          later(function () {
-            slogan.textContent = CONFIG.slogans[sloganIndex];
-            slogan.classList.remove("is-swapping");
-          }, 220);
-        }, SLOGAN_MS * factor());
-        timers.push(sloganTimer);
-
-        var conceptPromise = null;
-        var step = 0;
-
-        function activate() {
-          if (myRun !== runId) return;
-          // La génération part dès que les 2 pop-ups ont été répondues (les
-          // réponses entrent dans le prompt) ; la dernière étape attend sa
-          // réponse avant de se cocher.
-          if (!conceptPromise && answers.influenceurs && answers.clippers) {
-            conceptPromise = callDemo({ answers: answers });
-          }
-          if (step >= steps.length) {
-            window.clearInterval(sloganTimer);
-            (conceptPromise || callDemo({ answers: answers })).then(function (out) {
-              if (myRun !== runId) return;
-              renderConcept(out && out.status === 200 ? out.data.concept : null);
-            }).catch(function () {
-              if (myRun === runId) renderConcept(null);
-            });
-            return;
-          }
-          for (var i = 0; i < CONFIG.popups.length; i += 1) {
-            if (CONFIG.popups[i].atStep === step && !answers[CONFIG.popups[i].field]) {
-              openPopup(CONFIG.popups[i], activate);
-              return;
-            }
-          }
-          var current = steps[step];
-          current.classList.add("is-active");
-          later(function () {
-            current.classList.remove("is-active");
-            current.classList.add("is-done");
-            step += 1;
-            var p = Math.round((step / steps.length) * 100);
-            fill.style.width = p + "%";
-            percent.textContent = p + " %";
-            haptic(6);
-            activate();
-          }, STEP_MS);
-        }
-
-        later(activate, 500);
-      }
-
-      function openPopup(def, resume) {
-        pendingPopup = { def: def, resume: resume };
-        document.getElementById("d-popup-q").textContent = def.question;
-        document.getElementById("d-popup-hint").textContent = def.hint || "";
-        popup.hidden = false;
-        haptic();
-      }
-
-      popup.addEventListener("click", function (e) {
-        var btn = e.target.closest("[data-answer]");
-        if (!btn || !pendingPopup) return;
-        var current = pendingPopup;
-        pendingPopup = null;
-        answers[current.def.field] = btn.getAttribute("data-answer");
-        haptic();
-        popup.hidden = true;
-        later(current.resume, 250);
-      });
-
-      // ---- Concept généré ---------------------------------------------------
-      function renderConcept(concept) {
-        var screen = el("section", "d-screen d-concept");
-        if (!concept) {
-          screen.appendChild(el("p", "d-error", "Génération indisponible. Appuie sur R pour relancer."));
-          showScreen(screen);
-          return;
-        }
-        screen.appendChild(el("span", "d-eyebrow", "Ton concept est prêt"));
-        screen.appendChild(el("h1", "d-name", concept.concept_name));
-        screen.appendChild(el("p", "d-tagline", concept.tagline));
-        [
-          ["Ce que ça fait", concept.description],
-          ["Pour qui", concept.target_persona],
-          ["Comment le faire connaître", concept.channels]
-        ].forEach(function (pair, i) {
-          var card = el("div", "d-card");
-          card.style.setProperty("--i", String(i));
-          card.appendChild(el("p", "d-card__label", pair[0]));
-          card.appendChild(el("p", "d-card__text", pair[1]));
-          screen.appendChild(card);
-        });
-        showScreen(screen);
-        haptic([12, 40, 12, 40, 30]);
-        later(confetti, 900);
-      }
-
-      function confetti() {
-        if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
-        function burst() {
-          if (!window.confetti) return;
-          var rect = frame.getBoundingClientRect();
-          var x = (rect.left + rect.width / 2) / window.innerWidth;
-          window.confetti({
-            particleCount: 110,
-            spread: 70,
-            startVelocity: 40,
-            origin: { x: x, y: 0.3 },
-            colors: ["#0047FF", "#3D7BFF", "#00C48C", "#FFFFFF"]
-          });
-        }
-        if (window.confetti) return burst();
-        var s = document.createElement("script");
-        s.src = "https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.3/dist/confetti.browser.min.js";
-        s.onload = burst;
-        document.head.appendChild(s);
-      }
-
-      // ---- Relance et raccourcis de tournage ---------------------------------
-      function restart() {
-        runId += 1;
-        clearTimers();
-        pendingPopup = null;
-        popup.hidden = true;
-        answers = {};
-        index = 0;
-        stage.innerHTML = "";
-        renderQuestion();
-      }
-
-      document.addEventListener("keydown", function (e) {
-        if (frame.hidden || e.metaKey || e.ctrlKey || e.altKey) return;
-        var key = e.key.toLowerCase();
-        if (key === "r") {
-          restart();
-        } else if (key === "l") {
-          slow = !slow;
-          applySlow();
-        } else if (key === "f") {
-          if (document.fullscreenElement) document.exitFullscreen();
-          else if (document.documentElement.requestFullscreen) document.documentElement.requestFullscreen();
-        }
-      });
-
-      if (window.ColdTrendSupabase) boot();
-      else document.addEventListener("coldtrend:supabase-ready", boot, { once: true });
-    })();
-  </script>
-</body>
-</html>
-`;
-}
+const DEMO_CONFIG = loadDemoConfig();
 
 // ---------------------------------------------------------------------------
 // sitemap.xml / robots.txt — générés à chaque build à partir d'une seule
@@ -17511,7 +17135,6 @@ const PUBLIC_PAGES = ["/", "/conditions-remboursement", "/contact", "/mentions-l
 
 const DISALLOWED_PATHS = [
   "/admin",
-  "/demo",
   "/compte",
   "/concept",
   "/profil-entrepreneur",
@@ -17564,7 +17187,6 @@ writeBuiltFile(path.join(OUT_DIR, "mot-de-passe-oublie.html"), motDePasseOubliee
 writeBuiltFile(path.join(OUT_DIR, "reinitialiser-mot-de-passe.html"), reinitialiserMotDePassePage());
 writeBuiltFile(path.join(OUT_DIR, "compte.html"), comptePage());
 writeBuiltFile(path.join(OUT_DIR, "admin.html"), adminPage());
-writeBuiltFile(path.join(OUT_DIR, "demo.html"), demoPage());
 writeBuiltFile(path.join(OUT_DIR, "desabonnement.html"), desabonnementPage());
 
 console.log("Aucun motif interdit (service_role / sb_secret_ / SUPABASE_SERVICE) trouvé dans la sortie buildée.");

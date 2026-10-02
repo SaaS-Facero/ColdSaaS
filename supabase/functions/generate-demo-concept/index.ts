@@ -1,18 +1,24 @@
-// Supabase Edge Function — Mode Vidéo (/demo), réservé aux admins.
+// Supabase Edge Function — Mode Vidéo (admin), sur le vrai site.
 //
 // Deux usages, un seul contrôle d'accès :
-//   { check: true }        -> { ok: true } si l'appelant est admin (la page
-//                             /demo n'affiche RIEN avant cette réponse) ;
+//   { check: true }        -> { ok: true } si l'appelant est admin. Appelé
+//                             au chargement de l'accueil quand le cookie
+//                             d'armement ct_vm est présent : c'est CE
+//                             verdict, pas le cookie, qui active le mode
+//                             démo du quiz ;
 //   { answers: {...} }     -> concept généré par le vrai LLM, mis en cache
-//                             par combinaison de réponses (demo_concepts).
+//                             par combinaison de réponses (demo_concepts,
+//                             is_demo = true).
 //
 // Accès : JWT vérifié, puis profiles.role relu avec le rôle service (jamais
 // de confiance dans le client). role est une colonne générée depuis
 // is_admin, que les clients ne peuvent plus écrire (migration 0029).
 //
-// Intégrité : aucune écriture dans profiles, user_concepts ni funnel_events.
-// Le concept ne contient jamais de chiffre de revenu (mêmes garde-fous que
-// generate-user-concept) et la démo n'affiche aucune projection.
+// Intégrité : aucune écriture dans profiles, user_concepts ni funnel_events
+// (le compteur social_proof_stats compte user_concepts : la démo n'y entre
+// pas). Le concept ne contient jamais de chiffre de revenu (mêmes
+// garde-fous que generate-user-concept) ; la projection affichée à côté est
+// celle du funnel public (computeProjection côté client).
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
