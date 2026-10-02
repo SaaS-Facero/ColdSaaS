@@ -1,6 +1,7 @@
 import { writeFileSync, mkdirSync, readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
+import vm from "node:vm";
 import { siteFooterCss, siteFooterHtml } from "./site-footer.mjs";
 import {
   mentionsLegalesPage,
@@ -13,6 +14,17 @@ import {
 } from "./legal-pages.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
+
+// Module de calcul de l'objectif (écrans Montant / Délai) : un seul fichier,
+// servi au navigateur (public/js/goal-math.js) ET chargé ici pour calculer
+// au build les valeurs initiales et les repères du slider -- les deux
+// côtés utilisent donc exactement les mêmes formules.
+const GOAL_MATH_SOURCE = readFileSync(path.join(__dirname, "goal-math.js"), "utf8");
+const GOAL = (() => {
+  const ctx = { window: {} };
+  vm.runInNewContext(GOAL_MATH_SOURCE, ctx);
+  return ctx.window.ColdTrendGoal;
+})();
 const OUT_DIR = path.join(__dirname, "..", "public");
 const OUT_FILE = path.join(OUT_DIR, "index.html");
 const OUT_FILE_SUCCESS = path.join(OUT_DIR, "succes.html");
@@ -731,50 +743,40 @@ const quiz = {
       ]
     },
     {
-      // Écran 14 -- fusion objectif de revenu + délai ("d'ici quand").
-      // Transitoires (jamais en base), transmis à generate-user-concept.
-      // Le mot du titre tourne (1 mois, 2 mois...) tant qu'aucun délai
-      // n'est choisi, puis se fige sur le délai choisi.
+      // Écran A « Montant » -- concept « Ton espace prend vie » : la
+      // question à gauche, l'aperçu live de l'espace ColdTrend à droite
+      // (au-dessus en mobile), rempli avec les réponses déjà données. Tous
+      // les chiffres (paliers, slider non linéaire, prix moyen, équivalences)
+      // viennent de scripts/goal-math.js. Plus aucune mention de délai ici :
+      // le délai a son propre écran juste après.
       id: "objectifRevenu",
       stepName: "objectif-revenu",
       chapter: 2,
       chapterLabel: "Ton objectif",
       chapterIcon: "objectif",
-      title: "Combien veux-tu gagner par mois",
-      titleRotator: ["1 mois", "2 mois", "3 mois", "4 mois", "5 mois"],
-      subtext: "Dis-nous où tu veux aller, on construit autour.",
-      echoSubtext: "Pour {attente}, fixe ton cap. On construit autour.",
-      type: "slider",
-      min: 0,
-      max: 50000,
-      step: 100,
-      chips: {
-        field: "delai",
-        label: "D'ici combien de temps ?",
-        options: [
-          { value: "1", label: "1 mois" },
-          { value: "2", label: "2 mois" },
-          { value: "3", label: "3 mois" },
-          { value: "4", label: "4 mois" },
-          { value: "5", label: "5 mois" },
-          { value: "6", label: "6 mois" }
-        ]
-      }
+      type: "goal-amount",
+      title: "Combien veux-tu gagner par mois ?",
+      // Remplace l'ancien sous-titre en italique : direct et chaleureux.
+      lead: "Choisis le montant qui changerait vraiment ton quotidien. Tu pourras l'ajuster quand tu veux.",
+      shortcuts: [500, 1000, 5000, 10000],
+      initial: 1000,
+      cta: "Valider mon objectif"
     },
     {
-      // Effet IKEA -- le nom choisi est réutilisé jusqu'au paiement
-      // ("On assemble {nomProjet}"). Transitoire, jamais en base.
-      id: "nomProjet",
-      stepName: "nom-projet",
+      // Écran B « Délai » -- frise de 6 jalons, rythme hebdomadaire
+      // recalculé et accompagnement honnête (objectif × délai × temps),
+      // tout calculé par ColdTrendGoal.assess(). Le titre reprend le
+      // montant en écho (rempli côté client).
+      id: "delai",
+      stepName: "delai",
       chapter: 2,
-      chapterLabel: "Ton projet",
-      chapterIcon: "objectif",
-      title: "Donne un nom à ton projet",
-      subtext: "Même provisoire. On le construit avec toi.",
-      type: "text",
-      placeholder: "Ex : Projet Liberté",
-      maxLength: 40,
-      cta: "C'est mon projet"
+      chapterLabel: "Ton rythme",
+      chapterIcon: "delai",
+      type: "goal-delay",
+      title: "En combien de temps veux-tu atteindre ton objectif ?",
+      subtext: "Pas de mauvaise réponse. On adapte ton plan à ton rythme.",
+      months: [1, 2, 3, 4, 5, 6],
+      cta: "Continuer"
     },
     {
       // Phase Engagement, écran 16 -- remplace la question "persévérance"
@@ -786,7 +788,6 @@ const quiz = {
       type: "engagement",
       title: "Avant de construire, un engagement.",
       subtext: "Ton projet mérite que tu t'y tiennes.",
-      echoSubtext: "{nomProjet} mérite que tu t'y tiennes.",
       commitments: [
         { text: "Je bloque du temps chaque semaine pour mon projet.", echo: "Je bloque {temps} par semaine pour mon projet." },
         { text: "Je publie, même quand ce n'est pas parfait." },
@@ -802,7 +803,6 @@ const quiz = {
       stepName: "assemblage",
       type: "assembling",
       title: "On assemble ton projet",
-      echoTitle: "On assemble {nomProjet}",
       steps: [
         "Analyse de ton profil",
         "Choix de ta cible",
@@ -834,7 +834,6 @@ const quiz = {
       // Phase Gate, écran 18 -- projection floutée (calculée pour de vrai,
       // voir computeProjection) au-dessus de la création de compte.
       title: "Ton projet est prêt.",
-      echoTitle: "{nomProjet} est prêt.",
       subtext: "Crée ton compte pour débloquer ta projection et ton concept complet."
     }
   ]
@@ -2253,8 +2252,7 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
   .quiz-screen .quiz-question-title,
   .quiz-screen .quiz-subtext,
   .quiz-screen .quiz-option,
-  .quiz-screen .revenue-slider,
-  .quiz-screen .revenue-slider__note,
+  .quiz-screen .goal-block,
   .quiz-screen .quiz-payment__teaser,
   .quiz-screen .guarantee-banner,
   .quiz-screen .payment-card,
@@ -2272,8 +2270,7 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
   .quiz-screen.is-active .quiz-question-title,
   .quiz-screen.is-active .quiz-subtext,
   .quiz-screen.is-active .quiz-option,
-  .quiz-screen.is-active .revenue-slider,
-  .quiz-screen.is-active .revenue-slider__note,
+  .quiz-screen.is-active .goal-block,
   .quiz-screen.is-active .quiz-payment__teaser,
   .quiz-screen.is-active .guarantee-banner,
   .quiz-screen.is-active .payment-card,
@@ -2300,8 +2297,8 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
   .quiz-screen.is-active .quiz-chapter-label { transition-delay: 60ms; }
   .quiz-screen.is-active .quiz-question-title { transition-delay: 140ms; }
   .quiz-screen.is-active .quiz-subtext { transition-delay: 200ms; }
-  .quiz-screen.is-active .revenue-slider { transition-delay: 220ms; }
-  .quiz-screen.is-active .revenue-slider__note { transition-delay: 280ms; }
+  .quiz-screen.is-active .goal-block { transition-delay: 220ms; }
+  .quiz-screen.is-active .goal-block ~ .goal-block { transition-delay: 300ms; }
   .quiz-screen.is-active .quiz-payment__teaser { transition-delay: 0ms; }
   .quiz-screen.is-active .guarantee-banner { transition-delay: 60ms; }
   .quiz-screen.is-active .payment-card { transition-delay: 120ms; }
@@ -2333,9 +2330,8 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
     .quiz-screen .quiz-question-title,
     .quiz-screen .quiz-subtext,
     .quiz-screen .quiz-option,
-    .quiz-screen .revenue-slider,
-    .quiz-screen .revenue-slider__note,
-    .quiz-screen .quiz-payment__teaser,
+    .quiz-screen .goal-block,
+      .quiz-screen .quiz-payment__teaser,
     .quiz-screen .guarantee-banner,
     .quiz-screen .payment-card,
     .quiz-screen .guarantee-floating,
@@ -2447,22 +2443,6 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
     width: auto;
     padding-left: 18px;
     padding-right: 18px;
-  }
-
-  /* Mot du titre qui tourne (1 mois, 2 mois...) jusqu'au choix du délai. */
-  .quiz-title-rotator {
-    display: inline-block;
-    color: var(--cobalt);
-    transition: opacity 160ms ease, transform 160ms ease;
-  }
-
-  .quiz-title-rotator.is-swapping {
-    opacity: 0;
-    transform: translateY(-6px);
-  }
-
-  .quiz-title-rotator.is-fixed {
-    text-shadow: 0 0 18px rgba(0, 71, 255, 0.6);
   }
 
   .quiz-skip-link {
@@ -2605,7 +2585,6 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
   @media (prefers-reduced-motion: reduce) {
     .audit-step.is-active::before { animation: none; }
     .audit-block li { animation: none; opacity: 1; }
-    .quiz-title-rotator { transition: none; }
   }
 
   .quiz-minor-exit {
@@ -2939,198 +2918,383 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
     }
   }
 
-  /* Slider objectif de revenu -- track/fill custom (pas juste accent-color
-     comme sur /profil-entrepreneur) : le natif input[type=range] est rendu
-     transparent (piste + pouce natifs invisibles), seul son pouce personnalisé
-     reste visible pour l'affordance de drag ; la barre de remplissage est un
-     calque séparé animé en transform pour un mouvement fluide (voir
-     updateRevenueSlider() côté client), jamais en saut brutal. */
-  .revenue-slider { text-align: center; position: relative; }
-
-  /* Élément d'ambiance en arrière-plan -- jamais devant le slider/le chiffre
-     (positionné en premier dans le DOM, sous le contenu statique qui suit,
-     voir la règle de stacking naturelle sans z-index à gérer). Animé via la
-     propriété left plutôt que transform: translateX() seul : la traversée
-     doit couvrir toute la largeur réelle du conteneur quel que soit le
-     breakpoint, ce qu'un pourcentage de transform (relatif à la taille de
-     l'élément lui-même, pas du conteneur) ne permet pas -- coût de reflow
-     négligeable pour un seul petit élément décoratif. */
-  .revenue-slider-bg {
+  /* ---- Écrans objectif : A « Montant » et B « Délai » --------------------
+     Chiffres et paliers : scripts/goal-math.js. Même typo, mêmes
+     espacements et même cobalt que le reste du quiz ; seuls les éléments
+     propres à ces écrans sont stylés ici. */
+  .goal-sr {
     position: absolute;
-    inset: 0;
+    width: 1px;
+    height: 1px;
     overflow: hidden;
-    pointer-events: none;
-    z-index: 0;
-  }
-
-  .revenue-slider-bg__coin {
-    position: absolute;
-    top: 15%;
-    left: -12%;
-    color: var(--cobalt);
-    opacity: 0.2;
-    animation: revenue-coin-sweep 10s cubic-bezier(0.37, 0, 0.63, 1) infinite, revenue-coin-bob 3.4s ease-in-out infinite;
-  }
-
-  @keyframes revenue-coin-sweep {
-    from { left: -12%; }
-    to { left: 108%; }
-  }
-
-  @keyframes revenue-coin-bob {
-    0%, 100% { transform: translateY(0); }
-    50% { transform: translateY(-14px); }
-  }
-
-  @media (prefers-reduced-motion: reduce) {
-    .revenue-slider-bg { display: none; }
-  }
-  .revenue-slider__badge {
-    display: inline-block;
-    font-size: 12px;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-    color: var(--cobalt-soft);
-    background: rgba(0, 71, 255, 0.12);
-    border-radius: 999px;
-    padding: 4px 12px;
-    margin: 0 0 14px;
-    transition: opacity 300ms var(--ease-standard, ease), background 300ms var(--ease-standard, ease);
-  }
-  .revenue-slider__badge.is-changing { opacity: 0; }
-  /* Chiffre central -- grand format, drop-shadow Cobalt Blue qui s'intensifie
-     avec la position (voir updateRevenueSlider(), pas une valeur fixe) ;
-     .is-pulsing marque le pas franchi (changement de valeur affichée) et
-     .is-released la confirmation au relâchement -- deux pulses distincts,
-     jamais à chaque pixel de drag. */
-  .revenue-slider__value {
-    /* "3rem-5rem" du brief wrappait sur deux lignes avec le suffixe
-       "/ mois" inclus dans le même texte -- réduit pour rester sur une
-       ligne au format le plus long ("20 000 € et plus / mois") tout en
-       restant très largement le plus grand texte de l'écran. */
-    font-size: clamp(1.9rem, 6vw, 3rem);
-    font-weight: 800;
-    letter-spacing: -0.02em;
-    color: var(--paper-soft);
-    margin: 0 0 24px;
-    font-variant-numeric: tabular-nums;
-    filter: drop-shadow(0 0 0 rgba(0, 71, 255, 0));
-    transition: filter 200ms var(--ease-standard, ease);
+    clip: rect(0 0 0 0);
     white-space: nowrap;
   }
-  .revenue-slider__value.is-pulsing,
-  .revenue-slider__value.is-released {
-    animation: revenue-value-pulse 340ms var(--ease-standard, ease);
+
+  /* Sous-titre direct (remplace l'italique de l'ancien écran). */
+  .goal-lead {
+    margin: 0 0 20px;
+    font-size: 15px;
+    line-height: 1.5;
+    color: var(--paper-soft);
   }
-  .revenue-slider__control {
-    position: relative;
-    height: 32px;
+
+  /* CTA collé en bas pendant le défilement (l'écran est le conteneur de scroll). */
+  .goal-screen .goal-footer {
+    position: sticky;
+    bottom: 0;
+    z-index: 3;
+    padding: 18px 0 calc(6px + env(safe-area-inset-bottom));
+    background: linear-gradient(to top, var(--ink) 72%, rgba(10, 14, 26, 0));
+  }
+
+  /* -- Écran A : deux colonnes en desktop, aperçu au-dessus en mobile. */
+  .goal-a { display: flex; flex-direction: column; gap: 18px; min-height: 100%; }
+  .goal-a__main { display: flex; flex-direction: column; flex: 1; }
+
+  @media (min-width: 960px) {
+    .quiz-screen.goal-screen--amount { max-width: 1000px; }
+    .goal-a {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) minmax(0, 440px);
+      grid-template-areas: "main preview";
+      gap: 48px;
+      align-items: start;
+    }
+    .goal-a__main { grid-area: main; min-height: 100%; }
+    .goal-a__preview { grid-area: preview; position: sticky; top: 0; }
+  }
+
+  .goal-amount { text-align: center; }
+  .goal-amount__badge {
+    display: inline-block;
+    margin: 0 0 6px;
+    padding: 4px 12px;
+    border-radius: 999px;
+    border: 1px solid rgba(61, 107, 255, 0.45);
+    background: rgba(0, 71, 255, 0.14);
+    color: #C8D4FF;
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    transition: opacity 150ms ease;
+  }
+  .goal-amount__badge.is-changing { opacity: 0; }
+  .goal-amount__badge[data-tier="tres_ambitieux"] { border-color: var(--cobalt); color: #fff; box-shadow: 0 0 18px rgba(0, 71, 255, 0.45); }
+
+  /* Montant en grand, modifiable au tap (champ texte numérique). */
+  .goal-amount__field {
     display: flex;
-    align-items: center;
+    align-items: baseline;
+    justify-content: center;
+    gap: 8px;
+    cursor: text;
   }
-  .revenue-slider__track {
+  .goal-amount__input {
+    width: 6.2ch;
+    padding: 0;
+    border: 0;
+    border-bottom: 2px dashed rgba(255, 255, 255, 0.18);
+    border-radius: 0;
+    background: transparent;
+    color: #fff;
+    font: inherit;
+    font-size: clamp(40px, 11vw, 56px);
+    font-weight: 800;
+    letter-spacing: -0.02em;
+    font-variant-numeric: tabular-nums;
+    text-align: right;
+    text-shadow: 0 0 calc(8px + var(--goal-glow, 0) * 14px) rgba(0, 71, 255, 0.5);
+  }
+  .goal-amount__input:focus { outline: none; border-bottom-color: var(--cobalt-soft); }
+  .goal-amount__unit { font-size: 18px; font-weight: 700; color: var(--steel); }
+  .goal-amount__equiv { margin: 8px 0 0; font-size: 16px; font-weight: 700; color: var(--paper-soft); min-height: 1.4em; }
+  .goal-amount__clients { margin: 2px 0 0; font-size: 13px; color: var(--steel); min-height: 1.4em; }
+
+  .goal-shortcuts { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; margin: 18px 0 6px; }
+  .goal-shortcut {
+    min-height: 40px;
+    padding: 8px 14px;
+    border-radius: 999px;
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    background: rgba(255, 255, 255, 0.04);
+    color: var(--paper-soft);
+    font: inherit;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: border-color 160ms ease, background 160ms ease, transform 160ms ease;
+  }
+  .goal-shortcut:hover { border-color: var(--cobalt-soft); }
+  .goal-shortcut:active { transform: scale(0.96); }
+  .goal-shortcut.is-selected { border-color: var(--cobalt); background: rgba(0, 71, 255, 0.2); color: #fff; }
+
+  /* Slider : piste custom, poignée 28px, remplissage via --goal-ratio. */
+  .goal-slider { position: relative; margin: 20px 4px 0; padding-bottom: 26px; }
+  .goal-slider__track {
     position: absolute;
     left: 0;
     right: 0;
-    height: 9px;
+    top: 13px;
+    height: 6px;
     border-radius: 999px;
     background: rgba(255, 255, 255, 0.1);
     overflow: hidden;
   }
-  .revenue-slider__fill {
-    position: absolute;
-    top: 0;
-    left: 0;
+  .goal-slider__fill {
     height: 100%;
-    width: 100%;
+    background: linear-gradient(90deg, var(--cobalt-dark), var(--cobalt-soft));
     transform-origin: left center;
-    transform: scaleX(0);
-    background: linear-gradient(90deg, var(--steel), var(--cobalt));
-    transition: transform 150ms ease-out;
+    transform: scaleX(var(--goal-ratio, 0));
   }
-  .revenue-slider__input {
+  .goal-slider__input {
     position: relative;
     z-index: 1;
     width: 100%;
     height: 32px;
     margin: 0;
     background: transparent;
-    appearance: none;
     -webkit-appearance: none;
+    appearance: none;
     cursor: pointer;
   }
-  .revenue-slider__input::-webkit-slider-runnable-track { background: transparent; height: 32px; }
-  .revenue-slider__input::-moz-range-track { background: transparent; height: 32px; border: none; }
-  .revenue-slider__input::-webkit-slider-thumb {
+  .goal-slider__input::-webkit-slider-runnable-track { background: transparent; height: 32px; }
+  .goal-slider__input::-moz-range-track { background: transparent; height: 32px; border: none; }
+  .goal-slider__input::-webkit-slider-thumb {
     -webkit-appearance: none;
-    width: 22px;
-    height: 22px;
-    border-radius: 999px;
+    width: 28px;
+    height: 28px;
+    margin-top: 2px;
+    border-radius: 50%;
     background: #fff;
-    border: 3px solid var(--cobalt);
-    margin-top: 5px;
-    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.35);
-    transition: transform 150ms var(--ease-standard, ease), box-shadow 150ms var(--ease-standard, ease);
+    border: 4px solid var(--cobalt);
+    box-shadow: 0 0 0 6px rgba(0, 71, 255, 0.18), 0 4px 14px rgba(0, 0, 0, 0.4);
+    transition: transform 160ms ease;
   }
-  .revenue-slider__input::-moz-range-thumb {
-    width: 22px;
-    height: 22px;
-    border-radius: 999px;
+  .goal-slider__input::-moz-range-thumb {
+    width: 28px;
+    height: 28px;
+    box-sizing: border-box;
+    border-radius: 50%;
     background: #fff;
-    border: 3px solid var(--cobalt);
-    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.35);
-    transition: transform 150ms var(--ease-standard, ease), box-shadow 150ms var(--ease-standard, ease);
+    border: 4px solid var(--cobalt);
+    box-shadow: 0 0 0 6px rgba(0, 71, 255, 0.18), 0 4px 14px rgba(0, 0, 0, 0.4);
   }
-  .revenue-slider__input:active::-webkit-slider-thumb {
-    transform: scale(1.15);
-    box-shadow: 0 4px 14px rgba(0, 71, 255, 0.55);
+  .goal-slider__input:active::-webkit-slider-thumb { transform: scale(1.12); }
+  .goal-slider__input:focus-visible { outline: 2px solid var(--cobalt-soft); outline-offset: 4px; border-radius: 999px; }
+  .goal-slider__ticks { position: absolute; left: 14px; right: 14px; bottom: 0; height: 16px; }
+  .goal-slider__tick { position: absolute; transform: translateX(-50%); font-size: 11px; color: var(--steel); white-space: nowrap; }
+
+  /* -- Aperçu de l'espace (renderSpacePreview) -- */
+  .space-preview { margin: 0; --sp-ratio: 0; }
+  .space-preview__window {
+    border-radius: 18px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    background: linear-gradient(160deg, rgba(0, 71, 255, 0.1), rgba(10, 14, 26, 0.96) 45%);
+    box-shadow: 0 30px 80px -40px rgba(0, 71, 255, 0.7), inset 0 1px 0 rgba(255, 255, 255, 0.06);
+    overflow: hidden;
   }
-  .revenue-slider__input:active::-moz-range-thumb {
-    transform: scale(1.15);
-    box-shadow: 0 4px 14px rgba(0, 71, 255, 0.55);
-  }
-  .revenue-slider__ticks {
+  .space-preview__bar {
     display: flex;
-    justify-content: space-between;
-    margin-top: 10px;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 14px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+    font-size: 12px;
+    color: var(--steel);
   }
-  .revenue-slider__tick {
+  .space-preview__dots { display: inline-flex; gap: 5px; }
+  .space-preview__dots i { width: 8px; height: 8px; border-radius: 50%; background: rgba(255, 255, 255, 0.16); }
+  .space-preview__body { display: grid; grid-template-columns: 116px minmax(0, 1fr); min-height: 260px; }
+  .sp-nav { list-style: none; margin: 0; padding: 14px 10px; border-right: 1px solid rgba(255, 255, 255, 0.07); display: flex; flex-direction: column; gap: 4px; }
+  .sp-nav__brand {
+    width: 28px;
+    height: 28px;
+    margin: 0 0 10px 6px;
+    border-radius: 8px;
+    display: grid;
+    place-items: center;
+    background: var(--cobalt);
+    color: #fff;
+    font-weight: 800;
+    font-size: 14px;
+  }
+  .sp-nav__item { display: flex; align-items: center; justify-content: space-between; padding: 7px 8px; border-radius: 8px; font-size: 12px; color: var(--steel); }
+  .sp-nav__item.is-active { background: rgba(0, 71, 255, 0.18); color: #fff; }
+  .sp-nav__lock svg { width: 12px; height: 12px; opacity: 0.7; }
+  .sp-main { padding: 14px; display: grid; gap: 10px; align-content: start; }
+  .sp-eyebrow { margin: 0; font-size: 11px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: #9DB4FF; }
+  .sp-card {
+    padding: 12px 14px;
+    border-radius: 14px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    background: rgba(255, 255, 255, 0.03);
+    text-align: left;
+  }
+  .sp-card__title { margin: 0 0 8px; font-size: 13px; font-weight: 700; color: #fff; }
+  .sp-list { margin: 0; display: grid; gap: 6px; }
+  .sp-list div { display: flex; justify-content: space-between; gap: 10px; font-size: 12px; }
+  .sp-list dt { color: var(--steel); }
+  .sp-list dd { margin: 0; color: var(--paper-soft); font-weight: 600; text-align: right; transition: color 300ms ease; }
+  .sp-list dd.is-empty { color: rgba(255, 255, 255, 0.3); font-weight: 400; }
+  .sp-card__hint { margin: 8px 0 0; font-size: 11px; color: var(--steel); }
+  .sp-gauge { position: relative; max-width: 220px; margin: 0 auto; }
+  .sp-gauge__svg { display: block; width: 100%; height: auto; overflow: visible; }
+  .sp-gauge__track, .sp-gauge__arc { fill: none; stroke-width: 9; stroke-linecap: round; }
+  .sp-gauge__track { stroke: rgba(255, 255, 255, 0.1); }
+  .sp-gauge__arc {
+    stroke: var(--cobalt-soft);
+    filter: drop-shadow(0 0 6px rgba(0, 71, 255, 0.6));
+    transition: stroke-dashoffset 260ms cubic-bezier(0.22, 1, 0.36, 1);
+  }
+  .sp-gauge__value { position: absolute; left: 0; right: 0; bottom: 4px; margin: 0; text-align: center; line-height: 1.2; }
+  .sp-gauge__value strong { display: block; font-size: 20px; color: #fff; font-variant-numeric: tabular-nums; }
+  .sp-gauge__value span { font-size: 11px; color: var(--steel); }
+  .sp-gauge__min, .sp-gauge__max { position: absolute; bottom: -16px; font-size: 10px; color: var(--steel); }
+  .sp-gauge__min { left: 0; }
+  .sp-gauge__max { right: 0; }
+  .sp-card--goal .sp-card__hint { margin-top: 20px; }
+
+  /* Mobile : aperçu compact (sans navigation, cartes côte à côte). */
+  @media (max-width: 959px) {
+    .space-preview__body { grid-template-columns: 1fr; min-height: 0; }
+    .sp-nav, .sp-eyebrow, .sp-card__hint { display: none; }
+    .sp-main { grid-template-columns: 1fr 1fr; gap: 8px; padding: 10px; }
+    .sp-card { padding: 10px; }
+    .sp-list div { flex-direction: column; gap: 0; }
+    .sp-list dd { text-align: left; }
+    .sp-gauge__value strong { font-size: 16px; }
+    .sp-gauge__min, .sp-gauge__max { display: none; }
+    /* Assez compact pour que le slider reste visible sans défiler au-dessus
+       du CTA collé en bas (iPhone 375 x 812). */
+    .space-preview__bar { display: none; }
+    .sp-card__title { margin-bottom: 4px; font-size: 12px; }
+    .sp-gauge { max-width: 132px; }
+    .goal-a { gap: 12px; }
+    .goal-lead { margin-bottom: 12px; }
+    .goal-shortcuts { margin-top: 12px; }
+    .goal-slider { margin-top: 12px; }
+  }
+
+  /* -- Écran B : frise de 6 jalons. -- */
+  .goal-subtext { font-style: normal; color: var(--paper-soft); }
+  .delay-timeline { position: relative; margin: 8px 0 18px; }
+  .delay-timeline__stops { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(6, 1fr); position: relative; z-index: 1; }
+  .delay-timeline__item { display: flex; justify-content: center; }
+  .delay-timeline__rail {
+    position: absolute;
+    left: calc(100% / 12);
+    right: calc(100% / 12);
+    top: 21px;
+    height: 4px;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.1);
+    overflow: hidden;
+  }
+  .delay-timeline__fill {
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg, var(--cobalt-dark), var(--cobalt-soft));
+    transform-origin: left center;
+    transform: scaleX(var(--delay-progress, 0));
+    /* Remplissage « spring » : léger dépassement puis retour. */
+    transition: transform 620ms cubic-bezier(0.34, 1.56, 0.64, 1);
+  }
+  .delay-stop {
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 4px;
-    font-size: 11px;
+    gap: 10px;
+    min-width: 44px;
+    padding: 6px 2px;
+    border: 0;
+    background: none;
     color: var(--steel);
-  }
-  .revenue-slider__tick::before {
-    content: "";
-    width: 1px;
-    height: 5px;
-    background: rgba(255, 255, 255, 0.18);
-  }
-  .revenue-slider__math {
+    font: inherit;
     font-size: 13px;
-    color: var(--steel);
-    margin: 20px 0 0;
+    font-weight: 600;
+    cursor: pointer;
   }
-  .revenue-slider__note {
-    font-size: 12px;
-    color: var(--steel);
-    margin: 16px 0 0;
+  .delay-stop__dot {
+    width: 30px;
+    height: 30px;
+    border-radius: 50%;
+    background: var(--ink);
+    border: 2px solid rgba(255, 255, 255, 0.22);
+    transition: border-color 200ms ease, background 200ms ease, box-shadow 260ms ease, transform 320ms cubic-bezier(0.34, 1.56, 0.64, 1);
   }
-  @keyframes revenue-value-pulse {
-    0% { transform: scale(1); }
-    50% { transform: scale(1.02); }
-    100% { transform: scale(1); }
+  .delay-stop.is-reached .delay-stop__dot { border-color: var(--cobalt-soft); background: rgba(0, 71, 255, 0.35); }
+  .delay-stop[aria-checked="true"] { color: #fff; }
+  .delay-stop[aria-checked="true"] .delay-stop__dot {
+    border-color: #fff;
+    background: var(--cobalt);
+    transform: scale(1.18);
+    box-shadow: 0 0 0 6px rgba(0, 71, 255, 0.25), 0 0 26px rgba(0, 71, 255, 0.85);
   }
+  .delay-stop:focus-visible { outline: 2px solid var(--cobalt-soft); outline-offset: 2px; border-radius: 10px; }
+
+  /* Mobile : frise verticale. */
+  @media (max-width: 599px) {
+    .delay-timeline__stops { grid-template-columns: 1fr; gap: 4px; }
+    .delay-timeline__item { justify-content: flex-start; }
+    .delay-stop { flex-direction: row; gap: 14px; width: 100%; min-height: 44px; padding: 4px 0; font-size: 15px; }
+    .delay-timeline__rail {
+      left: 13px;
+      right: auto;
+      top: 22px;
+      bottom: 22px;
+      width: 4px;
+      height: auto;
+    }
+    .delay-timeline__fill { transform-origin: center top; transform: scaleY(var(--delay-progress, 0)); }
+  }
+
+  .delay-card {
+    padding: 16px 18px;
+    border-radius: 16px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    background: rgba(255, 255, 255, 0.03);
+    transition: border-color 260ms ease, background 260ms ease;
+  }
+  .delay-card[data-level="realiste"] { border-color: rgba(34, 197, 94, 0.4); }
+  .delay-card[data-level="ambitieux"] { border-color: rgba(61, 107, 255, 0.45); }
+  .delay-card[data-level="tres_ambitieux"] { border-color: rgba(217, 162, 61, 0.5); background: rgba(217, 162, 61, 0.06); }
+  .delay-card__pace { margin: 0; font-size: 18px; font-weight: 800; color: #fff; }
+  .delay-card__hyp { margin: 4px 0 0; font-size: 12px; color: var(--steel); }
+  .delay-card__hyp:empty, .delay-card__msg:empty { display: none; }
+  .delay-card__msg { margin: 10px 0 0; font-size: 14px; line-height: 1.5; color: var(--paper-soft); }
+  .delay-card__suggest {
+    margin-top: 12px;
+    min-height: 40px;
+    padding: 8px 14px;
+    border-radius: 999px;
+    border: 1px solid var(--cobalt-soft);
+    background: transparent;
+    color: #fff;
+    font: inherit;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  .delay-card__suggest[hidden] { display: none; }
+  .delay-card__suggest:hover { background: rgba(0, 71, 255, 0.2); }
+
+  /* Montant qui « vole » de l'écran A vers la puce récap (voir flyGoalToTag). */
+  .goal-fly {
+    position: fixed;
+    z-index: 80;
+    margin: 0;
+    pointer-events: none;
+    font-weight: 800;
+    color: #fff;
+    white-space: nowrap;
+    transform-origin: left top;
+  }
+
   @media (prefers-reduced-motion: reduce) {
-    .revenue-slider__fill { transition: none; }
-    .revenue-slider__value { transition: none; }
-    .revenue-slider__value.is-pulsing,
-    .revenue-slider__value.is-released { animation: none; }
-    .revenue-slider__input::-webkit-slider-thumb,
-    .revenue-slider__input::-moz-range-thumb { transition: none; }
+    .goal-amount__badge, .goal-shortcut, .sp-gauge__arc, .sp-list dd,
+    .delay-timeline__fill, .delay-stop__dot, .delay-card { transition: none; }
+    .goal-slider__input::-webkit-slider-thumb { transition: none; }
   }
 
   .quiz-chips {
@@ -6720,6 +6884,9 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
        d'auth pour toute l'app, quel que soit le point d'entrée. -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="/js/supabase-client.js"></script>
+  <!-- Module de calcul des écrans objectif (scripts/goal-math.js) : avant
+       le script du quiz, qui lit window.ColdTrendGoal. -->
+  <script src="/js/goal-math.js"></script>
   <!-- Mode Vidéo (admin) -- AVANT auth-state.js, qui lit window.ColdTrendDemo
        pour afficher le header d'un visiteur ("Se connecter") pendant le
        tournage. Le cookie ct_vm n'est qu'un drapeau d'armement posé depuis
@@ -7267,106 +7434,299 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
       // toute adresse contenant la lettre "s" était refusée).
       var EMAIL_RE = /^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/;
 
-      // Prix moyen par client explicite et fixe -- jamais un chiffre déduit
-      // ou variable, juste une illustration transparente déclarée dans le
-      // texte lui-même (voir revenue-slider__math), pas une donnée mesurée.
-      var REVENUE_PER_CLIENT = 20;
-      var REVENUE_BADGES = [
-        { max: 3000, label: "Complément" },
-        { max: 10000, label: "Revenu principal" },
-        { max: Infinity, label: "Ambitieux" }
-      ];
+      // ---- Écrans objectif : A « Montant » et B « Délai » -----------------
+      // Tous les chiffres viennent de window.ColdTrendGoal
+      // (scripts/goal-math.js, servi en /js/goal-math.js) : paliers, slider
+      // non linéaire, prix moyen B2B/B2C, équivalences, rythme hebdomadaire
+      // et ton de l'accompagnement. Ici, uniquement de l'affichage.
+      var GOAL = window.ColdTrendGoal;
+      var goalTierIndex = null;
+      var goalBadgeTimer = null;
 
-      function formatRevenueValue(v) {
-        var input = document.getElementById("revenue-slider-input");
-        var max = input ? Number(input.max) : 50000;
-        return v >= max
-          ? max.toLocaleString("fr-FR") + " € et plus / mois"
-          : Number(v).toLocaleString("fr-FR") + " € / mois";
-      }
+      // Libellés de l'aperçu (réponses réelles uniquement).
+      var PREVIEW_PLATFORM_LABELS = {
+        aucune: "Aucune pour l'instant",
+        "1": "1 plateforme",
+        "2": "2 plateformes",
+        "3": "3 plateformes",
+        "4_plus": "4 ou plus"
+      };
 
-      function revenueBadgeLabel(v) {
-        for (var i = 0; i < REVENUE_BADGES.length; i += 1) {
-          if (v <= REVENUE_BADGES[i].max) return REVENUE_BADGES[i].label;
+      function goalVibrate(ms) {
+        try {
+          if (navigator.vibrate) navigator.vibrate(ms);
+        } catch (err) {
+          /* repli silencieux (iOS) */
         }
-        return "Ambitieux";
       }
 
-      // Appelée à l'init (valeur par défaut) et à chaque "input" sur le
-      // slider (voir le handler délégué sur #stage) -- jamais seulement au
-      // relâchement, pour un affichage en direct pendant le drag.
-      var revenueBadgeChangeTimer = null;
-
-      // Séparé de updateRevenueSlider() : appelé uniquement au relâchement
-      // ("change", pas "input") pour la pulsation de confirmation -- un
-      // retour haptique visuel n'a de sens qu'une fois le choix arrêté, pas
-      // à chaque pixel de drag.
-      function pulseRevenueValueOnRelease() {
-        var valueEl = document.getElementById("revenue-slider-value");
-        if (!valueEl || reduceMotion) return;
-        valueEl.classList.remove("is-released");
-        void valueEl.offsetWidth;
-        valueEl.classList.add("is-released");
+      function setTextById(id, text) {
+        var el = document.getElementById(id);
+        if (el && el.textContent !== text) el.textContent = text;
       }
 
-      function updateRevenueSlider() {
-        var input = document.getElementById("revenue-slider-input");
-        if (!input) return;
-        var v = Number(input.value);
+      // Valeur par défaut de l'écran A : celle rendue au build (attribut
+      // value d'origine du slider), jamais une valeur codée deux fois.
+      function defaultGoal() {
+        var slider = document.getElementById("goal-slider");
+        return slider && GOAL ? GOAL.positionToValue(slider.defaultValue) : 1000;
+      }
+
+      // Aperçu « Ton espace prend vie » (composant renderSpacePreview) :
+      // remplit les champs data-sp avec les réponses déjà données. Une
+      // réponse absente reste « À définir », jamais une valeur inventée.
+      function updateSpacePreview(id) {
+        var root = document.getElementById(id);
+        if (!root || !GOAL) return;
+        var goal = typeof answers.objectifRevenu === "number" ? answers.objectifRevenu : defaultGoal();
+        var values = {
+          secteur:
+            answers.secteur && answers.secteur.length
+              ? answers.secteur.map(function (v) { return SECTOR_LABELS[v] || v; }).join(" + ")
+              : null,
+          temps: answers.temps ? TIME_LABELS[answers.temps] || null : null,
+          plateformes: answers.plateformes ? PREVIEW_PLATFORM_LABELS[answers.plateformes] || null : null,
+          goal: GOAL.formatEuro(goal)
+        };
+        Array.prototype.forEach.call(root.querySelectorAll("[data-sp]"), function (el) {
+          var key = el.getAttribute("data-sp");
+          var value = values[key];
+          el.textContent = value || "À définir";
+          el.classList.toggle("is-empty", !value);
+        });
+        root.style.setProperty("--sp-ratio", GOAL.valueToRatio(goal).toFixed(4));
+      }
+
+      // Met tout l'écran A d'accord avec une valeur. source :
+      //   "slider"   -> ne réécrit pas la position (évite les sauts), vibre
+      //                 au passage d'un palier ;
+      //   "input"    -> saisie en cours : ne reformate pas le champ ;
+      //   "commit"   -> fin de saisie (Entrée, perte de focus) : reformate ;
+      //   "shortcut" / "restore" -> tout est réécrit.
+      function setGoal(value, source) {
+        if (!GOAL) return;
+        var v = GOAL.snap(value);
         answers.objectifRevenu = v;
+        var ratio = GOAL.valueToRatio(v);
 
-        var min = Number(input.min);
-        var max = Number(input.max);
-        var pct = (v - min) / (max - min);
+        var slider = document.getElementById("goal-slider");
+        if (slider) {
+          if (source !== "slider") slider.value = String(GOAL.valueToPosition(v));
+          slider.setAttribute("aria-valuetext", GOAL.formatGoal(v));
+          slider.parentNode.style.setProperty("--goal-ratio", ratio.toFixed(4));
+        }
+        var input = document.getElementById("goal-amount-input");
+        if (input) {
+          if (source !== "input") input.value = v.toLocaleString("fr-FR");
+          input.style.setProperty("--goal-glow", ratio.toFixed(3));
+        }
 
-        var valueEl = document.getElementById("revenue-slider-value");
-        var newValueText = formatRevenueValue(v);
-        if (valueEl.textContent !== newValueText) {
-          valueEl.textContent = newValueText;
-          // Pulse discret à chaque changement de tranche réel (le step du
-          // slider fait déjà ce filtrage -- pas besoin de le refaire ici),
-          // jamais au repos ni en boucle.
-          if (!reduceMotion) {
-            valueEl.classList.remove("is-pulsing");
-            void valueEl.offsetWidth;
-            valueEl.classList.add("is-pulsing");
+        // Badge de palier : fondu croisé, vibration légère au franchissement
+        // pendant le glissé (jamais au premier affichage).
+        var idx = GOAL.tierIndex(v);
+        var badge = document.getElementById("goal-badge");
+        if (badge && idx !== goalTierIndex) {
+          var tierInfo = GOAL.TIERS[idx];
+          if (goalTierIndex !== null && source === "slider") goalVibrate(8);
+          goalTierIndex = idx;
+          window.clearTimeout(goalBadgeTimer);
+          var applyTier = function () {
+            badge.textContent = tierInfo.label;
+            badge.setAttribute("data-tier", tierInfo.id);
+            badge.classList.remove("is-changing");
+          };
+          if (reduceMotion || badge.textContent === tierInfo.label) {
+            applyTier();
+          } else {
+            badge.classList.add("is-changing");
+            goalBadgeTimer = window.setTimeout(applyTier, 150);
           }
         }
-        // Glow Cobalt Blue qui s'intensifie avec la position -- un
-        // renforcement discret, jamais un effet qui distrait.
-        valueEl.style.filter = "drop-shadow(0 0 " + (6 + pct * 10) + "px rgba(0, 71, 255, " + (0.15 + pct * 0.35) + "))";
 
-        var badgeEl = document.getElementById("revenue-slider-badge");
-        var newBadgeText = revenueBadgeLabel(v);
-        if (!badgeEl.textContent) {
-          // Premier rendu -- pas de fondu à faire, rien à croiser.
-          badgeEl.textContent = newBadgeText;
-        } else if (badgeEl.textContent !== newBadgeText) {
-          // Fondu croisé plutôt qu'un remplacement de texte brutal : on
-          // masque, on change le texte pendant que c'est invisible, on
-          // réaffiche -- jamais les deux libellés visibles en même temps.
-          window.clearTimeout(revenueBadgeChangeTimer);
-          badgeEl.classList.add("is-changing");
-          revenueBadgeChangeTimer = window.setTimeout(
-            function () {
-              badgeEl.textContent = newBadgeText;
-              badgeEl.classList.remove("is-changing");
-            },
-            reduceMotion ? 0 : 150
-          );
+        var price = GOAL.averagePrice(answers.secteur);
+        var clients = GOAL.clientsNeeded(v, price);
+        setTextById("goal-equivalence", GOAL.equivalence(v));
+        setTextById(
+          "goal-clients",
+          v > 0
+            ? "≈ " + clients.toLocaleString("fr-FR") + " client" + (clients > 1 ? "s" : "") + " à " + price + " €/mois"
+            : "Choisis un montant pour voir ce qu'il représente."
+        );
+
+        Array.prototype.forEach.call(stage.querySelectorAll("[data-goal-shortcut]"), function (btn) {
+          btn.classList.toggle("is-selected", Number(btn.getAttribute("data-goal-shortcut")) === v);
+        });
+
+        updateSpacePreview("goal-preview");
+        var screenEl = stage.querySelector('[data-id="objectifRevenu"]');
+        if (screenEl) updateNextEnabled(screenEl);
+      }
+
+      // Les deux réponses, telles que stockées dans profiles (migration
+      // 0030) : objectif_mensuel (euros) et delai_mois (1 à 6). null tant
+      // que l'écran n'a pas été répondu.
+      function goalProfileFields() {
+        return {
+          objectif_mensuel: typeof answers.objectifRevenu === "number" ? answers.objectifRevenu : null,
+          delai_mois: answers.delai ? parseInt(answers.delai, 10) : null
+        };
+      }
+
+      // Saisie au clavier : chiffres uniquement, plafonnée au maximum.
+      function goalFromInput(raw) {
+        var digits = String(raw || "").replace(/[^0-9]/g, "");
+        return Math.min(GOAL ? GOAL.MAX : 50000, Number(digits) || 0);
+      }
+
+      // Entrée sur l'écran A : reprend la réponse existante (retour arrière,
+      // édition depuis la puce) ou la valeur par défaut.
+      function enterGoalAmount() {
+        goalTierIndex = null;
+        setGoal(typeof answers.objectifRevenu === "number" ? answers.objectifRevenu : defaultGoal(), "restore");
+      }
+
+      // Remise à zéro visuelle à l'ouverture du quiz, SANS écrire de réponse :
+      // objectif_mensuel n'est enregistré que si l'écran a vraiment été vu.
+      function resetGoalScreens() {
+        if (!GOAL) return;
+        goalTierIndex = null;
+        setGoal(defaultGoal(), "restore");
+        delete answers.objectifRevenu;
+        renderDelay();
+      }
+
+      // ---- Écran B : frise, rythme, accompagnement --------------------------
+      function delayScreen() {
+        return stage.querySelector('[data-id="delai"]');
+      }
+
+      function renderDelay() {
+        var screenEl = delayScreen();
+        if (!screenEl || !GOAL) return;
+        var goal = typeof answers.objectifRevenu === "number" ? answers.objectifRevenu : 0;
+        var months = parseInt(answers.delai, 10) || 0;
+
+        // Titre en écho du montant choisi (nœuds texte, jamais d'HTML).
+        var title = document.getElementById("delay-title");
+        if (title && goal > 0) {
+          var echo = document.createElement("span");
+          echo.className = "goal-echo";
+          echo.textContent = GOAL.formatGoal(goal);
+          title.textContent = "En combien de temps veux-tu atteindre ";
+          title.appendChild(echo);
+          title.appendChild(document.createTextNode(" ?"));
         }
 
-        var fillEl = document.getElementById("revenue-slider-fill");
-        fillEl.style.transform = "scaleX(" + pct + ")";
+        Array.prototype.forEach.call(screenEl.querySelectorAll(".delay-stop"), function (btn) {
+          var m = Number(btn.getAttribute("data-months"));
+          var checked = m === months;
+          btn.setAttribute("aria-checked", checked ? "true" : "false");
+          btn.setAttribute("tabindex", checked || (!months && m === 1) ? "0" : "-1");
+          btn.classList.toggle("is-reached", months > 0 && m < months);
+        });
+        var timeline = screenEl.querySelector(".delay-timeline");
+        if (timeline) timeline.style.setProperty("--delay-progress", months ? String((months - 1) / 5) : "0");
 
-        var mathEl = document.getElementById("revenue-slider-math");
-        if (v > 0) {
-          var clientCount = Math.ceil(v / REVENUE_PER_CLIENT);
-          mathEl.textContent =
-            "À " + REVENUE_PER_CLIENT + " € par client en moyenne, ça fait " + clientCount + " client" + (clientCount !== 1 ? "s" : "") + " à trouver.";
-        } else {
-          mathEl.textContent = "";
+        var result = GOAL.assess({ goal: goal, months: months, temps: answers.temps, secteur: answers.secteur });
+        var card = document.getElementById("delay-card");
+        if (card) card.setAttribute("data-level", result.level || "");
+        setTextById("delay-pace", months ? result.perWeekText : "Choisis un jalon : on calcule ton rythme.");
+        var clients = GOAL.clientsNeeded(goal, result.price);
+        setTextById(
+          "delay-hyp",
+          months
+            ? "Calcul : " + clients.toLocaleString("fr-FR") + " client" + (clients > 1 ? "s" : "") + " à " + result.price + " €/mois, d'ici " + months + " mois. Un repère, pas une promesse."
+            : ""
+        );
+        setTextById("delay-msg", result.message);
+
+        // Suggestion en un tap, uniquement si le défi est très ambitieux et
+        // qu'un délai plus long change vraiment la donne. Jamais imposée.
+        var suggest = document.getElementById("delay-suggest");
+        if (suggest) {
+          if (result.suggestion) {
+            suggest.hidden = false;
+            suggest.setAttribute("data-months", String(result.suggestion));
+            suggest.textContent = "Essayer " + result.suggestion + " mois, plus tenable";
+          } else {
+            suggest.hidden = true;
+          }
         }
+        updateNextEnabled(screenEl);
+      }
+
+      function selectDelay(months, focus) {
+        if (!(months >= 1 && months <= 6)) return;
+        answers.delai = String(months);
+        goalVibrate(10);
+        renderDelay();
+        if (focus) {
+          var btn = delayScreen().querySelector('.delay-stop[data-months="' + months + '"]');
+          if (btn) btn.focus();
+        }
+      }
+
+      // Radiogroup au clavier : flèches, Début, Fin.
+      (function initDelayKeyboard() {
+        var screenEl = delayScreen();
+        if (!screenEl) return;
+        screenEl.addEventListener("keydown", function (e) {
+          var stop = e.target.closest(".delay-stop");
+          if (!stop) return;
+          var current = Number(stop.getAttribute("data-months"));
+          var next = null;
+          if (e.key === "ArrowRight" || e.key === "ArrowDown") next = Math.min(6, current + 1);
+          else if (e.key === "ArrowLeft" || e.key === "ArrowUp") next = Math.max(1, current - 1);
+          else if (e.key === "Home") next = 1;
+          else if (e.key === "End") next = 6;
+          if (next === null) return;
+          e.preventDefault();
+          selectDelay(next, true);
+        });
+      })();
+
+      // Transition A -> B : le montant « vole » vers la puce récap qui vient
+      // d'apparaître en haut. Pur décor : sans animation (reduced motion,
+      // navigateur sans Web Animations), la puce s'affiche simplement.
+      function flyGoalToTag() {
+        if (reduceMotion || !quizTagsEl || !GOAL) return;
+        var src = document.getElementById("goal-amount-input");
+        var tag = quizTagsEl.querySelector('[data-tag-id="objectifRevenu"]');
+        if (!src || !tag || !tag.animate) return;
+        var from = src.getBoundingClientRect();
+        var to = tag.getBoundingClientRect();
+        if (!from.width || !to.width) return;
+        var ghost = document.createElement("p");
+        ghost.className = "goal-fly";
+        ghost.setAttribute("aria-hidden", "true");
+        ghost.textContent = GOAL.formatGoal(answers.objectifRevenu);
+        ghost.style.left = from.left + "px";
+        ghost.style.top = from.top + "px";
+        ghost.style.fontSize = window.getComputedStyle(src).fontSize;
+        document.body.appendChild(ghost);
+        var size = ghost.getBoundingClientRect();
+        var scale = Math.max(0.15, (to.height / size.height) * 0.85);
+        tag.style.opacity = "0";
+        var anim = ghost.animate(
+          [
+            { transform: "translate(0, 0) scale(1)", opacity: 1 },
+            { transform: "translate(" + (to.left - from.left) + "px, " + (to.top - from.top) + "px) scale(" + scale + ")", opacity: 0.3 }
+          ],
+          { duration: 650, easing: "cubic-bezier(0.22, 1, 0.36, 1)" }
+        );
+        var landed = false;
+        function land() {
+          if (landed) return;
+          landed = true;
+          if (ghost.parentNode) ghost.parentNode.removeChild(ghost);
+          tag.style.opacity = "";
+          tag.animate([{ transform: "scale(1.15)" }, { transform: "scale(1)" }], { duration: 320, easing: "cubic-bezier(0.34, 1.56, 0.64, 1)" });
+        }
+        anim.onfinish = land;
+        anim.oncancel = land;
+        // Filet de sécurité : onglet passé en arrière-plan pendant le vol,
+        // animation jamais terminée -> la puce ne doit pas rester invisible.
+        window.setTimeout(land, 1200);
       }
 
       // ---- Accumulateur de tags — libellés d'affichage ----------------
@@ -7375,16 +7735,18 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
       // champ -- la valeur reste interne (défaut "creation").
       var QUESTION_LABELS = {
         temps: "Temps",
-        secteur: "Cible"
+        secteur: "Cible",
+        objectifRevenu: "Objectif :"
       };
       // Ordre d'affichage fixe des tags, indépendant de l'ordre dans lequel
       // les questions ont été répondues.
-      var TAG_ORDER = ["secteur", "temps"];
+      var TAG_ORDER = ["secteur", "temps", "objectifRevenu"];
 
       function tagValueLabel(id) {
         var value = answers[id];
         if (value === undefined) return null;
         if (id === "temps") return TIME_LABELS[value] || value;
+        if (id === "objectifRevenu") return typeof value === "number" && value > 0 && GOAL ? GOAL.formatGoal(value) : null;
         if (id === "secteur") {
           return (value || []).map(function (v) { return SECTOR_LABELS[v] || v; }).join(" + ") || null;
         }
@@ -7504,13 +7866,13 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
         }
 
         if (id === "objectifRevenu") {
-          // Le slider a toujours une valeur ; il ne manque que le délai.
-          nextBtn.disabled = !answers.delai;
+          // Écran A : un objectif de 0 € n'est pas un objectif.
+          nextBtn.disabled = !(answers.objectifRevenu > 0);
           return;
         }
 
-        if (id === "nomProjet") {
-          nextBtn.disabled = !(answers.nomProjet && answers.nomProjet.trim().length >= 2);
+        if (id === "delai") {
+          nextBtn.disabled = !answers.delai;
           return;
         }
 
@@ -7587,8 +7949,8 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
         var exitTo = direction === "back" ? 24 : -24;
 
         applyEcho(nextEl);
-        if (nextEl.getAttribute("data-id") === "objectifRevenu") startTitleRotator();
-        else stopTitleRotator();
+        if (nextEl.getAttribute("data-id") === "objectifRevenu") enterGoalAmount();
+        if (nextEl.getAttribute("data-id") === "delai") renderDelay();
         if (nextEl.getAttribute("data-id") === "engagement") syncEngagementUI();
         if (nextEl.getAttribute("data-id") === "auth") renderGateProjection();
         if (nextEl.getAttribute("data-id") === "assemblage") runAssembly();
@@ -7710,7 +8072,6 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
           lignesRouges: ans.lignesRouges || [],
           objectifRevenu: typeof ans.objectifRevenu === "number" ? ans.objectifRevenu : null,
           delai: ans.delai || null,
-          nomProjet: ans.nomProjet || null,
           influenceurs: ans.influenceurs || null,
           clippers: ans.clippers || null,
           forceRegenerate: !!forceRegenerate
@@ -7935,7 +8296,8 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
           ? conceptName + " : débloque la description complète, la cible et les canaux d'acquisition."
           : "Débloque ton concept complet : description, cible et canaux d'acquisition.";
         var payTitle = document.getElementById("pay-title");
-        var projectName = typeof answers.nomProjet === "string" && answers.nomProjet.trim() ? answers.nomProjet.trim() : answers.concept ? answers.concept.concept_name : "";
+        // Nom du projet = concept_name généré (plus d'écran « Nom du projet »).
+        var projectName = answers.concept ? answers.concept.concept_name : "";
         if (payTitle) payTitle.textContent = projectName ? "Lance " + projectName : "Lance ton projet";
 
         initDurationCards();
@@ -8165,7 +8527,7 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
 
       function fillBridge() {
         var conceptEl = document.getElementById("bridge-concept");
-        var name = answers.concept && answers.concept.concept_name ? answers.concept.concept_name : typeof answers.nomProjet === "string" ? answers.nomProjet.trim() : "";
+        var name = answers.concept && answers.concept.concept_name ? answers.concept.concept_name : "";
         if (conceptEl && name) conceptEl.textContent = name;
 
         var projEl = document.getElementById("bridge-projection");
@@ -8285,7 +8647,9 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
 
       // Champs libres repris tels quels (insérés via textContent, jamais
       // en HTML).
-      var ECHO_RAW_FIELDS = { nomProjet: true };
+      // Vide depuis la suppression de l'écran « Nom du projet » ; le
+      // mécanisme reste pour un futur champ libre repris en écho.
+      var ECHO_RAW_FIELDS = {};
 
       function applyEcho(screenEl) {
         Array.prototype.forEach.call(screenEl.querySelectorAll("[data-echo]"), function (el) {
@@ -8348,44 +8712,6 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
       }
 
       // ---- Titre à mot tournant (objectif + délai) -----------------------
-      var titleRotatorTimer = null;
-
-      function stopTitleRotator() {
-        if (titleRotatorTimer) {
-          window.clearInterval(titleRotatorTimer);
-          titleRotatorTimer = null;
-        }
-      }
-
-      function updateTitleRotator() {
-        var el = document.getElementById("quiz-title-rotator");
-        if (!el || !answers.delai) return;
-        stopTitleRotator();
-        el.classList.remove("is-swapping");
-        el.textContent = answers.delai + " mois";
-        el.classList.add("is-fixed");
-      }
-
-      function startTitleRotator() {
-        stopTitleRotator();
-        var el = document.getElementById("quiz-title-rotator");
-        if (!el) return;
-        if (answers.delai) {
-          updateTitleRotator();
-          return;
-        }
-        if (reduceMotion) return;
-        var words = JSON.parse(el.getAttribute("data-words") || "[]");
-        var i = 0;
-        titleRotatorTimer = window.setInterval(function () {
-          i = (i + 1) % words.length;
-          el.classList.add("is-swapping");
-          window.setTimeout(function () {
-            el.textContent = words[i];
-            el.classList.remove("is-swapping");
-          }, 160);
-        }, 1300);
-      }
 
       // ---- Audit gratuit du SaaS existant (écran 7b) ---------------------
       // Analyse réelle côté serveur (analyze-site) ; les étapes cochées ne
@@ -8812,7 +9138,7 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
         chart.classList.remove("is-ready", "is-scrubbing");
         document.getElementById("dash-clip-rect").setAttribute("width", "0");
         dashSetNumbers(0, 0, 0);
-        var name = typeof answers.nomProjet === "string" ? answers.nomProjet.trim() : "";
+        var name = answers.concept && answers.concept.concept_name ? answers.concept.concept_name : "";
         document.getElementById("quiz-result-title").textContent = name || "Ton projet";
         dashSyncControls();
         if (!dashConfettiDone && !reduceMotion) loadConfetti(function () {});
@@ -9186,13 +9512,7 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
       })();
 
       function resetCustomScreens() {
-        stopTitleRotator();
-        var rotator = document.getElementById("quiz-title-rotator");
-        if (rotator) {
-          var words = JSON.parse(rotator.getAttribute("data-words") || "[]");
-          rotator.textContent = words[0] || "";
-          rotator.classList.remove("is-fixed", "is-swapping");
-        }
+        resetGoalScreens();
         stage.querySelectorAll("[data-text-field], .quiz-freetext input").forEach(function (input) {
           input.value = "";
         });
@@ -9226,6 +9546,12 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
           step_number: currentQuestionIndex + 1,
           answer: answers[currentId]
         });
+
+        // Passage A -> B : la puce « Objectif » apparaît et le montant y vole.
+        if (currentId === "objectifRevenu") {
+          renderTags();
+          flyGoalToTag();
+        }
 
         navHistory.push(currentQuestionIndex);
         var next = findNextQuestionIndex(currentQuestionIndex);
@@ -9452,6 +9778,8 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
                 intention: answers.intention || null,
                 temps: answers.temps || null,
                 secteur: answers.secteur || [],
+                objectif_mensuel: goalProfileFields().objectif_mensuel,
+                delai_mois: goalProfileFields().delai_mois,
                 // Pivot : match_count reste la colonne DB historique (pas de
                 // migration pour ce détail), mais sa sémantique n'est plus un
                 // vrai comptage de fiches correspondantes -- juste un flag
@@ -9495,15 +9823,19 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
           .then(function (userRes) {
             var user = userRes.data ? userRes.data.user : null;
             if (!user) return;
-            return supabase
-              .from("profiles")
-              .update({
-                intention: answers.intention || null,
-                temps: answers.temps || null,
-                secteur: answers.secteur || [],
-                funnel_last_step: stepIndex
-              })
-              .eq("id", user.id);
+            var update = {
+              intention: answers.intention || null,
+              temps: answers.temps || null,
+              secteur: answers.secteur || [],
+              funnel_last_step: stepIndex
+            };
+            // Écrans A/B : ajoutés seulement une fois répondus, pour ne
+            // jamais écraser une valeur déjà en base avec un null.
+            var goalFields = goalProfileFields();
+            Object.keys(goalFields).forEach(function (key) {
+              if (goalFields[key] !== null) update[key] = goalFields[key];
+            });
+            return supabase.from("profiles").update(update).eq("id", user.id);
           })
           .catch(function (err) {
             console.warn("[ColdTrend] persistProgress a échoué :", err);
@@ -9517,21 +9849,11 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
       function restoreAnswersUI() {
         questionScreens.forEach(function (screenEl) {
           var id = screenEl.getAttribute("data-id");
-          if (id === "objectifRevenu") {
-            // Toujours resynchronisé, même si answers.objectifRevenu est
-            // encore undefined (brouillon sauvegardé avant l'ajout de cette
-            // question, ou reprise depuis profiles qui ne la connaît pas) --
-            // sinon le slider affiche sa valeur par défaut sans que answers
-            // ne la reflète, et generate-user-concept ne la recevrait jamais.
-            var sliderInput = document.getElementById("revenue-slider-input");
-            if (sliderInput) {
-              if (typeof answers.objectifRevenu === "number") {
-                sliderInput.value = String(answers.objectifRevenu);
-              }
-              updateRevenueSlider();
-            }
-            updateTitleRotator();
+          if (id === "objectifRevenu" && typeof answers.objectifRevenu === "number") {
+            goalTierIndex = null;
+            setGoal(answers.objectifRevenu, "restore");
           }
+          if (id === "delai") renderDelay();
           if (id === "auth") return;
           // Chaque groupe d'options de l'écran (plusieurs sur "situation",
           // puces de délai sous le slider) a sa propre clé de réponse.
@@ -9745,7 +10067,7 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
             showConnectedBadge();
             return supabase
               .from("profiles")
-              .select("intention, budget, temps, secteur, deja_cherche, funnel_last_step")
+              .select("intention, budget, temps, secteur, deja_cherche, funnel_last_step, objectif_mensuel, delai_mois")
               .eq("id", user.id)
               .single()
               .then(function (profileRes) {
@@ -9757,6 +10079,9 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
                 answers.intention = profile.intention || "creation";
                 answers.temps = profile.temps || undefined;
                 answers.secteur = profile.secteur || undefined;
+                // Écrans A/B (migration 0030) : reprise sur un autre appareil.
+                if (typeof profile.objectif_mensuel === "number") answers.objectifRevenu = profile.objectif_mensuel;
+                if (profile.delai_mois) answers.delai = String(profile.delai_mois);
                 navHistory = buildNavHistoryUpTo(lastStep);
                 restoreAnswersUI();
                 updateBackVisibility();
@@ -9889,7 +10214,6 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
       }
 
       function closeQuiz() {
-        stopTitleRotator();
         stopAssembly();
         if (overlay.classList.contains("is-open") && !reachedResult && currentScreenEl) {
           var stepName = currentScreenEl.getAttribute("data-step-name") || "inconnu";
@@ -9904,6 +10228,25 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
       }
 
       stage.addEventListener("click", function (e) {
+        // Écran A : raccourcis de montant.
+        var goalShortcut = e.target.closest("[data-goal-shortcut]");
+        if (goalShortcut) {
+          haptic();
+          setGoal(Number(goalShortcut.getAttribute("data-goal-shortcut")), "shortcut");
+          return;
+        }
+        // Écran B : jalon de la frise, ou délai suggéré (un tap, jamais imposé).
+        var delayStop = e.target.closest(".delay-stop");
+        if (delayStop) {
+          selectDelay(Number(delayStop.getAttribute("data-months")), false);
+          return;
+        }
+        var delaySuggest = e.target.closest("#delay-suggest");
+        if (delaySuggest) {
+          selectDelay(Number(delaySuggest.getAttribute("data-months")), true);
+          return;
+        }
+
         var optBtn = e.target.closest(".quiz-option, .quiz-chip");
         if (optBtn) {
           haptic();
@@ -9934,7 +10277,6 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
               b.classList.toggle("is-selected", b === optBtn);
             });
             syncFreeText(screenEl, id, value);
-            if (id === "delai") updateTitleRotator();
 
             if (id === "dejaCherche" || id === "budget") {
               var followupEl2 = document.getElementById("quiz-followup");
@@ -10061,8 +10403,11 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
           answers[e.target.id.slice("quiz-freetext-".length) + "Autre"] = e.target.value;
           updateNextEnabled(e.target.closest(".quiz-screen"));
         }
-        if (e.target.id === "revenue-slider-input") {
-          updateRevenueSlider();
+        if (e.target.id === "goal-slider" && GOAL) {
+          setGoal(GOAL.positionToValue(e.target.value), "slider");
+        }
+        if (e.target.id === "goal-amount-input") {
+          setGoal(goalFromInput(e.target.value), "input");
         }
       });
 
@@ -10070,16 +10415,12 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
       // pendant le drag) -- la pulsation de confirmation ne doit jouer
       // qu'une fois le choix arrêté.
       stage.addEventListener("change", function (e) {
-        if (e.target.id === "revenue-slider-input") {
-          pulseRevenueValueOnRelease();
+        // Fin de saisie du montant (perte de focus) : valeur reformatée.
+        if (e.target.id === "goal-amount-input") {
+          setGoal(goalFromInput(e.target.value), "commit");
         }
       });
 
-      // Valeur/badge/barre affichés dès l'ouverture du quiz, avant toute
-      // interaction -- le slider a déjà une valeur par défaut au rendu
-      // serveur (voir renderQuizQuestionScreen), l'écran ne doit jamais
-      // s'afficher vide en attendant un premier drag.
-      updateRevenueSlider();
 
       stage.addEventListener("keydown", function (e) {
         if (e.key !== "Enter") return;
@@ -10092,6 +10433,13 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
         if (e.target.id === "audit-url-input") {
           e.preventDefault();
           runAudit();
+          return;
+        }
+        // Montant saisi au clavier : Entrée valide la saisie (ferme le
+        // clavier mobile), sans passer à l'écran suivant.
+        if (e.target.id === "goal-amount-input") {
+          e.preventDefault();
+          e.target.blur();
           return;
         }
         var isFreeText = (e.target.id || "").indexOf("quiz-freetext-") === 0;
@@ -10518,13 +10866,6 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
         }
         closeQuiz();
         answers = { intention: "creation" };
-        // Slider objectif de revenus remis à sa valeur de rendu serveur,
-        // comme pour un visiteur qui arrive.
-        var revenueInput = document.getElementById("revenue-slider-input");
-        if (revenueInput) {
-          revenueInput.value = revenueInput.defaultValue;
-          updateRevenueSlider();
-        }
         dashConfettiDone = false;
         transitionInProgress = false;
         resetCustomScreens();
@@ -10763,6 +11104,69 @@ const QUIZ_CHAPTER_ICONS = {
   recherche: ICON_QUIZ_RECHERCHE
 };
 
+// ---------------------------------------------------------------------------
+// Composant « aperçu de ton espace » (effet de dotation) -- réutilisable.
+//
+// Reprend le langage visuel de /compte (ton dossier) : fenêtre sombre,
+// navigation latérale, cartes à bord fin. Il ne montre QUE des données
+// réelles : les réponses déjà données (cible, temps, plateformes) et
+// l'objectif choisi. Jamais de revenu, de courbe de ventes ou de
+// notification inventés : la jauge représente l'objectif visé, avec le
+// point de départ réel (0 €).
+//
+// Rendu ici avec des valeurs neutres, rempli côté client par
+// updateSpacePreview(id) (champs data-sp). Plusieurs instances possibles
+// sur une page (id distinct).
+// ---------------------------------------------------------------------------
+const SPACE_PREVIEW_ARC = 157.08; // longueur du demi-cercle r=50 (π × 50)
+
+function renderSpacePreview({ id, goal }) {
+  const ratio = GOAL.valueToRatio(goal);
+  const navItem = (label, active, locked) =>
+    `<li class="sp-nav__item${active ? " is-active" : ""}">${label}${locked ? `<span class="sp-nav__lock" aria-hidden="true">${ICON_LOCK}</span>` : ""}</li>`;
+  return `<figure class="space-preview" id="${id}" style="--sp-ratio:${ratio.toFixed(4)}">
+                <div class="space-preview__window">
+                  <div class="space-preview__bar" aria-hidden="true">
+                    <span class="space-preview__dots"><i></i><i></i><i></i></span>
+                    <span class="space-preview__title">Ton espace ${brand.name}</span>
+                  </div>
+                  <div class="space-preview__body">
+                    <ul class="sp-nav" aria-hidden="true">
+                      <li class="sp-nav__brand">${brand.name.charAt(0)}</li>
+                      ${navItem("Mon dossier", true, false)}
+                      ${navItem("Mon objectif", false, false)}
+                      ${navItem("Mon concept", false, true)}
+                    </ul>
+                    <div class="sp-main">
+                      <p class="sp-eyebrow">Ton espace prend vie</p>
+                      <section class="sp-card sp-card--project">
+                        <h3 class="sp-card__title">Ton projet</h3>
+                        <dl class="sp-list">
+                          <div><dt>Cible</dt><dd data-sp="secteur">À définir</dd></div>
+                          <div><dt>Temps</dt><dd data-sp="temps">À définir</dd></div>
+                          <div><dt>Plateformes</dt><dd data-sp="plateformes">À définir</dd></div>
+                        </dl>
+                        <p class="sp-card__hint">Le nom de ton projet arrive avec ton concept.</p>
+                      </section>
+                      <section class="sp-card sp-card--goal">
+                        <h3 class="sp-card__title">Objectif mensuel</h3>
+                        <div class="sp-gauge">
+                          <svg class="sp-gauge__svg" viewBox="0 0 120 68" aria-hidden="true">
+                            <path class="sp-gauge__track" d="M10 60 A50 50 0 0 1 110 60" />
+                            <path class="sp-gauge__arc" d="M10 60 A50 50 0 0 1 110 60" style="stroke-dasharray:${SPACE_PREVIEW_ARC};stroke-dashoffset:calc(${SPACE_PREVIEW_ARC} * (1 - var(--sp-ratio)))" />
+                          </svg>
+                          <p class="sp-gauge__value"><strong data-sp="goal">${GOAL.formatEuro(goal)}</strong><span>par mois visés</span></p>
+                          <span class="sp-gauge__min" aria-hidden="true">0 €</span>
+                          <span class="sp-gauge__max" aria-hidden="true">${GOAL.formatEuro(GOAL.MAX)}</span>
+                        </div>
+                        <p class="sp-card__hint">Point de départ : 0 €. Un objectif, pas un résultat.</p>
+                      </section>
+                    </div>
+                  </div>
+                </div>
+              </figure>`;
+}
+
 // Icône + libellé de chapitre au-dessus du titre -- absent sur les
 // écrans sans chapterIcon (intention, intro, mirror, auth...) plutôt que
 // d'inventer une icône pour des écrans qui n'en avaient pas dans le brief.
@@ -10964,47 +11368,91 @@ function renderQuizQuestionScreen(question, index) {
         </div>`;
   }
 
-  if (question.type === "slider") {
-    // Valeur de départ au milieu de la plage, jamais 0 -- un slider qui
-    // démarre à zéro laisse croire à une réponse déjà donnée ("aucun
-    // objectif"), alors qu'aucune interaction n'a encore eu lieu.
-    const initial = Math.round((question.min + question.max) / 2 / question.step) * question.step;
-    // 5 repères régulièrement espacés, calculés depuis min/max plutôt
-    // qu'écrits en dur (la plage a changé : 0 - 50 000 €).
-    const ticks = Array.from({ length: 5 }, (_, i) => question.min + ((question.max - question.min) * i) / 4)
-      .map((v) => `<span class="revenue-slider__tick">${v.toLocaleString("fr-FR")} €</span>`)
-      .join("\n              ");
-    const sliderTitle = question.titleRotator
-      ? `${question.title}, d'ici <span class="quiz-title-rotator" id="quiz-title-rotator" data-words='${JSON.stringify(question.titleRotator)}'>${question.titleRotator[0]}</span> ?`
-      : question.title;
-    const sliderEcho = question.echoSubtext ? ` data-echo="${question.echoSubtext.replace(/"/g, "&quot;")}"` : "";
-    return `<div class="quiz-screen" data-screen="question" data-index="${index}" data-id="${question.id}" data-step-name="${question.stepName}"${skipAttrs}${question.chapter ? ` data-chapter="${question.chapter}"` : ""}>
-          ${renderChapterHeader(question)}
-          <h2 class="quiz-question-title">${sliderTitle}</h2>
-          ${question.subtext ? `<p class="quiz-subtext"${sliderEcho}>${question.subtext}</p>` : ""}
-          <div class="revenue-slider">
-            <div class="revenue-slider-bg" aria-hidden="true">
-              <svg class="revenue-slider-bg__coin" width="40" height="40" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <circle cx="20" cy="20" r="17" stroke="currentColor" stroke-width="2"/>
-                <text x="20" y="26" text-anchor="middle" font-size="17" font-weight="700" fill="currentColor" font-family="inherit">€</text>
-              </svg>
+  // ---- Écran A « Montant » ------------------------------------------------
+  // Valeurs initiales calculées au build avec le même module que le client
+  // (GOAL = scripts/goal-math.js) : l'écran s'affiche juste, sans attendre
+  // le JS. Le slider va de 0 à GOAL.SLIDER_POSITIONS (échelle non linéaire,
+  // convertie en euros par GOAL.positionToValue).
+  if (question.type === "goal-amount") {
+    const initial = GOAL.snap(question.initial);
+    const initialPos = GOAL.valueToPosition(initial);
+    const ticks = [0, 1000, 5000, 20000, 50000]
+      .map(
+        (v) =>
+          `<span class="goal-slider__tick" style="left:${(GOAL.valueToRatio(v) * 100).toFixed(2)}%">${v >= 1000 ? v / 1000 + " k" : v} €</span>`
+      )
+      .join("");
+    const shortcuts = question.shortcuts
+      .map((v) => `<button type="button" class="goal-shortcut" data-goal-shortcut="${v}">${v.toLocaleString("fr-FR")} €</button>`)
+      .join("");
+    const price = GOAL.averagePrice();
+    const clients = GOAL.clientsNeeded(initial, price);
+    return `<div class="quiz-screen goal-screen goal-screen--amount" data-screen="question" data-index="${index}" data-id="${question.id}" data-step-name="${question.stepName}"${skipAttrs}${question.chapter ? ` data-chapter="${question.chapter}"` : ""}>
+          <div class="goal-a">
+            <div class="goal-a__preview goal-block">
+              ${renderSpacePreview({ id: "goal-preview", goal: initial })}
             </div>
-            <p class="revenue-slider__badge" id="revenue-slider-badge"></p>
-            <p class="revenue-slider__value" id="revenue-slider-value"></p>
-            <div class="revenue-slider__control">
-              <div class="revenue-slider__track">
-                <div class="revenue-slider__fill" id="revenue-slider-fill"></div>
+            <div class="goal-a__main">
+              ${renderChapterHeader(question)}
+              <h2 class="quiz-question-title">${question.title}</h2>
+              <p class="goal-lead">${question.lead}</p>
+              <div class="goal-amount goal-block">
+                <p class="goal-amount__badge" id="goal-badge" data-tier="${GOAL.tier(initial).id}">${GOAL.tier(initial).label}</p>
+                <label class="goal-amount__field" for="goal-amount-input">
+                  <span class="goal-sr">Montant mensuel visé, en euros. Touche pour le saisir.</span>
+                  <input class="goal-amount__input" id="goal-amount-input" type="text" inputmode="numeric" autocomplete="off" enterkeyhint="done" maxlength="7" value="${initial.toLocaleString("fr-FR")}" aria-describedby="goal-equivalence goal-clients" />
+                  <span class="goal-amount__unit" aria-hidden="true">€ / mois</span>
+                </label>
+                <p class="goal-amount__equiv" id="goal-equivalence">${GOAL.equivalence(initial)}</p>
+                <p class="goal-amount__clients" id="goal-clients">≈ ${clients.toLocaleString("fr-FR")} client${clients > 1 ? "s" : ""} à ${price} €/mois</p>
+                <div class="goal-shortcuts" role="group" aria-label="Montants rapides">${shortcuts}</div>
+                <div class="goal-slider" style="--goal-ratio:${GOAL.valueToRatio(initial).toFixed(4)}">
+                  <div class="goal-slider__track" aria-hidden="true"><div class="goal-slider__fill"></div></div>
+                  <input class="goal-slider__input" id="goal-slider" type="range" min="0" max="${GOAL.SLIDER_POSITIONS}" step="1" value="${initialPos}" aria-label="Objectif mensuel" aria-valuetext="${GOAL.formatGoal(initial)}" />
+                  <div class="goal-slider__ticks" aria-hidden="true">${ticks}</div>
+                </div>
               </div>
-              <input type="range" class="revenue-slider__input" id="revenue-slider-input" min="${question.min}" max="${question.max}" step="${question.step}" value="${initial}" aria-label="${question.title}" />
+              <div class="quiz-footer goal-footer">
+                <button class="btn btn--primary quiz-next" type="button">${question.cta}</button>
+              </div>
             </div>
-            <div class="revenue-slider__ticks">
-              ${ticks}
-            </div>
-            <p class="revenue-slider__math" id="revenue-slider-math"></p>
           </div>
-          ${question.chips ? renderOptionGroup(question.chips, { noAdvance: true, extraClass: "quiz-options--chips" }) : ""}
-          <div class="quiz-footer">
-            <button class="btn btn--primary quiz-next" type="button">Continuer</button>
+        </div>`;
+  }
+
+  // ---- Écran B « Délai » ---------------------------------------------------
+  // Frise de 6 jalons (radiogroup accessible au clavier). Horizontale en
+  // desktop, verticale en mobile (CSS). La ligne se remplit jusqu'au jalon
+  // choisi via --delay-progress (0..1).
+  if (question.type === "goal-delay") {
+    const stops = question.months
+      .map(
+        (m) => `<li class="delay-timeline__item">
+                <button type="button" class="delay-stop" role="radio" aria-checked="false" tabindex="${m === 1 ? 0 : -1}" data-months="${m}">
+                  <span class="delay-stop__dot" aria-hidden="true"></span>
+                  <span class="delay-stop__label">${m} mois</span>
+                </button>
+              </li>`
+      )
+      .join("\n              ");
+    return `<div class="quiz-screen goal-screen goal-screen--delay" data-screen="question" data-index="${index}" data-id="${question.id}" data-step-name="${question.stepName}"${skipAttrs}${question.chapter ? ` data-chapter="${question.chapter}"` : ""}>
+          ${renderChapterHeader(question)}
+          <h2 class="quiz-question-title" id="delay-title">${question.title}</h2>
+          <p class="quiz-subtext goal-subtext">${question.subtext}</p>
+          <div class="delay-timeline goal-block" style="--delay-progress:0">
+            <div class="delay-timeline__rail" aria-hidden="true"><div class="delay-timeline__fill"></div></div>
+            <ol class="delay-timeline__stops" role="radiogroup" aria-labelledby="delay-title">
+              ${stops}
+            </ol>
+          </div>
+          <div class="delay-card goal-block" id="delay-card" data-level="">
+            <p class="delay-card__pace" id="delay-pace" aria-live="polite">Choisis un jalon : on calcule ton rythme.</p>
+            <p class="delay-card__hyp" id="delay-hyp"></p>
+            <p class="delay-card__msg" id="delay-msg"></p>
+            <button type="button" class="delay-card__suggest" id="delay-suggest" hidden></button>
+          </div>
+          <div class="quiz-footer goal-footer">
+            <button class="btn btn--primary quiz-next" type="button" disabled>${question.cta}</button>
           </div>
         </div>`;
   }
@@ -16923,8 +17371,8 @@ function writeBuiltFile(filePath, contents) {
 //     une vérification serveur (generate-demo-concept { check: true }, qui
 //     relit profiles.role avec le rôle service). Pas admin ou pas connecté
 //     = quiz public normal, avec suivi normal.
-//   - parcours : les questions de demo.config.json + objectifRevenu (slider
-//     et mois rotatifs) + assemblage (2 pop-ups), puis l'écran résultat et
+//   - parcours : les questions de demo.config.json + objectifRevenu (écran
+//     Montant) + delai (écran Délai) + assemblage (2 pop-ups), puis l'écran résultat et
 //     les offres réels. Mêmes écrans DOM, mêmes animations : seul
 //     isSkipped() change.
 //   - intégrité : aucun évènement funnel_events, aucune écriture profiles,
@@ -16937,7 +17385,7 @@ function writeBuiltFile(filePath, contents) {
 // ---------------------------------------------------------------------------
 
 // Questions autorisées : celles que generate-demo-concept sait transmettre
-// au LLM (sa liste blanche LABELS). objectifRevenu et assemblage sont
+// au LLM (sa liste blanche LABELS). objectifRevenu, delai et assemblage sont
 // toujours ajoutés, ils ne se configurent pas.
 const DEMO_ALLOWED_QUESTIONS = ["attente", "temps", "secteur", "reve", "plateformes", "blocage", "lignesRouges"];
 
@@ -16955,7 +17403,7 @@ function loadDemoConfig() {
       throw new Error(`[demo.config.json] question "${id}" non autorisée. Ids possibles : ${DEMO_ALLOWED_QUESTIONS.join(", ")}.`);
     }
   });
-  for (const fixed of ["objectifRevenu", "assemblage"]) {
+  for (const fixed of ["objectifRevenu", "delai", "assemblage"]) {
     if (!quiz.questions.some((x) => x.id === fixed)) {
       throw new Error(`[demo.config.json] écran "${fixed}" introuvable dans quiz.questions.`);
     }
@@ -16964,7 +17412,7 @@ function loadDemoConfig() {
   return {
     // Écrans affichés en mode démo. L'ordre réel est celui du quiz public
     // (ordre DOM), comme pour un vrai visiteur.
-    sequence: Array.from(new Set(ids)).concat(["objectifRevenu", "assemblage"]),
+    sequence: Array.from(new Set(ids)).concat(["objectifRevenu", "delai", "assemblage"]),
     slowMotion: raw.slowMotion === true,
     slowFactor: factor >= 1 && factor <= 3 ? factor : 1.3
   };
@@ -17046,6 +17494,7 @@ writeBuiltFile(path.join(OUT_DIR, "css", "auth.css"), authCss());
 writeBuiltFile(path.join(OUT_DIR, "js", "supabase-client.js"), supabaseClientJs());
 writeBuiltFile(path.join(OUT_DIR, "js", "auth-state.js"), authStateJs());
 writeBuiltFile(path.join(OUT_DIR, "js", "auth-ui.js"), authUiJs());
+writeBuiltFile(path.join(OUT_DIR, "js", "goal-math.js"), GOAL_MATH_SOURCE);
 
 writeBuiltFile(path.join(OUT_DIR, "connexion.html"), connexionPage());
 writeBuiltFile(path.join(OUT_DIR, "inscription.html"), inscriptionPage());

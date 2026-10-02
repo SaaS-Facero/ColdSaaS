@@ -159,7 +159,6 @@ type Profile = {
   temps: string | null;
   objectifRevenu: number | null;
   delai: string | null;
-  nomProjet: string | null;
   influenceurs: string | null;
   clippers: string | null;
 };
@@ -211,14 +210,13 @@ Format de sortie : JSON strict, aucun texte hors JSON.`;
 - Temps disponible : ${a.temps ? TEMPS_LABELS[a.temps] || a.temps : "non communiqué"}
 - Objectif de revenu (oriente le modèle économique, jamais à répéter) : ${formatObjectifRevenu(a.objectifRevenu)}
 - Délai souhaité (intention, jamais à commenter) : ${a.delai ? `d'ici ${a.delai} mois` : "non communiqué"}
-- Nom de projet choisi par la personne : ${a.nomProjet ? `"${a.nomProjet}"` : "aucun"}
 - Collaborer avec des influenceurs : ${ouiNon(a.influenceurs, "prêt à le faire", "refuse -- ne pas le proposer comme canal")}
 - Faire appel à des clippers (comptes qui republient des extraits) : ${ouiNon(a.clippers, "prêt à le faire", "refuse -- ne pas le proposer comme canal")}
 
-Génère un concept de SaaS pour cette personne. Si un nom de projet est fourni, tu peux le reprendre tel quel pour concept_name s'il convient, sinon t'en inspirer. Réponds au format JSON :
+Génère un concept de SaaS pour cette personne. concept_name sert aussi de NOM DU PROJET affiché tout au long du parcours : il doit sonner comme un vrai nom de produit. Réponds au format JSON :
 
 {
-  "concept_name": "Nom de concept court, mémorable, en français",
+  "concept_name": "Nom du projet : court (1 à 3 mots, 30 caractères max), mémorable, en français",
   "tagline": "Accroche 8-12 mots, orientée bénéfice utilisateur, sans chiffre",
   "description": "2-3 phrases : ce que fait le produit, pour qui, en français direct",
   "palette": "2-3 couleurs suggérées avec leur code hex, et pourquoi elles conviennent à ce positionnement",
@@ -274,9 +272,24 @@ Deno.serve(async (req) => {
     return json({ error: "Service réservé aux 18 ans et plus." }, 403);
   }
 
+  // Nom du projet (migration 0030) : plus d'écran "Nom du projet" dans le
+  // quiz, c'est le concept_name généré qui devient profiles.project_name.
+  // Écrit avec le rôle service : colonne protégée, jamais écrite par le
+  // client. Un échec n'empêche pas de renvoyer le concept.
+  async function saveProjectName(name: unknown) {
+    if (typeof name !== "string" || !name.trim()) return;
+    const { error } = await admin.from("profiles").update({ project_name: name.trim().slice(0, 80) }).eq("id", userId);
+    if (error) console.error("[generate-user-concept] project_name non enregistré :", error.message);
+  }
+
   if (!body.forceRegenerate) {
     const { data: cached } = await admin.from("user_concepts").select("*").eq("user_id", userId).maybeSingle();
-    if (cached) return json({ concept: cached, cached: true });
+    if (cached) {
+      // Comptes générés avant la migration 0030 : project_name rempli au
+      // premier passage par le cache.
+      await saveProjectName(cached.concept_name);
+      return json({ concept: cached, cached: true });
+    }
   }
 
   const { data: profileRow, error: profileErr } = await admin
@@ -311,7 +324,6 @@ Deno.serve(async (req) => {
     temps: profileRow.temps,
     objectifRevenu: typeof body.objectifRevenu === "number" ? body.objectifRevenu : null,
     delai: str(body.delai),
-    nomProjet: cleanFreeText(body.nomProjet, 40),
     influenceurs: str(body.influenceurs),
     clippers: str(body.clippers),
   });
@@ -410,6 +422,8 @@ Deno.serve(async (req) => {
     console.error("[generate-user-concept] échec de mise en cache :", saveErr.message);
     return json({ error: "Échec de sauvegarde du concept." }, 500);
   }
+
+  await saveProjectName(saved.concept_name);
 
   return json({ concept: saved, cached: false });
 });

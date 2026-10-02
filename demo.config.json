@@ -1,6 +1,11 @@
 {
-  "_doc": "Mode Vidéo (admin, sur le vrai site). questions = ids des questions affichées avant l'écran objectif de revenus ; ordre d'affichage = ordre du quiz public. Ids autorisés : attente, temps, secteur, reve, plateformes, blocage, lignesRouges. objectifRevenu et assemblage sont toujours ajoutés. slowMotion = ralenti actif au chargement (touche L pour basculer, R pour réinitialiser). url = adresse ouverte par npm run demo. Activer le mode depuis /admin (bouton Mode Vidéo) une fois par navigateur. Modifier ce fichier puis redéployer (build).",
-  "questions": ["attente", "temps", "secteur", "reve"],
+  "_doc": "Mode Vidéo (admin, sur le vrai site). questions = ids des questions affichées avant l'écran objectif de revenus ; ordre d'affichage = ordre du quiz public. Ids autorisés : attente, temps, secteur, reve, plateformes, blocage, lignesRouges. objectifRevenu (montant), delai et assemblage sont toujours ajoutés. slowMotion = ralenti actif au chargement (touche L pour basculer, R pour réinitialiser). url = adresse ouverte par npm run demo. Activer le mode depuis /admin (bouton Mode Vidéo) une fois par navigateur. Modifier ce fichier puis redéployer (build).",
+  "questions": [
+    "attente",
+    "temps",
+    "secteur",
+    "reve"
+  ],
   "slowMotion": false,
   "slowMotionFactor": 1.3,
   "url": "https://www.coldtrend.com/"
