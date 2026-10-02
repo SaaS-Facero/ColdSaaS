@@ -15294,9 +15294,25 @@ function connexionPage() {
         errorBanner.style.display = "block";
       }
 
+      // N'accepte qu'un chemin relatif de même origine (ex. "/resilier") :
+      // refuse "//hote", les antislashs (charCode 92) et les caractères de contrôle.
+      function safeRedirectPath(value) {
+        if (!value || value.charAt(0) !== "/" || value.charAt(1) === "/") return null;
+        for (var i = 0; i < value.length; i++) {
+          var code = value.charCodeAt(i);
+          if (code < 32 || code === 92 || code === 127) return null;
+        }
+        try {
+          if (new URL(value, window.location.origin).origin !== window.location.origin) return null;
+        } catch (err) {
+          return null;
+        }
+        return value;
+      }
+
       async function redirectAfterLogin() {
         var params = new URLSearchParams(window.location.search);
-        var redirect = params.get("redirect");
+        var redirect = safeRedirectPath(params.get("redirect"));
         if (redirect) {
           window.location.href = redirect;
           return;
