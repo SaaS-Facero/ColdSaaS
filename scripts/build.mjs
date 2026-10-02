@@ -2945,7 +2945,10 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
     bottom: 0;
     z-index: 3;
     padding: 18px 0 calc(6px + env(safe-area-inset-bottom));
-    background: linear-gradient(to top, var(--ink) 72%, rgba(10, 14, 26, 0));
+    background: linear-gradient(to top, rgba(10, 14, 26, 0.92) 45%, rgba(10, 14, 26, 0));
+  }
+  @media (min-width: 960px) {
+    .goal-screen--amount .goal-footer { background: none; }
   }
 
   /* -- Écran A : deux colonnes en desktop, aperçu au-dessus en mobile. */
@@ -3085,47 +3088,51 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
   .goal-slider__tick { position: absolute; transform: translateX(-50%); font-size: 11px; color: var(--steel); white-space: nowrap; }
 
   /* -- Ambiance de l'écran A : mesh cobalt lent, grain, halo au curseur.
-     Uniquement transform / opacity animés (les flous sont statiques). La
-     couche est absolute dans l'écran (lui-même absolute : jamais de
-     position: relative ajoutée à un écran). */
-  .goal-screen--amount > .goal-a { position: relative; z-index: 1; }
+     Posée sur TOUT l'overlay (pas dans l'écran, où elle formait un
+     rectangle à bords nets au milieu de la page) : z-index -1 dans le
+     contexte d'empilement de l'overlay = au-dessus de son fond, sous tout
+     le contenu. Apparaît en fondu quand l'écran Objectif est actif.
+     Uniquement transform / opacity animés, flous statiques. */
   .goal-ambient {
     position: absolute;
     inset: 0;
-    z-index: 0;
+    z-index: -1;
     overflow: hidden;
     pointer-events: none;
+    opacity: 0;
+    transition: opacity 700ms ease;
   }
+  .quiz-overlay.is-goal-ambient .goal-ambient { opacity: 1; }
   .goal-mesh {
     position: absolute;
-    width: 60vmax;
-    height: 60vmax;
+    width: 70vmax;
+    height: 70vmax;
     border-radius: 50%;
-    filter: blur(80px);
-    opacity: 0.32;
+    filter: blur(110px);
     will-change: transform;
   }
-  .goal-mesh--1 { left: -20vmax; top: -25vmax; background: #0047FF; animation: goal-mesh-1 22s ease-in-out infinite alternate; }
-  .goal-mesh--2 { right: -25vmax; top: 10vmax; background: #3D6BFF; opacity: 0.22; animation: goal-mesh-2 26s ease-in-out infinite alternate; }
-  .goal-mesh--3 { left: 10vmax; bottom: -35vmax; background: #0033B8; opacity: 0.28; animation: goal-mesh-3 30s ease-in-out infinite alternate; }
-  @keyframes goal-mesh-1 { to { transform: translate3d(14vmax, 8vmax, 0) scale(1.15); } }
-  @keyframes goal-mesh-2 { to { transform: translate3d(-12vmax, 10vmax, 0) scale(0.9); } }
-  @keyframes goal-mesh-3 { to { transform: translate3d(8vmax, -12vmax, 0) scale(1.1); } }
+  /* Lueurs discrètes dans les coins : le fond reste l'encre du site. */
+  .goal-mesh--1 { left: -35vmax; top: -40vmax; background: #0047FF; opacity: 0.2; animation: goal-mesh-1 24s ease-in-out infinite alternate; }
+  .goal-mesh--2 { right: -38vmax; top: -10vmax; background: #3D6BFF; opacity: 0.12; animation: goal-mesh-2 28s ease-in-out infinite alternate; }
+  .goal-mesh--3 { left: 5vmax; bottom: -50vmax; background: #0033B8; opacity: 0.16; animation: goal-mesh-3 32s ease-in-out infinite alternate; }
+  @keyframes goal-mesh-1 { to { transform: translate3d(10vmax, 6vmax, 0) scale(1.1); } }
+  @keyframes goal-mesh-2 { to { transform: translate3d(-8vmax, 8vmax, 0) scale(0.92); } }
+  @keyframes goal-mesh-3 { to { transform: translate3d(6vmax, -8vmax, 0) scale(1.08); } }
   .goal-grain {
     position: absolute;
     inset: 0;
-    opacity: 0.06;
+    opacity: 0.045;
     background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
   }
   .goal-halo {
     position: absolute;
     left: 0;
     top: 0;
-    width: 520px;
-    height: 520px;
-    margin: -260px 0 0 -260px;
+    width: 560px;
+    height: 560px;
+    margin: -280px 0 0 -280px;
     border-radius: 50%;
-    background: radial-gradient(circle, rgba(61, 107, 255, 0.22), transparent 62%);
+    background: radial-gradient(circle, rgba(61, 107, 255, 0.14), transparent 62%);
     opacity: 0;
     transition: opacity 400ms ease;
     will-change: transform;
@@ -7993,7 +8000,7 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
           slider.parentNode.style.setProperty("--goal-ratio", ratio.toFixed(4));
         }
         var input = document.getElementById("goal-amount-input");
-        if (input && source !== "input") input.value = v.toLocaleString("fr-FR");
+        if (input && source !== "input") input.value = GOAL.formatNumber(v);
         var glow = document.getElementById("goal-glow");
         if (glow) glow.style.opacity = (0.25 + ratio * 0.75).toFixed(3);
 
@@ -8028,7 +8035,7 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
         crossfadeText(document.getElementById("goal-equivalence"), GOAL.equivalence(v));
         if (v > 0) {
           countTo(document.getElementById("goal-clients-n"), clients, function (n) {
-            return Math.round(n).toLocaleString("fr-FR");
+            return GOAL.formatNumber(n);
           });
           setTextById("goal-clients-rest", "client" + (clients > 1 ? "s" : "") + " à " + price + " €/mois");
         } else {
@@ -8042,7 +8049,8 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
 
         updateSpaceGoal(v, tierChanged);
         scheduleAssistantReaction(v);
-        refreshEditBar();
+        if (quizTagsEl && quizTagsEl.querySelector('[data-tag-id="objectifRevenu"]')) renderTags();
+        else refreshEditBar();
         var screenEl = stage.querySelector('[data-id="objectifRevenu"]');
         if (screenEl) updateNextEnabled(screenEl);
       }
@@ -8169,9 +8177,10 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
         var y = 0;
         var frame = null;
         screenEl.addEventListener("pointermove", function (e) {
-          var rect = screenEl.getBoundingClientRect();
-          x = e.clientX - rect.left;
-          y = e.clientY - rect.top + screenEl.scrollTop;
+          // Le halo vit dans l'overlay (fixed, plein écran) : coordonnées
+          // directes de la fenêtre.
+          x = e.clientX;
+          y = e.clientY;
           halo.classList.add("is-on");
           if (frame) return;
           frame = window.requestAnimationFrame(function () {
@@ -8310,7 +8319,7 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
         setTextById(
           "delay-hyp",
           months
-            ? "Calcul : " + clients.toLocaleString("fr-FR") + " client" + (clients > 1 ? "s" : "") + " à " + result.price + " €/mois, d'ici " + months + " mois. Un repère, pas une promesse."
+            ? "Calcul : " + GOAL.formatNumber(clients) + " client" + (clients > 1 ? "s" : "") + " à " + result.price + " €/mois, d'ici " + months + " mois. Un repère, pas une promesse."
             : ""
         );
         setTextById("delay-msg", result.message);
@@ -8581,6 +8590,7 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
         var exitTo = direction === "back" ? 24 : -24;
 
         applyEcho(nextEl);
+        overlay.classList.toggle("is-goal-ambient", nextEl.getAttribute("data-id") === "objectifRevenu");
         if (nextEl.getAttribute("data-id") === "objectifRevenu") enterGoalAmount();
         if (nextEl.getAttribute("data-id") === "delai") renderDelay();
         if (nextEl.getAttribute("data-id") === "engagement") syncEngagementUI();
@@ -10845,6 +10855,7 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
       }
 
       function closeQuiz() {
+        overlay.classList.remove("is-goal-ambient");
         stopAssembly();
         if (overlay.classList.contains("is-open") && !reachedResult && currentScreenEl) {
           var stepName = currentScreenEl.getAttribute("data-step-name") || "inconnu";
@@ -12054,18 +12065,11 @@ function renderQuizQuestionScreen(question, index) {
       return `<span class="goal-slider__tick${edge}" style="left:${(GOAL.valueToRatio(v) * 100).toFixed(2)}%"><span class="goal-slider__tick-mark"></span><span class="goal-slider__tick-label">${label}</span></span>`;
     }).join("");
     const shortcuts = question.shortcuts
-      .map((v) => `<button type="button" class="goal-shortcut" data-goal-shortcut="${v}">${v.toLocaleString("fr-FR")} €</button>`)
+      .map((v) => `<button type="button" class="goal-shortcut" data-goal-shortcut="${v}">${GOAL.formatEuro(v)}</button>`)
       .join("");
     const price = GOAL.averagePrice();
     const clients = GOAL.clientsNeeded(initial, price);
     return `<div class="quiz-screen goal-screen goal-screen--amount" data-screen="question" data-index="${index}" data-id="${question.id}" data-step-name="${question.stepName}"${skipAttrs}${question.chapter ? ` data-chapter="${question.chapter}"` : ""}>
-          <div class="goal-ambient" aria-hidden="true">
-            <span class="goal-mesh goal-mesh--1"></span>
-            <span class="goal-mesh goal-mesh--2"></span>
-            <span class="goal-mesh goal-mesh--3"></span>
-            <span class="goal-grain"></span>
-            <span class="goal-halo" id="goal-halo"></span>
-          </div>
           <div class="goal-a">
             <div class="goal-a__preview">
               ${renderSpacePreview({ id: "goal-preview", goal: initial })}
@@ -12079,11 +12083,11 @@ function renderQuizQuestionScreen(question, index) {
                 <label class="goal-amount__field" for="goal-amount-input">
                   <span class="goal-amount__glow" id="goal-glow" aria-hidden="true" style="opacity:${(0.25 + GOAL.valueToRatio(initial) * 0.75).toFixed(3)}"></span>
                   <span class="goal-sr">Montant mensuel visé, en euros. Touche pour le saisir.</span>
-                  <input class="goal-amount__input" id="goal-amount-input" type="text" inputmode="numeric" autocomplete="off" enterkeyhint="done" maxlength="7" value="${initial.toLocaleString("fr-FR")}" aria-describedby="goal-equivalence goal-clients" />
+                  <input class="goal-amount__input" id="goal-amount-input" type="text" inputmode="numeric" autocomplete="off" enterkeyhint="done" maxlength="7" value="${GOAL.formatNumber(initial)}" aria-describedby="goal-equivalence goal-clients" />
                   <span class="goal-amount__unit" aria-hidden="true">€ / mois</span>
                 </label>
                 <p class="goal-amount__equiv goal-xfade" id="goal-equivalence" aria-live="polite"><span class="goal-xfade__item is-on">${GOAL.equivalence(initial)}</span><span class="goal-xfade__item"></span></p>
-                <p class="goal-amount__clients" id="goal-clients">≈ <span id="goal-clients-n">${clients.toLocaleString("fr-FR")}</span> <span id="goal-clients-rest">client${clients > 1 ? "s" : ""} à ${price} €/mois</span></p>
+                <p class="goal-amount__clients" id="goal-clients">≈ <span id="goal-clients-n">${GOAL.formatNumber(clients)}</span> <span id="goal-clients-rest">client${clients > 1 ? "s" : ""} à ${price} €/mois</span></p>
                 <div class="goal-shortcuts" role="group" aria-label="Montants rapides">${shortcuts}</div>
                 <div class="goal-slider" style="--goal-ratio:${GOAL.valueToRatio(initial).toFixed(4)}">
                   <div class="goal-slider__track" aria-hidden="true"><div class="goal-slider__fill"></div></div>
@@ -12298,6 +12302,15 @@ function renderQuizOverlay({ quiz, pricing, stripeLink }) {
   const chapter2Count = quiz.questions.filter((q) => q.chapter === 2).length;
 
   return `<div class="quiz-overlay" id="quiz-overlay" role="dialog" aria-modal="true" aria-label="Trouver ton SaaS">
+    <!-- Ambiance de l'écran Objectif : plein écran (overlay), en fondu
+         seulement quand cet écran est actif (classe is-goal-ambient). -->
+    <div class="goal-ambient" aria-hidden="true">
+      <span class="goal-mesh goal-mesh--1"></span>
+      <span class="goal-mesh goal-mesh--2"></span>
+      <span class="goal-mesh goal-mesh--3"></span>
+      <span class="goal-grain"></span>
+      <span class="goal-halo" id="goal-halo"></span>
+    </div>
     <div class="quiz-header">
       <button class="quiz-back" id="quiz-back-btn" type="button">${ICON_ARROW_LEFT} Retour</button>
       <span class="connected-badge" id="quiz-connected-badge" aria-live="polite">${ICON_CHECK_SMALL} Connecté</span>

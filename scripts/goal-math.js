@@ -106,8 +106,24 @@
   // national fiable à citer, on n'invente pas.
   var SMIC_NET_MENSUEL = 1426.3;
 
+  // Séparateur de milliers fixe (espace fine insécable U+202F), pour TOUS
+  // les nombres dès 1 000 : toLocaleString("fr-FR") ne groupe pas les
+  // nombres à 4 chiffres dans certains navigateurs (« 1000 € » à côté de
+  // « 5 000 € »), et Node ne fait pas toujours comme le navigateur.
+  var THIN_SPACE = String.fromCharCode(0x202f);
+
+  function formatNumber(n) {
+    var digits = String(Math.round(Math.abs(Number(n) || 0)));
+    var out = "";
+    while (digits.length > 3) {
+      out = THIN_SPACE + digits.slice(-3) + out;
+      digits = digits.slice(0, -3);
+    }
+    return (Number(n) < 0 ? "-" : "") + digits + out;
+  }
+
   function formatEuro(n) {
-    return Math.round(n).toLocaleString("fr-FR") + " €";
+    return formatNumber(n) + " €";
   }
 
   function equivalence(goal) {
@@ -139,7 +155,7 @@
     if (perWeek <= 0) return "Aucun client à trouver pour l'instant";
     if (perWeek < 1) return "Moins d'1 client par semaine à trouver";
     var n = Math.ceil(perWeek);
-    return "≈ " + n.toLocaleString("fr-FR") + " client" + (n > 1 ? "s" : "") + " par semaine à trouver";
+    return "≈ " + formatNumber(n) + " client" + (n > 1 ? "s" : "") + " par semaine à trouver";
   }
 
   // ---- Accompagnement : objectif × délai × heures/semaine --------------------
@@ -257,7 +273,8 @@
     assess: assess,
     formatGoal: formatGoal,
     assistantMessage: assistantMessage,
-    formatEuro: formatEuro
+    formatEuro: formatEuro,
+    formatNumber: formatNumber
   };
 
   root.ColdTrendGoal = api;
