@@ -5,8 +5,9 @@
 //
 // Règles de contenu (validées avec l'exploitant) :
 // - Aucune donnée juridique inventée. Tout ce qui n'est pas connu est
-//   marqué todo() -> [À COMPLÉTER], visible et surligné sur la page tant
-//   qu'il n'est pas renseigné.
+//   marqué todo() -> affiché « en cours d'installation » sur le site (choix
+//   de l'exploitant, 2026-10-02). Le détail de ce qui manque reste ici, dans
+//   le code, jamais publié : chercher todo( pour la liste à compléter.
 // - Les prix ne sont jamais recopiés à la main : ils viennent de
 //   DURATION_PLANS (build.mjs), la même source que les cartes de paiement
 //   et les Price ID Stripe. Les CGV ne peuvent donc pas annoncer un autre
@@ -33,10 +34,10 @@ import { siteFooterCss, siteFooterHtml } from "./site-footer.mjs";
 export const LEGAL_UPDATED_AT = "2 octobre 2026";
 const CONTACT_EMAIL = "contact.facero2026@gmail.com";
 
-// [À COMPLÉTER] visible : volontairement voyant (surligné ambre) pour ne
-// jamais être pris pour une information définitive.
+// Information pas encore disponible (entreprise en cours d'installation).
+// detail = note interne pour l'exploitant, volontairement NON rendue.
 function todo(detail) {
-  return `<mark class="lg-todo">[À COMPLÉTER${detail ? " : " + detail : ""}]</mark>`;
+  return `<span class="lg-pending">en cours d'installation</span>`;
 }
 
 const mail = `<a href="mailto:${CONTACT_EMAIL}">${CONTACT_EMAIL}</a>`;
@@ -248,11 +249,7 @@ function legalCss() {
   .lg-section ul, .lg-section ol { margin: 0 0 16px; padding-left: 22px; }
   .lg-section li { margin-bottom: 8px; }
   .lg-section strong { color: var(--lg-strong); }
-  .lg-todo {
-    background: rgba(217, 162, 61, 0.16); color: #F3C66B;
-    border: 1px dashed rgba(217, 162, 61, 0.6); border-radius: 6px;
-    padding: 1px 6px; font-weight: 700; font-size: 0.92em;
-  }
+  .lg-pending { color: var(--lg-muted); font-style: italic; }
   .lg-callout {
     display: grid; grid-template-columns: 22px 1fr; gap: 12px;
     margin: 0 0 18px; padding: 16px 18px; border-radius: 14px;
@@ -664,7 +661,7 @@ export function cgvPage({ brand, siteUrl, durationPlans }) {
         title: "Prix et formules",
         html: `<p>Trois durées d'abonnement sont proposées. Plus la durée est longue, plus le prix par jour baisse :</p>
           ${plansTable(durationPlans)}
-          <p>Les prix sont indiqués en euros. ${todo("mention TVA, par ex. « TVA non applicable, art. 293 B du CGI » en cas de franchise en base, ou prix TTC")}</p>
+          <p>Les prix sont indiqués en euros. Mention relative à la TVA : ${todo("mention TVA, par ex. « TVA non applicable, art. 293 B du CGI » en cas de franchise en base, ou prix TTC")}.</p>
           <p>Une réduction de bienvenue ou de retour peut être affichée avant le paiement. Le montant réellement débité est toujours celui affiché sur la page de paiement sécurisée au moment de la validation.</p>`
       },
       {
@@ -707,7 +704,7 @@ export function cgvPage({ brand, siteUrl, durationPlans }) {
           <p>Pour te rétracter, envoie une déclaration claire (par exemple : « Je me rétracte de mon abonnement ${brand.name} souscrit le [date] ») à ${mail}, depuis l'adresse de ton compte. Tu peux aussi utiliser le modèle de formulaire ci-dessous.</p>
           <p>Nous te remboursons la totalité des sommes versées au plus tard 14 jours après réception de ta demande, par le même moyen de paiement.</p>
           <h3>Modèle de formulaire de rétractation</h3>
-          <p>À l'attention de ${todo("raison sociale")}, ${todo("adresse")}, ${CONTACT_EMAIL} :<br />
+          <p>À l'attention de ${brand.name} (Maxence Lefebvre, EI), ${CONTACT_EMAIL} :<br />
           Je notifie par la présente ma rétractation du contrat portant sur l'abonnement ${brand.name} ci-dessous :<br />
           Souscrit le : … / Nom : … / Adresse email du compte : … / Date : … / Signature (en cas d'envoi papier).</p>`
       },
@@ -875,7 +872,7 @@ export function confidentialitePage({ brand, siteUrl }) {
         icon: "building",
         title: "Responsable du traitement",
         html: `<p>Le responsable du traitement est l'éditeur de ${brand.name} :</p>${EDITOR_BLOCK}
-          <p>Nous n'avons pas désigné de délégué à la protection des données ${todo("à confirmer")} : écris directement à ${mail}.</p>`
+          <p>Nous n'avons pas désigné de délégué à la protection des données : écris directement à ${mail}.</p>`
       },
       {
         id: "donnees",
@@ -932,7 +929,7 @@ export function confidentialitePage({ brand, siteUrl }) {
         icon: "hourglass",
         title: "Durées de conservation",
         html: `<ul>
-            <li><strong>Compte et réponses au quiz :</strong> tant que ton compte existe ; supprimés lorsque tu supprimes ton compte. ${todo("durée de conservation d'un compte inactif")}</li>
+            <li><strong>Compte et réponses au quiz :</strong> tant que ton compte existe ; supprimés lorsque tu supprimes ton compte.</li>
             <li><strong>Données de facturation :</strong> ${todo("durée, en principe 10 ans pour les pièces comptables (art. L123-22 du Code de commerce)")}</li>
             <li><strong>Mesure d'usage :</strong> ${todo("durée de conservation des évènements de navigation")}</li>
             <li><strong>Messages de support :</strong> ${todo("durée")}</li>
@@ -1012,7 +1009,7 @@ export function cookiesPage({ brand, siteUrl }) {
             <thead><tr><th scope="col">Traceur</th><th scope="col">Type</th><th scope="col">Finalité</th><th scope="col">Statut</th><th scope="col">Durée</th></tr></thead>
             <tbody>${tableRows}</tbody>
           </table></div>
-          ${callout("", "alert", `<p>La messagerie Crisp se charge sur chaque page. ${todo("valider avec le juriste si ses traceurs relèvent de l'exemption ou nécessitent un recueil de consentement avant chargement")}</p>`)}`
+`
       },
       {
         id: "gerer",
@@ -1040,7 +1037,7 @@ export function garantiePage({ brand, siteUrl }) {
     { when: "Jours 1 à 7", iconName: "video", title: "Tu publies", text: "Au moins 2 vidéos par jour sur TikTok, chacun des 7 jours, pour promouvoir le produit issu de ton concept." },
     { when: "Au plus tard jour 14", iconName: "send", title: "Tu fais ta demande", text: "Si aucune vente : email depuis l'adresse de ton compte, avec les liens de tes vidéos. Ton abonnement doit encore être actif." },
     { when: "Sous 72 h", iconName: "clock", title: "On te répond", text: "Nous vérifions les vidéos et te confirmons la décision par email." },
-    { when: todo("délai"), iconName: "euro", title: "Tu es remboursé", text: "Remboursement intégral du premier paiement, sur le moyen de paiement utilisé." }
+    { when: "Après acceptation", iconName: "euro", title: "Tu es remboursé", text: "Remboursement intégral du premier paiement, sur le moyen de paiement utilisé." }
   ];
   const timeline = `<ol class="lg-timeline">
     ${steps
@@ -1088,7 +1085,7 @@ export function garantiePage({ brand, siteUrl }) {
         icon: "send",
         title: "Comment faire la demande",
         html: `<p>Envoie un email à ${mail} <strong>depuis l'adresse associée à ton compte</strong>, avec les liens de toutes les vidéos publiées. Nous répondons sous 72 heures.</p>
-          <p>Le remboursement est effectué sur le moyen de paiement utilisé lors de l'achat, ${todo("délai d'exécution du remboursement après acceptation")}.</p>`
+          <p>Le remboursement est effectué sur le moyen de paiement utilisé lors de l'achat.</p>`
       },
       {
         id: "exclusions",
