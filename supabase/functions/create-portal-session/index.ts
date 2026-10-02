@@ -57,16 +57,41 @@ Deno.serve(async (req) => {
   const admin = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
   const { data: profile, error: profileErr } = await admin
     .from("profiles")
-    .select("stripe_customer_id")
+    .select("stripe_customer_id, stripe_subscription_id, subscription_status")
     .eq("id", userRes.user.id)
     .single();
   if (profileErr || !profile?.stripe_customer_id) {
     return json({ error: "Aucun abonnement associé à ce compte." }, 404);
   }
 
+  // { flow: "cancel" } (page /resilier, résiliation en 3 clics exigée par
+  // l'art. L215-1-1 du Code de la consommation) : ouvre directement l'écran
+  // de confirmation de résiliation du portail Stripe au lieu de l'accueil
+  // du portail. Nécessite "Annuler les abonnements" activé dans la
+  // configuration du portail Stripe. Sans abonnement résiliable connu :
+  // portail classique (jamais d'erreur bloquante pour résilier).
+  let flow: string | null = null;
+  try {
+    const body = await req.json();
+    if (body && body.flow === "cancel") flow = "cancel";
+  } catch {
+    // Corps vide (bouton "Gérer mon abonnement" de /compte) : portail classique.
+  }
+  const cancellable =
+    flow === "cancel" &&
+    typeof profile.stripe_subscription_id === "string" &&
+    profile.stripe_subscription_id &&
+    !["canceled", "incomplete_expired"].includes(profile.subscription_status ?? "");
+
   const params = new URLSearchParams();
   params.set("customer", profile.stripe_customer_id);
   params.set("return_url", `${SITE_URL}/compte`);
+  if (cancellable) {
+    params.set("flow_data[type]", "subscription_cancel");
+    params.set("flow_data[subscription_cancel][subscription]", profile.stripe_subscription_id);
+    params.set("flow_data[after_completion][type]", "redirect");
+    params.set("flow_data[after_completion][redirect][return_url]", `${SITE_URL}/compte`);
+  }
 
   let stripeRes: Response;
   try {
