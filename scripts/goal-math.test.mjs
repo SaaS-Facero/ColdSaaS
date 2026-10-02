@@ -62,3 +62,10 @@ test("aucun texte ne promet un résultat", () => {
     assert.doesNotMatch(a.message + a.perWeekText, /garanti|assuré|tu vas gagner|certain/i);
   }
 });
+
+test("assistant : un message par palier, honnête, sans promesse", () => {
+  const msgs = [0, 500, 3000, 15000, 40000].map((v) => G.assistantMessage(v));
+  assert.equal(new Set(msgs).size, 5);
+  for (const m of msgs) assert.doesNotMatch(m, /tu vas gagner|garanti[e]? |assuré|certain/i);
+  assert.match(G.assistantMessage(40000), /rien te garantir/);
+});

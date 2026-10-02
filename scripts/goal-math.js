@@ -210,6 +210,25 @@
     };
   }
 
+  // ---- Assistant ColdTrend (écran Montant) -----------------------------------
+  // Réaction au montant choisi, par palier. Textes fixes et déterministes
+  // (aucun LLM, aucune donnée inventée) : bienveillants, honnêtes, jamais une
+  // promesse de résultat. La bulle est présentée comme un assistant à
+  // réponses automatiques, jamais comme un humain.
+  var ASSISTANT_MESSAGES = {
+    zero: "Choisis un montant, même modeste : on construit ton plan à partir de là.",
+    premiers: "Un premier objectif concret. Décrocher tes premiers clients, c'est l'étape qui compte le plus.",
+    solide: "Un vrai complément de revenus. Ça se construit avec de la régularité, et on va la planifier.",
+    ambitieux: "Objectif ambitieux. On va le découper en étapes, pour que chaque semaine ait un cap clair.",
+    tres_ambitieux: "Très ambitieux, et viser haut, c'est permis. Je ne peux rien te garantir : à l'étape suivante, on regarde honnêtement le rythme que ça demande."
+  };
+
+  function assistantMessage(goal) {
+    var v = Number(goal) || 0;
+    if (v <= 0) return ASSISTANT_MESSAGES.zero;
+    return ASSISTANT_MESSAGES[tier(v).id];
+  }
+
   // Libellés partagés (titre en écho de l'écran Délai, puce récap).
   function formatGoal(goal) {
     var v = Number(goal) || 0;
@@ -237,6 +256,7 @@
     suggestedMonths: suggestedMonths,
     assess: assess,
     formatGoal: formatGoal,
+    assistantMessage: assistantMessage,
     formatEuro: formatEuro
   };
 

@@ -3004,7 +3004,6 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
     letter-spacing: -0.02em;
     font-variant-numeric: tabular-nums;
     text-align: right;
-    text-shadow: 0 0 calc(8px + var(--goal-glow, 0) * 14px) rgba(0, 71, 255, 0.5);
   }
   .goal-amount__input:focus { outline: none; border-bottom-color: var(--cobalt-soft); }
   .goal-amount__unit { font-size: 18px; font-weight: 700; color: var(--steel); }
@@ -3085,16 +3084,130 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
   .goal-slider__ticks { position: absolute; left: 14px; right: 14px; bottom: 0; height: 16px; }
   .goal-slider__tick { position: absolute; transform: translateX(-50%); font-size: 11px; color: var(--steel); white-space: nowrap; }
 
+  /* -- Ambiance de l'écran A : mesh cobalt lent, grain, halo au curseur.
+     Uniquement transform / opacity animés (les flous sont statiques). La
+     couche est absolute dans l'écran (lui-même absolute : jamais de
+     position: relative ajoutée à un écran). */
+  .goal-screen--amount > .goal-a { position: relative; z-index: 1; }
+  .goal-ambient {
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+    overflow: hidden;
+    pointer-events: none;
+  }
+  .goal-mesh {
+    position: absolute;
+    width: 60vmax;
+    height: 60vmax;
+    border-radius: 50%;
+    filter: blur(80px);
+    opacity: 0.32;
+    will-change: transform;
+  }
+  .goal-mesh--1 { left: -20vmax; top: -25vmax; background: #0047FF; animation: goal-mesh-1 22s ease-in-out infinite alternate; }
+  .goal-mesh--2 { right: -25vmax; top: 10vmax; background: #3D6BFF; opacity: 0.22; animation: goal-mesh-2 26s ease-in-out infinite alternate; }
+  .goal-mesh--3 { left: 10vmax; bottom: -35vmax; background: #0033B8; opacity: 0.28; animation: goal-mesh-3 30s ease-in-out infinite alternate; }
+  @keyframes goal-mesh-1 { to { transform: translate3d(14vmax, 8vmax, 0) scale(1.15); } }
+  @keyframes goal-mesh-2 { to { transform: translate3d(-12vmax, 10vmax, 0) scale(0.9); } }
+  @keyframes goal-mesh-3 { to { transform: translate3d(8vmax, -12vmax, 0) scale(1.1); } }
+  .goal-grain {
+    position: absolute;
+    inset: 0;
+    opacity: 0.06;
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
+  }
+  .goal-halo {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 520px;
+    height: 520px;
+    margin: -260px 0 0 -260px;
+    border-radius: 50%;
+    background: radial-gradient(circle, rgba(61, 107, 255, 0.22), transparent 62%);
+    opacity: 0;
+    transition: opacity 400ms ease;
+    will-change: transform;
+  }
+  .goal-halo.is-on { opacity: 1; }
+
+  /* Halo derrière le montant : son opacité suit le montant (au lieu
+     d'animer un text-shadow). */
+  .goal-amount__field { position: relative; }
+  .goal-amount__glow {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    width: 260px;
+    height: 120px;
+    margin: -60px 0 0 -130px;
+    border-radius: 50%;
+    background: radial-gradient(closest-side, rgba(0, 71, 255, 0.55), transparent);
+    filter: blur(6px);
+    pointer-events: none;
+    transition: opacity 200ms ease;
+  }
+  .goal-amount__input, .goal-amount__unit { position: relative; }
+
+  /* Équivalence en fondu croisé : deux libellés superposés. */
+  .goal-xfade { display: grid; }
+  .goal-xfade__item {
+    grid-area: 1 / 1;
+    opacity: 0;
+    transform: translateY(4px);
+    transition: opacity 260ms ease, transform 260ms ease;
+  }
+  .goal-xfade__item.is-on { opacity: 1; transform: none; }
+
+  /* Impulsion du badge au franchissement d'un palier. */
+  .goal-amount__badge { position: relative; }
+
+  /* CTA qui se transforme en check à la validation. */
+  .goal-cta { position: relative; overflow: hidden; }
+  .goal-cta__label { display: inline-block; transition: opacity 160ms ease, transform 160ms ease; }
+  .goal-cta__check {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    width: 26px;
+    height: 26px;
+    margin: -13px 0 0 -13px;
+    display: grid;
+    place-items: center;
+    border-radius: 50%;
+    background: #fff;
+    color: var(--cobalt);
+    opacity: 0;
+    transform: scale(0.3);
+    transition: opacity 180ms ease, transform 380ms cubic-bezier(0.34, 1.56, 0.64, 1);
+  }
+  .goal-cta__check svg { width: 16px; height: 16px; }
+  .goal-cta.is-validated .goal-cta__label { opacity: 0; transform: translateY(-6px); }
+  .goal-cta.is-validated .goal-cta__check { opacity: 1; transform: scale(1); }
+
+  /* Graduations alignées sur la course réelle du pouce (14px de chaque
+     côté = demi-poignée) et sur l'échelle non linéaire. */
+  .goal-slider__track { left: 14px; right: 14px; }
+  .goal-slider__ticks { left: 14px; right: 14px; height: 22px; }
+  .goal-slider__tick { position: absolute; top: 0; display: flex; flex-direction: column; align-items: center; transform: translateX(-50%); }
+  .goal-slider__tick.is-first { align-items: flex-start; transform: translateX(-1px); }
+  .goal-slider__tick.is-last { align-items: flex-end; transform: translateX(calc(-100% + 1px)); }
+  .goal-slider__tick-mark { width: 2px; height: 5px; border-radius: 1px; background: rgba(255, 255, 255, 0.28); }
+  .goal-slider__tick-label { margin-top: 3px; font-size: 11px; color: var(--steel); white-space: nowrap; }
+  .goal-slider { padding-bottom: 30px; }
+
   /* -- Aperçu de l'espace (renderSpacePreview) -- */
-  .space-preview { margin: 0; --sp-ratio: 0; }
-  .space-preview__window {
+  .space-preview { margin: 0; }
+  .sp-window {
+    position: relative;
     border-radius: 18px;
     border: 1px solid rgba(255, 255, 255, 0.1);
-    background: linear-gradient(160deg, rgba(0, 71, 255, 0.1), rgba(10, 14, 26, 0.96) 45%);
+    background: linear-gradient(160deg, rgba(0, 71, 255, 0.12), rgba(10, 14, 26, 0.94) 45%);
     box-shadow: 0 30px 80px -40px rgba(0, 71, 255, 0.7), inset 0 1px 0 rgba(255, 255, 255, 0.06);
     overflow: hidden;
   }
-  .space-preview__bar {
+  .sp-bar {
     display: flex;
     align-items: center;
     gap: 10px;
@@ -3103,27 +3216,41 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
     font-size: 12px;
     color: var(--steel);
   }
-  .space-preview__dots { display: inline-flex; gap: 5px; }
-  .space-preview__dots i { width: 8px; height: 8px; border-radius: 50%; background: rgba(255, 255, 255, 0.16); }
-  .space-preview__body { display: grid; grid-template-columns: 116px minmax(0, 1fr); min-height: 260px; }
-  .sp-nav { list-style: none; margin: 0; padding: 14px 10px; border-right: 1px solid rgba(255, 255, 255, 0.07); display: flex; flex-direction: column; gap: 4px; }
-  .sp-nav__brand {
-    width: 28px;
-    height: 28px;
-    margin: 0 0 10px 6px;
-    border-radius: 8px;
-    display: grid;
-    place-items: center;
-    background: var(--cobalt);
-    color: #fff;
-    font-weight: 800;
-    font-size: 14px;
+  .sp-bar__dots { display: inline-flex; gap: 5px; }
+  .sp-bar__dots i { width: 8px; height: 8px; border-radius: 50%; background: rgba(255, 255, 255, 0.16); }
+  .sp-body { display: grid; grid-template-columns: 128px minmax(0, 1fr); }
+
+  /* Checklist « Ton plan ». */
+  .sp-plan { padding: 14px 10px 14px 12px; border-right: 1px solid rgba(255, 255, 255, 0.07); }
+  .sp-plan__title { margin: 0 0 10px; font-size: 11px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: #9DB4FF; }
+  .sp-plan__list { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+  .sp-step { position: relative; display: flex; align-items: center; gap: 8px; padding: 6px 6px; border-radius: 9px; font-size: 13px; color: var(--steel); overflow: hidden; }
+  .sp-step__icon { position: relative; flex: none; width: 18px; height: 18px; border-radius: 50%; border: 1.5px solid rgba(255, 255, 255, 0.22); display: grid; place-items: center; }
+  .sp-step__check { position: absolute; inset: -1.5px; display: grid; place-items: center; border-radius: 50%; background: #22C55E; color: #06120A; opacity: 0; transform: scale(0.4); transition: opacity 180ms ease, transform 380ms cubic-bezier(0.34, 1.56, 0.64, 1); }
+  .sp-step__pulse { position: absolute; inset: 3px; border-radius: 50%; background: var(--cobalt-soft); opacity: 0; }
+  .sp-step__lock { display: grid; place-items: center; }
+  .sp-step__lock svg { width: 10px; height: 10px; }
+  .sp-step[data-status="done"] { color: var(--paper-soft); }
+  .sp-step[data-status="done"] .sp-step__icon { border-color: transparent; }
+  .sp-step[data-status="done"] .sp-step__check { opacity: 1; transform: scale(1); }
+  .sp-step[data-status="current"] { color: #fff; background: rgba(0, 71, 255, 0.18); }
+  .sp-step[data-status="current"] .sp-step__icon { border-color: var(--cobalt-soft); }
+  .sp-step[data-status="current"] .sp-step__pulse { animation: sp-pulse 1.6s ease-in-out infinite; }
+  @keyframes sp-pulse { 0%, 100% { opacity: 0.35; transform: scale(0.7); } 50% { opacity: 1; transform: scale(1); } }
+  .sp-step[data-status="locked"] { color: rgba(255, 255, 255, 0.4); }
+  .sp-step[data-status="locked"] .sp-step__icon { border-style: dashed; }
+  .sp-step__shimmer {
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(100deg, transparent 30%, rgba(255, 255, 255, 0.1) 50%, transparent 70%);
+    transform: translateX(-100%);
+    animation: sp-shimmer 2.8s ease-in-out infinite;
   }
-  .sp-nav__item { display: flex; align-items: center; justify-content: space-between; padding: 7px 8px; border-radius: 8px; font-size: 12px; color: var(--steel); }
-  .sp-nav__item.is-active { background: rgba(0, 71, 255, 0.18); color: #fff; }
-  .sp-nav__lock svg { width: 12px; height: 12px; opacity: 0.7; }
+  @keyframes sp-shimmer { 60%, 100% { transform: translateX(100%); } }
+
   .sp-main { padding: 14px; display: grid; gap: 10px; align-content: start; }
-  .sp-eyebrow { margin: 0; font-size: 11px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: #9DB4FF; }
+  .sp-welcome { margin: 0; font-size: 14px; font-weight: 700; color: #fff; }
+  .sp-cards { display: grid; gap: 10px; }
   .sp-card {
     padding: 12px 14px;
     border-radius: 14px;
@@ -3132,48 +3259,142 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
     text-align: left;
   }
   .sp-card__title { margin: 0 0 8px; font-size: 13px; font-weight: 700; color: #fff; }
-  .sp-list { margin: 0; display: grid; gap: 6px; }
-  .sp-list div { display: flex; justify-content: space-between; gap: 10px; font-size: 12px; }
-  .sp-list dt { color: var(--steel); }
-  .sp-list dd { margin: 0; color: var(--paper-soft); font-weight: 600; text-align: right; transition: color 300ms ease; }
-  .sp-list dd.is-empty { color: rgba(255, 255, 255, 0.3); font-weight: 400; }
-  .sp-card__hint { margin: 8px 0 0; font-size: 11px; color: var(--steel); }
-  .sp-gauge { position: relative; max-width: 220px; margin: 0 auto; }
-  .sp-gauge__svg { display: block; width: 100%; height: auto; overflow: visible; }
-  .sp-gauge__track, .sp-gauge__arc { fill: none; stroke-width: 9; stroke-linecap: round; }
-  .sp-gauge__track { stroke: rgba(255, 255, 255, 0.1); }
-  .sp-gauge__arc {
-    stroke: var(--cobalt-soft);
-    filter: drop-shadow(0 0 6px rgba(0, 71, 255, 0.6));
-    transition: stroke-dashoffset 260ms cubic-bezier(0.22, 1, 0.36, 1);
+  .sp-list { margin: 0; display: grid; gap: 7px; }
+  .sp-row { display: flex; justify-content: space-between; align-items: center; gap: 10px; font-size: 13px; }
+  .sp-row dt { color: var(--steel); }
+  .sp-row dd { position: relative; margin: 0; display: flex; align-items: center; gap: 6px; min-height: 18px; }
+  .sp-val { color: var(--paper-soft); font-weight: 600; text-align: right; }
+  .sp-val.is-empty { color: rgba(255, 255, 255, 0.32); font-weight: 400; }
+  .sp-val .sp-char { display: inline-block; white-space: pre; }
+  .sp-skel {
+    position: absolute;
+    right: 24px;
+    width: 70px;
+    height: 10px;
+    border-radius: 5px;
+    background: rgba(255, 255, 255, 0.1);
+    opacity: 0;
   }
-  .sp-gauge__value { position: absolute; left: 0; right: 0; bottom: 4px; margin: 0; text-align: center; line-height: 1.2; }
-  .sp-gauge__value strong { display: block; font-size: 20px; color: #fff; font-variant-numeric: tabular-nums; }
-  .sp-gauge__value span { font-size: 11px; color: var(--steel); }
-  .sp-gauge__min, .sp-gauge__max { position: absolute; bottom: -16px; font-size: 10px; color: var(--steel); }
-  .sp-gauge__min { left: 0; }
-  .sp-gauge__max { right: 0; }
-  .sp-card--goal .sp-card__hint { margin-top: 20px; }
+  .sp-row__check { flex: none; width: 16px; height: 16px; display: grid; place-items: center; border-radius: 50%; background: rgba(34, 197, 94, 0.2); color: #4ADE80; opacity: 0; transform: scale(0.4); }
+  .sp-row.is-filled .sp-row__check { opacity: 1; transform: none; }
+  .sp-row__check svg { width: 10px; height: 10px; }
 
-  /* Mobile : aperçu compact (sans navigation, cartes côte à côte). */
+  /* Jauge (transform only). Cadran : demi-cercle masqué en anneau. */
+  .sp-gauge { position: relative; max-width: 220px; margin: 0 auto; }
+  .sp-gauge__dial {
+    position: relative;
+    width: 100%;
+    aspect-ratio: 2 / 1;
+    overflow: hidden;
+    -webkit-mask: radial-gradient(circle at 50% 100%, transparent 62%, #000 calc(62% + 1px));
+    mask: radial-gradient(circle at 50% 100%, transparent 62%, #000 calc(62% + 1px));
+  }
+  .sp-gauge__track { position: absolute; inset: 0 0 -100% 0; border-radius: 50%; background: rgba(255, 255, 255, 0.1); }
+  /* Demi-disque inférieur, pivot au centre du cercle : rotate(0) = caché,
+     rotate(180deg) = cadran plein. Le JS l'anime en spring. */
+  .sp-gauge__sweep {
+    position: absolute;
+    left: 0;
+    top: 100%;
+    width: 100%;
+    height: 100%;
+    border-radius: 0 0 999px 999px;
+    overflow: hidden;
+    transform-origin: 50% 0;
+    will-change: transform;
+  }
+  .sp-gauge__tone { position: absolute; inset: 0; opacity: 0; transition: opacity 300ms ease; }
+  .sp-gauge__tone[data-tone="0"] { background: #6E8FFF; }
+  .sp-gauge__tone[data-tone="1"] { background: #3D6BFF; }
+  .sp-gauge__tone[data-tone="2"] { background: linear-gradient(90deg, #0047FF, #5B6CFF); }
+  .sp-gauge__tone[data-tone="3"] { background: linear-gradient(90deg, #0047FF, #7FA0FF); }
+  .sp-gauge__pulse {
+    position: absolute;
+    left: 50%;
+    top: 0;
+    width: 120%;
+    height: 120%;
+    margin-left: -60%;
+    border-radius: 50%;
+    background: radial-gradient(closest-side, rgba(61, 107, 255, 0.55), transparent);
+    opacity: 0;
+    pointer-events: none;
+  }
+  .sp-gauge__value { position: absolute; left: 0; right: 0; bottom: 0; margin: 0; text-align: center; line-height: 1.15; }
+  .sp-gauge__value strong { display: block; font-size: 22px; font-weight: 800; color: #fff; font-variant-numeric: tabular-nums; }
+  .sp-gauge__value span { font-size: 12px; color: var(--paper-soft); }
+  .sp-gauge__scale { display: flex; justify-content: space-between; max-width: 220px; margin: 6px auto 0; font-size: 12px; font-weight: 600; color: var(--paper-soft); }
+  .sp-card__hint { margin: 8px 0 0; font-size: 12px; color: var(--steel); }
+
+  /* Assistant : présenté comme tel (icône robot, mention « réponses
+     automatiques »), indicateur de saisie avant chaque réponse. */
+  .sp-assistant { display: flex; align-items: flex-start; gap: 8px; }
+  .sp-assistant__avatar { flex: none; width: 28px; height: 28px; border-radius: 9px; display: grid; place-items: center; background: rgba(0, 71, 255, 0.25); color: #C8D4FF; border: 1px solid rgba(61, 107, 255, 0.4); }
+  .sp-assistant__bubble { position: relative; flex: 1; min-width: 0; padding: 9px 12px; border-radius: 4px 14px 14px 14px; background: rgba(255, 255, 255, 0.06); border: 1px solid rgba(255, 255, 255, 0.08); }
+  .sp-assistant__name { margin: 0 0 3px; font-size: 11px; font-weight: 700; color: #9DB4FF; }
+  .sp-assistant__name span { font-weight: 400; color: var(--steel); }
+  .sp-assistant__text { margin: 0; font-size: 13px; line-height: 1.45; color: var(--paper-soft); transition: opacity 220ms ease, transform 220ms ease; }
+  .sp-assistant__typing { position: absolute; left: 12px; bottom: 11px; margin: 0; display: flex; gap: 4px; opacity: 0; transition: opacity 160ms ease; }
+  .sp-assistant__typing i { width: 6px; height: 6px; border-radius: 50%; background: #9DB4FF; animation: sp-typing 1s ease-in-out infinite; }
+  .sp-assistant__typing i:nth-child(2) { animation-delay: 150ms; }
+  .sp-assistant__typing i:nth-child(3) { animation-delay: 300ms; }
+  @keyframes sp-typing { 0%, 100% { opacity: 0.3; transform: translateY(0); } 50% { opacity: 1; transform: translateY(-3px); } }
+  .sp-assistant[data-state="typing"] .sp-assistant__typing { opacity: 1; }
+  .sp-assistant[data-state="typing"] .sp-assistant__text { opacity: 0; transform: translateY(3px); }
+
+  /* Mobile : 1 colonne, aperçu compact -- plan en ligne, cartes côte à
+     côte, assistant sur une bulle courte. */
   @media (max-width: 959px) {
-    .space-preview__body { grid-template-columns: 1fr; min-height: 0; }
-    .sp-nav, .sp-eyebrow, .sp-card__hint { display: none; }
-    .sp-main { grid-template-columns: 1fr 1fr; gap: 8px; padding: 10px; }
-    .sp-card { padding: 10px; }
-    .sp-list div { flex-direction: column; gap: 0; }
-    .sp-list dd { text-align: left; }
-    .sp-gauge__value strong { font-size: 16px; }
-    .sp-gauge__min, .sp-gauge__max { display: none; }
-    /* Assez compact pour que le slider reste visible sans défiler au-dessus
-       du CTA collé en bas (iPhone 375 x 812). */
-    .space-preview__bar { display: none; }
-    .sp-card__title { margin-bottom: 4px; font-size: 12px; }
-    .sp-gauge { max-width: 132px; }
-    .goal-a { gap: 12px; }
-    .goal-lead { margin-bottom: 12px; }
-    .goal-shortcuts { margin-top: 12px; }
-    .goal-slider { margin-top: 12px; }
+    .sp-bar { display: none; }
+    .sp-body { grid-template-columns: 1fr; }
+    .sp-plan { padding: 8px 10px; border-right: 0; border-bottom: 1px solid rgba(255, 255, 255, 0.07); }
+    .sp-plan__title { display: none; }
+    .sp-plan__list { grid-template-columns: repeat(4, auto); justify-content: space-between; gap: 4px; }
+    .sp-step { padding: 4px 6px; font-size: 12px; gap: 5px; }
+    .sp-step__icon { width: 15px; height: 15px; }
+    /* Jauge et assistant côte à côte ; « Ton projet » masqué : les puces
+       Cible / Temps juste au-dessus affichent déjà ces réponses, et le
+       slider doit rester visible au-dessus du CTA sans défiler. */
+    .sp-main { padding: 10px; gap: 8px; grid-template-columns: minmax(0, 1fr) minmax(0, 1.15fr); align-items: stretch; }
+    .sp-welcome { grid-column: 1 / -1; font-size: 13px; }
+    .sp-cards { display: contents; }
+    .sp-card--project { display: none; }
+    /* Le chapitre est déjà porté par la barre de progression et la
+       checklist « Ton plan » : en-tête masqué ici pour garder le slider
+       au-dessus du CTA collé en bas. */
+    .goal-screen--amount .quiz-chapter-icon,
+    .goal-screen--amount .quiz-chapter-label { display: none; }
+    .goal-screen--amount .quiz-question-title { margin-bottom: 8px; }
+    .sp-plan { padding: 6px 8px; }
+    .sp-main { gap: 6px; }
+    .sp-card { padding: 9px 10px; }
+    .sp-card__title { font-size: 12px; margin-bottom: 4px; }
+    .sp-row { flex-direction: column; align-items: flex-start; gap: 0; font-size: 12px; }
+    .sp-row dt { font-size: 11px; }
+    .sp-val { text-align: left; font-size: 12px; }
+    .sp-row__check { display: none; }
+    .sp-skel { left: 0; right: auto; }
+    .sp-card__hint { display: none; }
+    .sp-gauge { max-width: 140px; }
+    .sp-gauge__value strong { font-size: 17px; }
+    .sp-gauge__value span { font-size: 11px; }
+    .sp-gauge__scale { max-width: 140px; font-size: 11px; margin-top: 3px; }
+    .sp-assistant { align-items: stretch; }
+    .sp-assistant__name { display: none; }
+    .sp-assistant__avatar { display: none; }
+    .sp-assistant__bubble { padding: 8px 10px; border-radius: 14px; display: flex; flex-direction: column; justify-content: center; }
+    /* Mention « assistant » gardée en mobile, sur une ligne. */
+    .sp-assistant__bubble::before { content: "Assistant · automatique"; margin-bottom: 3px; font-size: 10px; font-weight: 700; letter-spacing: 0.04em; color: #9DB4FF; }
+    .sp-assistant__text { font-size: 12px; line-height: 1.4; }
+    .sp-card--goal .sp-card__title { font-size: 11px; }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .goal-mesh { animation: none; }
+    .goal-halo { display: none; }
+    .sp-step__shimmer, .sp-assistant__typing i { animation: none; }
+    .sp-step[data-status="current"] .sp-step__pulse { animation: none; opacity: 0.8; transform: none; }
+    .goal-xfade__item, .goal-cta__label, .goal-cta__check, .sp-step__check, .sp-gauge__tone, .sp-assistant__text, .goal-amount__glow { transition: none; }
   }
 
   /* -- Écran B : frise de 6 jalons. -- */
@@ -3279,7 +3500,7 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
   .delay-card__suggest[hidden] { display: none; }
   .delay-card__suggest:hover { background: rgba(0, 71, 255, 0.2); }
 
-  /* Montant qui « vole » de l'écran A vers la puce récap (voir flyGoalToTag). */
+  /* Montant qui « vole » de l'écran A vers la puce récap (voir flyGoalTo). */
   .goal-fly {
     position: fixed;
     z-index: 80;
@@ -3292,7 +3513,7 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
   }
 
   @media (prefers-reduced-motion: reduce) {
-    .goal-amount__badge, .goal-shortcut, .sp-gauge__arc, .sp-list dd,
+    .goal-amount__badge, .goal-shortcut,
     .delay-timeline__fill, .delay-stop__dot, .delay-card { transition: none; }
     .goal-slider__input::-webkit-slider-thumb { transition: none; }
   }
@@ -3923,12 +4144,13 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
     justify-content: space-between;
     gap: 12px;
     margin: 12px 20px 0;
-    padding: 10px 14px;
-    border-radius: 12px;
-    background: rgba(0, 71, 255, 0.12);
-    border: 1px solid rgba(0, 71, 255, 0.35);
-    font-size: 13px;
-    color: var(--paper-soft);
+    /* Discret : visible uniquement en mode édition (voir showEditBar). */
+    padding: 7px 12px;
+    border-radius: 10px;
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    font-size: 12px;
+    color: var(--steel);
   }
 
   .quiz-edit-bar.is-visible {
@@ -5068,8 +5290,7 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
 
   /* Budget / objectif de revenu -- dégradé radial doux centré sur le
      contenu, Cobalt Blue très dilué. Pas de position: relative -- idem. */
-  .quiz-screen[data-id="budget"]::before,
-  .quiz-screen[data-id="objectifRevenu"]::before {
+  .quiz-screen[data-id="budget"]::before {
     content: "";
     position: absolute;
     inset: 0;
@@ -7435,13 +7656,52 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
       var EMAIL_RE = /^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/;
 
       // ---- Écrans objectif : A « Montant » et B « Délai » -----------------
-      // Tous les chiffres viennent de window.ColdTrendGoal
-      // (scripts/goal-math.js, servi en /js/goal-math.js) : paliers, slider
-      // non linéaire, prix moyen B2B/B2C, équivalences, rythme hebdomadaire
-      // et ton de l'accompagnement. Ici, uniquement de l'affichage.
+      // Tous les chiffres et les messages de l'assistant viennent de
+      // window.ColdTrendGoal (scripts/goal-math.js, servi en
+      // /js/goal-math.js). Ici : affichage et mouvement uniquement.
+      //
+      // Règles de mouvement (écran A) : seules transform et opacity sont
+      // animées (WAAPI, transitions CSS ou rAF qui écrit un transform) ;
+      // le texte change par contenu (count-up), jamais par une propriété
+      // animée coûteuse. prefers-reduced-motion : état final immédiat, pas
+      // de vol, pas de halo, pas de ressort.
+      //
+      // TIMELINE D'ENTRÉE (playSpaceIntro, t = arrivée sur l'écran A, < 1,2 s)
+      //   0 ms     fenêtre « Ton espace » : opacity 0 -> 1, translateY 14 -> 0,
+      //            scale .97 -> 1 (320 ms, ease-out expo)
+      //   80 ms    checklist « Ton plan » : translateX -18 -> 0 (320 ms)
+      //   120 ms   étapes Profil / Objectif / Délai / Concept en cascade,
+      //            +50 ms chacune (260 ms)
+      //   160 ms   cartes « Ton projet » puis « Objectif mensuel », +80 ms
+      //            (320 ms) ; squelettes visibles dans « Ton projet »
+      //   240 ms   jauge : ressort 0 -> objectif ; montant en count-up
+      //   380 ms   réponse 1 écrite lettre par lettre (fondu + translateY),
+      //            squelette qui s'efface, check en ressort à +140 ms ;
+      //            réponses 2 et 3 à 500 et 620 ms
+      //   760 ms   message d'accueil (prénom Google si connu)
+      //   820 ms   bulle Assistant : apparition + indicateur de saisie
+      //   1000 ms  texte de l'assistant (fondu 220 ms) -> fin à ~1,22 s
+      //
+      // TIMELINE DE VALIDATION (playGoalValidation, t = clic)
+      //   0 ms     bouton -> check (libellé opacity 0, check scale .3 -> 1)
+      //   160 ms   le montant « vole » vers la puce récap et vers l'étape
+      //            Objectif de la checklist (650 ms, ease-out)
+      //   ~810 ms  atterrissage : puce en scale 1.15 -> 1, Objectif coché,
+      //            Délai passe « en cours »
+      //   820 ms   transition partagée vers l'écran B (slide horizontal du
+      //            quiz ; la puce récap reste en place d'un écran à l'autre)
       var GOAL = window.ColdTrendGoal;
+      var GOAL_EASE = "cubic-bezier(0.16, 1, 0.3, 1)";
+      var GOAL_SPRING = "cubic-bezier(0.34, 1.56, 0.64, 1)";
+      var GOAL_PREVIEW_ID = "goal-preview";
       var goalTierIndex = null;
       var goalBadgeTimer = null;
+      var goalAssistantTimer = null;
+      var goalAssistantSaid = "";
+      var goalIntroPlayed = false;
+      var goalIntroRunning = false;
+      var goalValidating = false;
+      var welcomeFirstName = null;
 
       // Libellés de l'aperçu (réponses réelles uniquement).
       var PREVIEW_PLATFORM_LABELS = {
@@ -7452,9 +7712,9 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
         "4_plus": "4 ou plus"
       };
 
-      function goalVibrate(ms) {
+      function goalVibrate(pattern) {
         try {
-          if (navigator.vibrate) navigator.vibrate(ms);
+          if (navigator.vibrate) navigator.vibrate(pattern);
         } catch (err) {
           /* repli silencieux (iOS) */
         }
@@ -7465,101 +7725,15 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
         if (el && el.textContent !== text) el.textContent = text;
       }
 
+      function goalPreview() {
+        return document.getElementById(GOAL_PREVIEW_ID);
+      }
+
       // Valeur par défaut de l'écran A : celle rendue au build (attribut
       // value d'origine du slider), jamais une valeur codée deux fois.
       function defaultGoal() {
         var slider = document.getElementById("goal-slider");
         return slider && GOAL ? GOAL.positionToValue(slider.defaultValue) : 1000;
-      }
-
-      // Aperçu « Ton espace prend vie » (composant renderSpacePreview) :
-      // remplit les champs data-sp avec les réponses déjà données. Une
-      // réponse absente reste « À définir », jamais une valeur inventée.
-      function updateSpacePreview(id) {
-        var root = document.getElementById(id);
-        if (!root || !GOAL) return;
-        var goal = typeof answers.objectifRevenu === "number" ? answers.objectifRevenu : defaultGoal();
-        var values = {
-          secteur:
-            answers.secteur && answers.secteur.length
-              ? answers.secteur.map(function (v) { return SECTOR_LABELS[v] || v; }).join(" + ")
-              : null,
-          temps: answers.temps ? TIME_LABELS[answers.temps] || null : null,
-          plateformes: answers.plateformes ? PREVIEW_PLATFORM_LABELS[answers.plateformes] || null : null,
-          goal: GOAL.formatEuro(goal)
-        };
-        Array.prototype.forEach.call(root.querySelectorAll("[data-sp]"), function (el) {
-          var key = el.getAttribute("data-sp");
-          var value = values[key];
-          el.textContent = value || "À définir";
-          el.classList.toggle("is-empty", !value);
-        });
-        root.style.setProperty("--sp-ratio", GOAL.valueToRatio(goal).toFixed(4));
-      }
-
-      // Met tout l'écran A d'accord avec une valeur. source :
-      //   "slider"   -> ne réécrit pas la position (évite les sauts), vibre
-      //                 au passage d'un palier ;
-      //   "input"    -> saisie en cours : ne reformate pas le champ ;
-      //   "commit"   -> fin de saisie (Entrée, perte de focus) : reformate ;
-      //   "shortcut" / "restore" -> tout est réécrit.
-      function setGoal(value, source) {
-        if (!GOAL) return;
-        var v = GOAL.snap(value);
-        answers.objectifRevenu = v;
-        var ratio = GOAL.valueToRatio(v);
-
-        var slider = document.getElementById("goal-slider");
-        if (slider) {
-          if (source !== "slider") slider.value = String(GOAL.valueToPosition(v));
-          slider.setAttribute("aria-valuetext", GOAL.formatGoal(v));
-          slider.parentNode.style.setProperty("--goal-ratio", ratio.toFixed(4));
-        }
-        var input = document.getElementById("goal-amount-input");
-        if (input) {
-          if (source !== "input") input.value = v.toLocaleString("fr-FR");
-          input.style.setProperty("--goal-glow", ratio.toFixed(3));
-        }
-
-        // Badge de palier : fondu croisé, vibration légère au franchissement
-        // pendant le glissé (jamais au premier affichage).
-        var idx = GOAL.tierIndex(v);
-        var badge = document.getElementById("goal-badge");
-        if (badge && idx !== goalTierIndex) {
-          var tierInfo = GOAL.TIERS[idx];
-          if (goalTierIndex !== null && source === "slider") goalVibrate(8);
-          goalTierIndex = idx;
-          window.clearTimeout(goalBadgeTimer);
-          var applyTier = function () {
-            badge.textContent = tierInfo.label;
-            badge.setAttribute("data-tier", tierInfo.id);
-            badge.classList.remove("is-changing");
-          };
-          if (reduceMotion || badge.textContent === tierInfo.label) {
-            applyTier();
-          } else {
-            badge.classList.add("is-changing");
-            goalBadgeTimer = window.setTimeout(applyTier, 150);
-          }
-        }
-
-        var price = GOAL.averagePrice(answers.secteur);
-        var clients = GOAL.clientsNeeded(v, price);
-        setTextById("goal-equivalence", GOAL.equivalence(v));
-        setTextById(
-          "goal-clients",
-          v > 0
-            ? "≈ " + clients.toLocaleString("fr-FR") + " client" + (clients > 1 ? "s" : "") + " à " + price + " €/mois"
-            : "Choisis un montant pour voir ce qu'il représente."
-        );
-
-        Array.prototype.forEach.call(stage.querySelectorAll("[data-goal-shortcut]"), function (btn) {
-          btn.classList.toggle("is-selected", Number(btn.getAttribute("data-goal-shortcut")) === v);
-        });
-
-        updateSpacePreview("goal-preview");
-        var screenEl = stage.querySelector('[data-id="objectifRevenu"]');
-        if (screenEl) updateNextEnabled(screenEl);
       }
 
       // Les deux réponses, telles que stockées dans profiles (migration
@@ -7578,21 +7752,522 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
         return Math.min(GOAL ? GOAL.MAX : 50000, Number(digits) || 0);
       }
 
-      // Entrée sur l'écran A : reprend la réponse existante (retour arrière,
-      // édition depuis la puce) ou la valeur par défaut.
-      function enterGoalAmount() {
-        goalTierIndex = null;
-        setGoal(typeof answers.objectifRevenu === "number" ? answers.objectifRevenu : defaultGoal(), "restore");
+      // ---- Briques de mouvement -------------------------------------------
+      // Animation WAAPI « depuis » un état : fill backwards = l'élément est
+      // dans l'état de départ pendant son délai, puis revient à son style
+      // normal (donc l'état final est toujours le CSS, même si WAAPI manque).
+      function animateFrom(el, from, delay, duration, easing) {
+        if (!el || !el.animate) return null;
+        return el.animate([from, { opacity: 1, transform: "none" }], {
+          duration: duration,
+          delay: delay,
+          easing: easing || GOAL_EASE,
+          fill: "backwards"
+        });
       }
 
-      // Remise à zéro visuelle à l'ouverture du quiz, SANS écrire de réponse :
+      // Count-up retargetable : chaque frame rapproche l'affichage de la
+      // cible (≈ 28 % de l'écart), sans minuterie ni durée figée -- suit le
+      // slider en direct sans saccade.
+      function countTo(el, target, format) {
+        if (!el) return;
+        el._ctTarget = target;
+        el._ctFormat = format;
+        if (reduceMotion || typeof el._ctValue !== "number") {
+          el._ctValue = target;
+          el.textContent = format(target);
+          return;
+        }
+        if (el._ctRaf) return;
+        (function tick() {
+          var v = el._ctValue + (el._ctTarget - el._ctValue) * 0.28;
+          if (Math.abs(el._ctTarget - v) < 0.5) v = el._ctTarget;
+          el._ctValue = v;
+          el.textContent = el._ctFormat(v);
+          el._ctRaf = v === el._ctTarget ? null : window.requestAnimationFrame(tick);
+        })();
+      }
+
+      // Fondu croisé entre deux libellés superposés (.goal-xfade).
+      function crossfadeText(container, text) {
+        if (!container) return;
+        var items = container.querySelectorAll(".goal-xfade__item");
+        var on = container.querySelector(".goal-xfade__item.is-on") || items[0];
+        if (on.textContent === text) return;
+        var off = on === items[0] ? items[1] : items[0];
+        off.textContent = text;
+        off.classList.add("is-on");
+        off.removeAttribute("aria-hidden");
+        on.classList.remove("is-on");
+        on.setAttribute("aria-hidden", "true");
+      }
+
+      // ---- Jauge en ressort (rAF -> transform: rotate uniquement) ---------
+      // Raideur 170, amortissement 18 : rapport ≈ 0,69, léger dépassement
+      // (~5 %) puis stabilisation. Sous Mode Vidéo ralenti, l'horloge rAF
+      // virtuelle ralentit aussi le ressort.
+      var gaugeSpring = { pos: null, vel: 0, target: 0, raf: null, last: null, el: null };
+
+      function paintGauge() {
+        if (!gaugeSpring.el) return;
+        var p = Math.max(-0.02, Math.min(1.03, gaugeSpring.pos));
+        gaugeSpring.el.style.transform = "rotate(" + (p * 180).toFixed(2) + "deg)";
+      }
+
+      function stepGauge(now) {
+        var s = gaugeSpring;
+        var dt = s.last === null ? 1 / 60 : Math.min(0.032, (now - s.last) / 1000);
+        s.last = now;
+        var force = -170 * (s.pos - s.target) - 18 * s.vel;
+        s.vel += force * dt;
+        s.pos += s.vel * dt;
+        paintGauge();
+        if (Math.abs(s.vel) < 0.001 && Math.abs(s.pos - s.target) < 0.001) {
+          s.pos = s.target;
+          s.vel = 0;
+          paintGauge();
+          s.raf = null;
+          return;
+        }
+        s.raf = window.requestAnimationFrame(stepGauge);
+      }
+
+      function gaugeTo(ratio, immediate) {
+        var root = goalPreview();
+        if (!root) return;
+        gaugeSpring.el = root.querySelector(".sp-gauge__sweep");
+        gaugeSpring.target = ratio;
+        if (gaugeSpring.pos === null || immediate || reduceMotion) {
+          if (gaugeSpring.raf) window.cancelAnimationFrame(gaugeSpring.raf);
+          gaugeSpring.raf = null;
+          gaugeSpring.pos = ratio;
+          gaugeSpring.vel = 0;
+          paintGauge();
+          return;
+        }
+        if (!gaugeSpring.raf) {
+          gaugeSpring.last = null;
+          gaugeSpring.raf = window.requestAnimationFrame(stepGauge);
+        }
+      }
+
+      // ---- Aperçu : checklist, réponses, objectif, assistant ---------------
+      function setPlanStep(step, status) {
+        var root = goalPreview();
+        var el = root && root.querySelector('.sp-step[data-step="' + step + '"]');
+        if (el) el.setAttribute("data-status", status);
+      }
+
+      // Réponses réelles de « Ton projet ». Une réponse absente reste
+      // « À définir », jamais une valeur inventée.
+      function spaceRowValues() {
+        return {
+          secteur:
+            answers.secteur && answers.secteur.length
+              ? answers.secteur.map(function (v) { return SECTOR_LABELS[v] || v; }).join(" + ")
+              : null,
+          temps: answers.temps ? TIME_LABELS[answers.temps] || null : null,
+          plateformes: answers.plateformes ? PREVIEW_PLATFORM_LABELS[answers.plateformes] || null : null
+        };
+      }
+
+      function fillSpaceRows(root) {
+        var values = spaceRowValues();
+        Array.prototype.forEach.call(root.querySelectorAll(".sp-row"), function (row) {
+          var key = row.getAttribute("data-row");
+          var val = row.querySelector(".sp-val");
+          val.textContent = values[key] || "À définir";
+          val.classList.toggle("is-empty", !values[key]);
+          row.classList.toggle("is-filled", !!values[key]);
+        });
+        var anyAnswer = values.secteur || values.temps || values.plateformes;
+        setPlanStep("profil", anyAnswer ? "done" : "todo");
+        var welcome = root.querySelector("[data-sp-welcome]");
+        if (welcome) {
+          welcome.textContent = welcomeFirstName
+            ? "Bienvenue " + welcomeFirstName + ", ton espace est prêt."
+            : "Bienvenue, ton espace est prêt.";
+        }
+      }
+
+      // Une réponse « s'écrit » : lettres en fondu + translateY, décalées,
+      // le tout en moins de 160 ms quelle que soit la longueur.
+      function writeRowValue(row, delay) {
+        var val = row.querySelector(".sp-val");
+        var text = val.textContent;
+        var filled = row.classList.contains("is-filled");
+        var skel = row.querySelector(".sp-skel");
+        if (skel && skel.animate) {
+          skel.animate(
+            [{ opacity: 0 }, { opacity: 1, offset: 0.15 }, { opacity: 1, offset: 0.7 }, { opacity: 0 }],
+            { duration: delay - 120, delay: 200, easing: "linear" }
+          );
+        }
+        if (!filled || !val.animate) return;
+        val.textContent = "";
+        var step = Math.min(14, 140 / Math.max(1, text.length));
+        for (var i = 0; i < text.length; i += 1) {
+          var ch = document.createElement("span");
+          ch.className = "sp-char";
+          ch.textContent = text.charAt(i);
+          val.appendChild(ch);
+          animateFrom(ch, { opacity: 0, transform: "translateY(4px)" }, delay + i * step, 160);
+        }
+        animateFrom(row.querySelector(".sp-row__check"), { opacity: 0, transform: "scale(0.4)" }, delay + 140, 320, GOAL_SPRING);
+      }
+
+      // Bulle de l'assistant : indicateur de saisie, puis le texte.
+      function assistantSay(text, typingMs) {
+        var root = goalPreview();
+        var box = root && root.querySelector(".sp-assistant");
+        if (!box) return;
+        var textEl = box.querySelector(".sp-assistant__text");
+        goalAssistantSaid = text;
+        window.clearTimeout(goalAssistantTimer);
+        if (reduceMotion) {
+          textEl.textContent = text;
+          box.setAttribute("data-state", "idle");
+          return;
+        }
+        box.setAttribute("data-state", "typing");
+        goalAssistantTimer = window.setTimeout(function () {
+          textEl.textContent = text;
+          box.setAttribute("data-state", "idle");
+        }, typingMs);
+      }
+
+      // L'assistant réagit au montant une fois le geste posé (650 ms sans
+      // changement), et seulement si son message change (palier différent).
+      function scheduleAssistantReaction(goal) {
+        if (goalIntroRunning || !GOAL) return;
+        window.clearTimeout(goalAssistantTimer);
+        var message = GOAL.assistantMessage(goal);
+        if (message === goalAssistantSaid) return;
+        goalAssistantTimer = window.setTimeout(function () {
+          assistantSay(message, 450);
+        }, 650);
+      }
+
+      // Objectif dans l'aperçu : jauge en ressort, montant en count-up,
+      // couleur de palier en fondu, impulsion lumineuse au franchissement.
+      function updateSpaceGoal(goal, tierChanged) {
+        var root = goalPreview();
+        if (!root || !GOAL) return;
+        gaugeTo(GOAL.valueToRatio(goal));
+        countTo(root.querySelector('[data-sp="goal"]'), goal, function (v) {
+          return GOAL.formatEuro(Math.round(v / 10) * 10);
+        });
+        var idx = GOAL.tierIndex(goal);
+        root.setAttribute("data-tier", GOAL.TIERS[idx].id);
+        Array.prototype.forEach.call(root.querySelectorAll(".sp-gauge__tone"), function (tone) {
+          tone.style.opacity = Number(tone.getAttribute("data-tone")) === idx ? "1" : "0";
+        });
+        if (tierChanged && !reduceMotion) {
+          var pulse = root.querySelector(".sp-gauge__pulse");
+          if (pulse && pulse.animate) {
+            pulse.animate(
+              [{ opacity: 0, transform: "scale(0.8)" }, { opacity: 0.9, transform: "scale(1)", offset: 0.35 }, { opacity: 0, transform: "scale(1.25)" }],
+              { duration: 560, easing: "ease-out" }
+            );
+          }
+        }
+      }
+
+      // ---- Écran A : état complet pour une valeur ---------------------------
+      // source :
+      //   "slider"   -> ne réécrit pas la position (évite les sauts), vibre
+      //                 au passage d'un palier ;
+      //   "input"    -> saisie en cours : ne reformate pas le champ ;
+      //   "commit"   -> fin de saisie (Entrée, perte de focus) : reformate ;
+      //   "shortcut" / "restore" -> tout est réécrit.
+      function setGoal(value, source) {
+        if (!GOAL) return;
+        var v = GOAL.snap(value);
+        answers.objectifRevenu = v;
+        var ratio = GOAL.valueToRatio(v);
+
+        var slider = document.getElementById("goal-slider");
+        if (slider) {
+          if (source !== "slider") slider.value = String(GOAL.valueToPosition(v));
+          slider.setAttribute("aria-valuetext", GOAL.formatGoal(v));
+          slider.parentNode.style.setProperty("--goal-ratio", ratio.toFixed(4));
+        }
+        var input = document.getElementById("goal-amount-input");
+        if (input && source !== "input") input.value = v.toLocaleString("fr-FR");
+        var glow = document.getElementById("goal-glow");
+        if (glow) glow.style.opacity = (0.25 + ratio * 0.75).toFixed(3);
+
+        // Palier : badge en fondu croisé + impulsion, vibration au
+        // franchissement pendant le glissé (jamais au premier affichage).
+        var idx = GOAL.tierIndex(v);
+        var tierChanged = goalTierIndex !== null && idx !== goalTierIndex;
+        var badge = document.getElementById("goal-badge");
+        if (badge && idx !== goalTierIndex) {
+          var tierInfo = GOAL.TIERS[idx];
+          if (tierChanged && source === "slider") goalVibrate(8);
+          goalTierIndex = idx;
+          window.clearTimeout(goalBadgeTimer);
+          var applyTier = function () {
+            badge.textContent = tierInfo.label;
+            badge.setAttribute("data-tier", tierInfo.id);
+            badge.classList.remove("is-changing");
+          };
+          if (reduceMotion || badge.textContent === tierInfo.label) {
+            applyTier();
+          } else {
+            badge.classList.add("is-changing");
+            goalBadgeTimer = window.setTimeout(applyTier, 150);
+          }
+          if (tierChanged && !reduceMotion && badge.animate) {
+            badge.animate([{ transform: "scale(1)" }, { transform: "scale(1.14)" }, { transform: "scale(1)" }], { duration: 420, easing: GOAL_SPRING });
+          }
+        }
+
+        var price = GOAL.averagePrice(answers.secteur);
+        var clients = GOAL.clientsNeeded(v, price);
+        crossfadeText(document.getElementById("goal-equivalence"), GOAL.equivalence(v));
+        if (v > 0) {
+          countTo(document.getElementById("goal-clients-n"), clients, function (n) {
+            return Math.round(n).toLocaleString("fr-FR");
+          });
+          setTextById("goal-clients-rest", "client" + (clients > 1 ? "s" : "") + " à " + price + " €/mois");
+        } else {
+          setTextById("goal-clients-n", "0");
+          setTextById("goal-clients-rest", "client pour l'instant : choisis un montant");
+        }
+
+        Array.prototype.forEach.call(stage.querySelectorAll("[data-goal-shortcut]"), function (btn) {
+          btn.classList.toggle("is-selected", Number(btn.getAttribute("data-goal-shortcut")) === v);
+        });
+
+        updateSpaceGoal(v, tierChanged);
+        scheduleAssistantReaction(v);
+        refreshEditBar();
+        var screenEl = stage.querySelector('[data-id="objectifRevenu"]');
+        if (screenEl) updateNextEnabled(screenEl);
+      }
+
+      // ---- Chorégraphie d'entrée (voir TIMELINE ci-dessus) ----------------
+      function playSpaceIntro() {
+        var root = goalPreview();
+        if (!root || !GOAL) return;
+        var goal = typeof answers.objectifRevenu === "number" ? answers.objectifRevenu : defaultGoal();
+        fillSpaceRows(root);
+        setPlanStep("objectif", "current");
+        setPlanStep("delai", "todo");
+        var message = GOAL.assistantMessage(goal);
+
+        if (reduceMotion || !root.animate) {
+          gaugeTo(GOAL.valueToRatio(goal), true);
+          assistantSay(message, 0);
+          return;
+        }
+
+        goalIntroRunning = true;
+        window.clearTimeout(goalAssistantTimer);
+        animateFrom(root.querySelector(".sp-window"), { opacity: 0, transform: "translateY(14px) scale(0.97)" }, 0, 320);
+        animateFrom(root.querySelector(".sp-plan"), { opacity: 0, transform: "translateX(-18px)" }, 80, 320);
+        Array.prototype.forEach.call(root.querySelectorAll(".sp-step"), function (el, i) {
+          animateFrom(el, { opacity: 0, transform: "translateX(-8px)" }, 120 + i * 50, 260);
+        });
+        Array.prototype.forEach.call(root.querySelectorAll(".sp-card"), function (el, i) {
+          animateFrom(el, { opacity: 0, transform: "translateY(12px)" }, 160 + i * 80, 320);
+        });
+        // Jauge et montant partent de 0.
+        gaugeTo(0, true);
+        var goalEl = root.querySelector('[data-sp="goal"]');
+        if (goalEl) {
+          goalEl._ctValue = 0;
+          goalEl.textContent = GOAL.formatEuro(0);
+        }
+        window.setTimeout(function () {
+          updateSpaceGoal(goal, false);
+        }, 240);
+        Array.prototype.forEach.call(root.querySelectorAll(".sp-row"), function (row, i) {
+          writeRowValue(row, 380 + i * 120);
+        });
+        animateFrom(root.querySelector("[data-sp-welcome]"), { opacity: 0, transform: "translateY(6px)" }, 760, 280);
+        animateFrom(root.querySelector(".sp-assistant"), { opacity: 0, transform: "translateY(8px) scale(0.98)" }, 820, 260);
+        window.setTimeout(function () {
+          assistantSay(message, 180);
+        }, 820);
+        window.setTimeout(function () {
+          goalIntroRunning = false;
+        }, 1200);
+      }
+
+      // Prénom Google pour l'accueil : uniquement s'il existe dans la
+      // session (connexion Google) ; jamais en Mode Vidéo (vue visiteur).
+      function resolveWelcomeName() {
+        welcomeFirstName = null;
+        if (demoMode) return;
+        var supabase = window.ColdTrendSupabase;
+        if (!supabase) return;
+        supabase.auth.getSession().then(function (res) {
+          var user = res.data.session ? res.data.session.user : null;
+          if (!user || user.is_anonymous) return;
+          var meta = user.user_metadata || {};
+          var raw = meta.given_name || meta.first_name || String(meta.full_name || meta.name || "").split(" ")[0];
+          var name = String(raw || "").trim().slice(0, 24);
+          if (name && /^[A-Za-zÀ-ÖØ-öø-ÿ' -]+$/.test(name)) welcomeFirstName = name;
+        });
+      }
+
+      // Entrée sur l'écran A : chorégraphie complète la première fois,
+      // simple remise à jour ensuite (retour arrière, édition).
+      function enterGoalAmount() {
+        goalTierIndex = null;
+        goalValidating = false;
+        var cta = stage.querySelector('[data-id="objectifRevenu"] .goal-cta');
+        if (cta) cta.classList.remove("is-validated");
+        setGoal(typeof answers.objectifRevenu === "number" ? answers.objectifRevenu : defaultGoal(), "restore");
+        if (!goalIntroPlayed) {
+          goalIntroPlayed = true;
+          playSpaceIntro();
+        } else {
+          var root = goalPreview();
+          if (root) fillSpaceRows(root);
+          setPlanStep("objectif", "current");
+          setPlanStep("delai", "todo");
+        }
+      }
+
+      // Remise à zéro à l'ouverture du quiz, SANS écrire de réponse :
       // objectif_mensuel n'est enregistré que si l'écran a vraiment été vu.
       function resetGoalScreens() {
         if (!GOAL) return;
         goalTierIndex = null;
+        goalIntroPlayed = false;
+        goalAssistantSaid = "";
+        resolveWelcomeName();
         setGoal(defaultGoal(), "restore");
         delete answers.objectifRevenu;
         renderDelay();
+      }
+
+      // Bandeau « Tu modifies » : visible seulement en mode édition (voir
+      // showEditBar / hideEditBar), avec la valeur courante, mise à jour en
+      // direct.
+      function refreshEditBar() {
+        if (!editContext) return;
+        var textEl = document.getElementById("quiz-edit-bar-text");
+        if (!textEl) return;
+        var id = editContext.questionId;
+        var value = tagValueLabel(id);
+        textEl.textContent = "Tu modifies : " + (QUESTION_LABELS[id] || id) + (value ? " · " + value : "");
+      }
+
+      // Halo qui suit le curseur (desktop, pointeur précis, mouvement
+      // autorisé). Écrit un transform au plus une fois par frame.
+      (function initGoalHalo() {
+        var screenEl = stage.querySelector('[data-id="objectifRevenu"]');
+        var halo = document.getElementById("goal-halo");
+        if (!screenEl || !halo) return;
+        if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+        if (!window.matchMedia("(hover: hover) and (pointer: fine)").matches) return;
+        var x = 0;
+        var y = 0;
+        var frame = null;
+        screenEl.addEventListener("pointermove", function (e) {
+          var rect = screenEl.getBoundingClientRect();
+          x = e.clientX - rect.left;
+          y = e.clientY - rect.top + screenEl.scrollTop;
+          halo.classList.add("is-on");
+          if (frame) return;
+          frame = window.requestAnimationFrame(function () {
+            frame = null;
+            halo.style.transform = "translate3d(" + x.toFixed(0) + "px, " + y.toFixed(0) + "px, 0)";
+          });
+        });
+        screenEl.addEventListener("pointerleave", function () {
+          halo.classList.remove("is-on");
+        });
+      })();
+
+      // ---- Validation (voir TIMELINE ci-dessus) ----------------------------
+      // Le montant « vole » vers une cible. hideTarget : la cible reste
+      // invisible jusqu'à l'atterrissage (puce récap qui vient d'apparaître).
+      function flyGoalTo(target, hideTarget, onLand) {
+        var landed = false;
+        function land() {
+          if (landed) return;
+          landed = true;
+          if (ghost && ghost.parentNode) ghost.parentNode.removeChild(ghost);
+          if (hideTarget) target.style.opacity = "";
+          if (target.animate) {
+            target.animate([{ transform: "scale(1.15)" }, { transform: "scale(1)" }], { duration: 320, easing: GOAL_SPRING });
+          }
+          if (onLand) onLand();
+        }
+        var ghost = null;
+        var src = document.getElementById("goal-amount-input");
+        if (reduceMotion || !target || !src || !target.animate) {
+          if (target) land();
+          else if (onLand) onLand();
+          return;
+        }
+        var from = src.getBoundingClientRect();
+        var to = target.getBoundingClientRect();
+        if (!from.width || !to.width) {
+          land();
+          return;
+        }
+        ghost = document.createElement("p");
+        ghost.className = "goal-fly";
+        ghost.setAttribute("aria-hidden", "true");
+        ghost.textContent = GOAL.formatGoal(answers.objectifRevenu);
+        ghost.style.left = from.left + "px";
+        ghost.style.top = from.top + "px";
+        ghost.style.fontSize = window.getComputedStyle(src).fontSize;
+        document.body.appendChild(ghost);
+        var size = ghost.getBoundingClientRect();
+        var scale = Math.max(0.12, (to.height / size.height) * 0.85);
+        if (hideTarget) target.style.opacity = "0";
+        var anim = ghost.animate(
+          [
+            { transform: "translate(0, 0) scale(1)", opacity: 1 },
+            { transform: "translate(" + (to.left - from.left) + "px, " + (to.top - from.top) + "px) scale(" + scale + ")", opacity: 0.3 }
+          ],
+          { duration: 650, easing: "cubic-bezier(0.22, 1, 0.36, 1)" }
+        );
+        anim.onfinish = land;
+        anim.oncancel = land;
+        // Filet de sécurité : onglet en arrière-plan pendant le vol.
+        window.setTimeout(land, 1200);
+      }
+
+      function playGoalValidation(done) {
+        var screenEl = stage.querySelector('[data-id="objectifRevenu"]');
+        var cta = screenEl && screenEl.querySelector(".goal-cta");
+        if (goalValidating || !cta || cta.disabled) return;
+        goalValidating = true;
+        renderTags();
+        function markDone() {
+          setPlanStep("objectif", "done");
+          setPlanStep("delai", "current");
+        }
+        if (reduceMotion) {
+          markDone();
+          goalValidating = false;
+          done();
+          return;
+        }
+        cta.classList.add("is-validated");
+        goalVibrate([8, 40, 12]);
+        window.setTimeout(function () {
+          var tag = quizTagsEl ? quizTagsEl.querySelector('[data-tag-id="objectifRevenu"]') : null;
+          if (tag) flyGoalTo(tag, true, null);
+          var root = goalPreview();
+          var stepIcon = root && root.querySelector('.sp-step[data-step="objectif"] .sp-step__icon');
+          // Étape visible seulement si la checklist l'est (desktop et mobile
+          // compact) ; sinon elle est simplement cochée.
+          if (stepIcon && stepIcon.getBoundingClientRect().width) flyGoalTo(stepIcon, false, markDone);
+          else markDone();
+        }, 160);
+        window.setTimeout(function () {
+          goalValidating = false;
+          done();
+        }, 820);
       }
 
       // ---- Écran B : frise, rythme, accompagnement --------------------------
@@ -7685,49 +8360,6 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
         });
       })();
 
-      // Transition A -> B : le montant « vole » vers la puce récap qui vient
-      // d'apparaître en haut. Pur décor : sans animation (reduced motion,
-      // navigateur sans Web Animations), la puce s'affiche simplement.
-      function flyGoalToTag() {
-        if (reduceMotion || !quizTagsEl || !GOAL) return;
-        var src = document.getElementById("goal-amount-input");
-        var tag = quizTagsEl.querySelector('[data-tag-id="objectifRevenu"]');
-        if (!src || !tag || !tag.animate) return;
-        var from = src.getBoundingClientRect();
-        var to = tag.getBoundingClientRect();
-        if (!from.width || !to.width) return;
-        var ghost = document.createElement("p");
-        ghost.className = "goal-fly";
-        ghost.setAttribute("aria-hidden", "true");
-        ghost.textContent = GOAL.formatGoal(answers.objectifRevenu);
-        ghost.style.left = from.left + "px";
-        ghost.style.top = from.top + "px";
-        ghost.style.fontSize = window.getComputedStyle(src).fontSize;
-        document.body.appendChild(ghost);
-        var size = ghost.getBoundingClientRect();
-        var scale = Math.max(0.15, (to.height / size.height) * 0.85);
-        tag.style.opacity = "0";
-        var anim = ghost.animate(
-          [
-            { transform: "translate(0, 0) scale(1)", opacity: 1 },
-            { transform: "translate(" + (to.left - from.left) + "px, " + (to.top - from.top) + "px) scale(" + scale + ")", opacity: 0.3 }
-          ],
-          { duration: 650, easing: "cubic-bezier(0.22, 1, 0.36, 1)" }
-        );
-        var landed = false;
-        function land() {
-          if (landed) return;
-          landed = true;
-          if (ghost.parentNode) ghost.parentNode.removeChild(ghost);
-          tag.style.opacity = "";
-          tag.animate([{ transform: "scale(1.15)" }, { transform: "scale(1)" }], { duration: 320, easing: "cubic-bezier(0.34, 1.56, 0.64, 1)" });
-        }
-        anim.onfinish = land;
-        anim.oncancel = land;
-        // Filet de sécurité : onglet passé en arrière-plan pendant le vol,
-        // animation jamais terminée -> la puce ne doit pas rester invisible.
-        window.setTimeout(land, 1200);
-      }
 
       // ---- Accumulateur de tags — libellés d'affichage ----------------
       // intention retiré de TAG_ORDER : plus d'écran dédié à rouvrir en
@@ -7736,7 +8368,7 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
       var QUESTION_LABELS = {
         temps: "Temps",
         secteur: "Cible",
-        objectifRevenu: "Objectif :"
+        objectifRevenu: "Objectif"
       };
       // Ordre d'affichage fixe des tags, indépendant de l'ordre dans lequel
       // les questions ont été répondues.
@@ -9547,12 +10179,6 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
           answer: answers[currentId]
         });
 
-        // Passage A -> B : la puce « Objectif » apparaît et le montant y vole.
-        if (currentId === "objectifRevenu") {
-          renderTags();
-          flyGoalToTag();
-        }
-
         navHistory.push(currentQuestionIndex);
         var next = findNextQuestionIndex(currentQuestionIndex);
         currentQuestionIndex = next;
@@ -9907,12 +10533,15 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
             '">' +
             '<span class="quiz-tag__label">' +
             QUESTION_LABELS[id] +
+            // Puce récap de l'objectif : « Objectif : 25 000 €/mois ».
+            (id === "objectifRevenu" ? " :" : "") +
             "</span> " +
             valueLabel +
             "</button>";
         });
         quizTagsEl.innerHTML = html;
         quizTagsEl.classList.toggle("is-visible", html !== "");
+        refreshEditBar();
       }
 
       // propagateAnswerDependencies()/fadeOutAndRemoveTag() retirés : leur
@@ -9931,6 +10560,8 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
         var textEl = document.getElementById("quiz-edit-bar-text");
         if (textEl) textEl.textContent = "Tu modifies : " + QUESTION_LABELS[questionId];
         quizEditBarEl.classList.add("is-visible");
+        // Valeur courante affichée (et suivie en direct) : voir refreshEditBar.
+        refreshEditBar();
       }
 
       // Clic sur un tag : saute directement à l'écran concerné, avec la
@@ -10334,6 +10965,12 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
         }
 
         if (e.target.closest(".quiz-next")) {
+          // Écran A : chorégraphie de validation (bouton -> check, vol du
+          // montant) avant la transition partagée vers l'écran B.
+          if (e.target.closest('[data-id="objectifRevenu"]')) {
+            playGoalValidation(goForwardFromQuestion);
+            return;
+          }
           goForwardFromQuestion();
           return;
         }
@@ -11107,60 +11744,92 @@ const QUIZ_CHAPTER_ICONS = {
 // ---------------------------------------------------------------------------
 // Composant « aperçu de ton espace » (effet de dotation) -- réutilisable.
 //
-// Reprend le langage visuel de /compte (ton dossier) : fenêtre sombre,
-// navigation latérale, cartes à bord fin. Il ne montre QUE des données
-// réelles : les réponses déjà données (cible, temps, plateformes) et
-// l'objectif choisi. Jamais de revenu, de courbe de ventes ou de
-// notification inventés : la jauge représente l'objectif visé, avec le
-// point de départ réel (0 €).
+// Fenêtre « Ton espace ColdTrend » : checklist « Ton plan » à gauche
+// (Profil / Objectif / Délai / Concept), carte « Ton projet » (réponses
+// réelles écrites une à une, validées par un check), carte « Objectif
+// mensuel » (jauge), bulle « Assistant ColdTrend » (réponses automatiques,
+// jamais présentée comme un humain).
 //
-// Rendu ici avec des valeurs neutres, rempli côté client par
-// updateSpacePreview(id) (champs data-sp). Plusieurs instances possibles
-// sur une page (id distinct).
+// Ne montre QUE des données réelles : réponses déjà données, objectif
+// choisi, prénom Google s'il existe. Jamais de revenu, de courbe de ventes
+// ou de notification inventés. La jauge représente l'objectif visé ; le
+// point de départ affiché est 0 €.
+//
+// Jauge : 100 % transform. Le « balayage » est un demi-disque tourné de
+// 0 à 180° (rotate) dans un cadran masqué en anneau (mask statique) ; les
+// couleurs de palier sont 4 calques superposés en fondu d'opacité.
+//
+// Rendu ici à l'état final (sans JS, tout est lisible) ; la chorégraphie
+// d'entrée et les mises à jour vivent côté client (playSpaceIntro,
+// fillSpaceRows, updateSpaceGoal ; instance pilotée : GOAL_PREVIEW_ID).
 // ---------------------------------------------------------------------------
-const SPACE_PREVIEW_ARC = 157.08; // longueur du demi-cercle r=50 (π × 50)
+const SPACE_CHECK_SVG =
+  '<svg viewBox="0 0 24 24" width="12" height="12" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg>';
+const SPACE_BOT_SVG =
+  '<svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="8" width="16" height="11" rx="3"/><path d="M12 4v4M9 13h.01M15 13h.01M9.5 16.5h5"/></svg>';
 
 function renderSpacePreview({ id, goal }) {
-  const ratio = GOAL.valueToRatio(goal);
-  const navItem = (label, active, locked) =>
-    `<li class="sp-nav__item${active ? " is-active" : ""}">${label}${locked ? `<span class="sp-nav__lock" aria-hidden="true">${ICON_LOCK}</span>` : ""}</li>`;
-  return `<figure class="space-preview" id="${id}" style="--sp-ratio:${ratio.toFixed(4)}">
-                <div class="space-preview__window">
-                  <div class="space-preview__bar" aria-hidden="true">
-                    <span class="space-preview__dots"><i></i><i></i><i></i></span>
-                    <span class="space-preview__title">Ton espace ${brand.name}</span>
+  const tierInfo = GOAL.tier(goal);
+  const step = (key, label, status, extra = "") =>
+    `<li class="sp-step" data-step="${key}" data-status="${status}">
+                        <span class="sp-step__icon" aria-hidden="true"><span class="sp-step__pulse"></span><span class="sp-step__check">${SPACE_CHECK_SVG}</span>${key === "concept" ? `<span class="sp-step__lock">${ICON_LOCK}</span>` : ""}</span>
+                        <span class="sp-step__label">${label}</span>${extra}
+                      </li>`;
+  const row = (key, label) =>
+    `<div class="sp-row" data-row="${key}">
+                            <dt>${label}</dt>
+                            <dd><span class="sp-skel" aria-hidden="true"></span><span class="sp-val" data-sp="${key}">À définir</span><span class="sp-row__check" aria-hidden="true">${SPACE_CHECK_SVG}</span></dd>
+                          </div>`;
+  const tones = [0, 1, 2, 3].map((i) => `<span class="sp-gauge__tone" data-tone="${i}"${GOAL.tierIndex(goal) === i ? ' style="opacity:1"' : ""}></span>`).join("");
+  return `<figure class="space-preview" id="${id}" data-tier="${tierInfo.id}">
+                <div class="sp-window">
+                  <div class="sp-bar" aria-hidden="true">
+                    <span class="sp-bar__dots"><i></i><i></i><i></i></span>
+                    <span class="sp-bar__title">Ton espace ${brand.name}</span>
                   </div>
-                  <div class="space-preview__body">
-                    <ul class="sp-nav" aria-hidden="true">
-                      <li class="sp-nav__brand">${brand.name.charAt(0)}</li>
-                      ${navItem("Mon dossier", true, false)}
-                      ${navItem("Mon objectif", false, false)}
-                      ${navItem("Mon concept", false, true)}
-                    </ul>
+                  <div class="sp-body">
+                    <aside class="sp-plan" aria-label="Ton plan">
+                      <p class="sp-plan__title">Ton plan</p>
+                      <ol class="sp-plan__list">
+                      ${step("profil", "Profil", "done")}
+                      ${step("objectif", "Objectif", "current")}
+                      ${step("delai", "Délai", "todo")}
+                      ${step("concept", "Concept", "locked", '<span class="sp-step__shimmer" aria-hidden="true"></span>')}
+                      </ol>
+                    </aside>
                     <div class="sp-main">
-                      <p class="sp-eyebrow">Ton espace prend vie</p>
-                      <section class="sp-card sp-card--project">
-                        <h3 class="sp-card__title">Ton projet</h3>
-                        <dl class="sp-list">
-                          <div><dt>Cible</dt><dd data-sp="secteur">À définir</dd></div>
-                          <div><dt>Temps</dt><dd data-sp="temps">À définir</dd></div>
-                          <div><dt>Plateformes</dt><dd data-sp="plateformes">À définir</dd></div>
-                        </dl>
-                        <p class="sp-card__hint">Le nom de ton projet arrive avec ton concept.</p>
-                      </section>
-                      <section class="sp-card sp-card--goal">
-                        <h3 class="sp-card__title">Objectif mensuel</h3>
-                        <div class="sp-gauge">
-                          <svg class="sp-gauge__svg" viewBox="0 0 120 68" aria-hidden="true">
-                            <path class="sp-gauge__track" d="M10 60 A50 50 0 0 1 110 60" />
-                            <path class="sp-gauge__arc" d="M10 60 A50 50 0 0 1 110 60" style="stroke-dasharray:${SPACE_PREVIEW_ARC};stroke-dashoffset:calc(${SPACE_PREVIEW_ARC} * (1 - var(--sp-ratio)))" />
-                          </svg>
-                          <p class="sp-gauge__value"><strong data-sp="goal">${GOAL.formatEuro(goal)}</strong><span>par mois visés</span></p>
-                          <span class="sp-gauge__min" aria-hidden="true">0 €</span>
-                          <span class="sp-gauge__max" aria-hidden="true">${GOAL.formatEuro(GOAL.MAX)}</span>
+                      <p class="sp-welcome" data-sp-welcome>Bienvenue, ton espace est prêt.</p>
+                      <div class="sp-cards">
+                        <section class="sp-card sp-card--project">
+                          <h3 class="sp-card__title">Ton projet</h3>
+                          <dl class="sp-list">
+                          ${row("secteur", "Cible")}
+                          ${row("temps", "Temps")}
+                          ${row("plateformes", "Plateformes")}
+                          </dl>
+                        </section>
+                        <section class="sp-card sp-card--goal">
+                          <h3 class="sp-card__title">Objectif mensuel</h3>
+                          <div class="sp-gauge">
+                            <div class="sp-gauge__dial" aria-hidden="true">
+                              <span class="sp-gauge__track"></span>
+                              <span class="sp-gauge__sweep" style="transform:rotate(${(GOAL.valueToRatio(goal) * 180).toFixed(1)}deg)">${tones}</span>
+                            </div>
+                            <span class="sp-gauge__pulse" aria-hidden="true"></span>
+                            <p class="sp-gauge__value"><strong data-sp="goal">${GOAL.formatEuro(goal)}</strong><span>par mois visés</span></p>
+                          </div>
+                          <p class="sp-gauge__scale" aria-hidden="true"><span>0 €</span><span>${GOAL.formatEuro(GOAL.MAX)}</span></p>
+                          <p class="sp-card__hint">Point de départ : 0 €. Un objectif, pas un résultat.</p>
+                        </section>
+                      </div>
+                      <div class="sp-assistant" data-state="idle">
+                        <span class="sp-assistant__avatar" aria-hidden="true">${SPACE_BOT_SVG}</span>
+                        <div class="sp-assistant__bubble">
+                          <p class="sp-assistant__name">Assistant ${brand.name} <span>· réponses automatiques</span></p>
+                          <p class="sp-assistant__typing" aria-hidden="true"><i></i><i></i><i></i></p>
+                          <p class="sp-assistant__text" aria-live="polite">${GOAL.assistantMessage(goal)}</p>
                         </div>
-                        <p class="sp-card__hint">Point de départ : 0 €. Un objectif, pas un résultat.</p>
-                      </section>
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -11376,20 +12045,29 @@ function renderQuizQuestionScreen(question, index) {
   if (question.type === "goal-amount") {
     const initial = GOAL.snap(question.initial);
     const initialPos = GOAL.valueToPosition(initial);
-    const ticks = [0, 1000, 5000, 20000, 50000]
-      .map(
-        (v) =>
-          `<span class="goal-slider__tick" style="left:${(GOAL.valueToRatio(v) * 100).toFixed(2)}%">${v >= 1000 ? v / 1000 + " k" : v} €</span>`
-      )
-      .join("");
+    // Repères choisis pour être lisibles sur l'échelle non linéaire :
+    // 0 % / 30 % / 60 % (coude à 5 000 €) / 78 % / 100 % de la course.
+    const TICK_VALUES = [0, 2500, 5000, 25000, 50000];
+    const ticks = TICK_VALUES.map((v, i) => {
+      const edge = i === 0 ? " is-first" : i === TICK_VALUES.length - 1 ? " is-last" : "";
+      const label = v >= 1000 ? `${(v / 1000).toLocaleString("fr-FR")} k€` : `${v} €`;
+      return `<span class="goal-slider__tick${edge}" style="left:${(GOAL.valueToRatio(v) * 100).toFixed(2)}%"><span class="goal-slider__tick-mark"></span><span class="goal-slider__tick-label">${label}</span></span>`;
+    }).join("");
     const shortcuts = question.shortcuts
       .map((v) => `<button type="button" class="goal-shortcut" data-goal-shortcut="${v}">${v.toLocaleString("fr-FR")} €</button>`)
       .join("");
     const price = GOAL.averagePrice();
     const clients = GOAL.clientsNeeded(initial, price);
     return `<div class="quiz-screen goal-screen goal-screen--amount" data-screen="question" data-index="${index}" data-id="${question.id}" data-step-name="${question.stepName}"${skipAttrs}${question.chapter ? ` data-chapter="${question.chapter}"` : ""}>
+          <div class="goal-ambient" aria-hidden="true">
+            <span class="goal-mesh goal-mesh--1"></span>
+            <span class="goal-mesh goal-mesh--2"></span>
+            <span class="goal-mesh goal-mesh--3"></span>
+            <span class="goal-grain"></span>
+            <span class="goal-halo" id="goal-halo"></span>
+          </div>
           <div class="goal-a">
-            <div class="goal-a__preview goal-block">
+            <div class="goal-a__preview">
               ${renderSpacePreview({ id: "goal-preview", goal: initial })}
             </div>
             <div class="goal-a__main">
@@ -11399,12 +12077,13 @@ function renderQuizQuestionScreen(question, index) {
               <div class="goal-amount goal-block">
                 <p class="goal-amount__badge" id="goal-badge" data-tier="${GOAL.tier(initial).id}">${GOAL.tier(initial).label}</p>
                 <label class="goal-amount__field" for="goal-amount-input">
+                  <span class="goal-amount__glow" id="goal-glow" aria-hidden="true" style="opacity:${(0.25 + GOAL.valueToRatio(initial) * 0.75).toFixed(3)}"></span>
                   <span class="goal-sr">Montant mensuel visé, en euros. Touche pour le saisir.</span>
                   <input class="goal-amount__input" id="goal-amount-input" type="text" inputmode="numeric" autocomplete="off" enterkeyhint="done" maxlength="7" value="${initial.toLocaleString("fr-FR")}" aria-describedby="goal-equivalence goal-clients" />
                   <span class="goal-amount__unit" aria-hidden="true">€ / mois</span>
                 </label>
-                <p class="goal-amount__equiv" id="goal-equivalence">${GOAL.equivalence(initial)}</p>
-                <p class="goal-amount__clients" id="goal-clients">≈ ${clients.toLocaleString("fr-FR")} client${clients > 1 ? "s" : ""} à ${price} €/mois</p>
+                <p class="goal-amount__equiv goal-xfade" id="goal-equivalence" aria-live="polite"><span class="goal-xfade__item is-on">${GOAL.equivalence(initial)}</span><span class="goal-xfade__item"></span></p>
+                <p class="goal-amount__clients" id="goal-clients">≈ <span id="goal-clients-n">${clients.toLocaleString("fr-FR")}</span> <span id="goal-clients-rest">client${clients > 1 ? "s" : ""} à ${price} €/mois</span></p>
                 <div class="goal-shortcuts" role="group" aria-label="Montants rapides">${shortcuts}</div>
                 <div class="goal-slider" style="--goal-ratio:${GOAL.valueToRatio(initial).toFixed(4)}">
                   <div class="goal-slider__track" aria-hidden="true"><div class="goal-slider__fill"></div></div>
@@ -11413,7 +12092,7 @@ function renderQuizQuestionScreen(question, index) {
                 </div>
               </div>
               <div class="quiz-footer goal-footer">
-                <button class="btn btn--primary quiz-next" type="button">${question.cta}</button>
+                <button class="btn btn--primary quiz-next goal-cta" type="button"><span class="goal-cta__label">${question.cta}</span><span class="goal-cta__check" aria-hidden="true">${SPACE_CHECK_SVG}</span></button>
               </div>
             </div>
           </div>
