@@ -835,8 +835,8 @@ const quiz = {
       steps: [
         { text: "Analyse de ton objectif de {objectif}…", fallback: "Analyse de ton objectif…", ms: 1300, to: 22 },
         { text: "Calcul de ton rythme sur {delai} mois…", fallback: "Calcul de ton rythme…", ms: 1500, to: 45 },
-        { text: "Construction de ta stratégie vidéo…", ms: 1700, to: 72 },
-        { text: "Sélection de tes canaux…", ms: 1200, to: 88 },
+        { text: "Construction de ta stratégie vidéo {videoIA}…", fallback: "Construction de ta stratégie vidéo…", ms: 1700, to: 72 },
+        { text: "Réglage de ton accompagnement : {accompagnement}…", fallback: "Réglage de ton accompagnement…", ms: 1200, to: 88 },
         { text: "Chiffrage prudent de ton potentiel…", ms: 1300, to: 100 }
       ],
       note: "Chiffrage déterministe et prudent (fourchette basse) · estimation non garantie",
@@ -8530,17 +8530,30 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
       var QUESTION_LABELS = {
         temps: "Temps",
         secteur: "Cible",
-        objectifRevenu: "Objectif"
+        objectifRevenu: "Objectif",
+        videoIA: "Vidéos",
+        accompagnement: "Accompagnement"
+      };
+      // Libellés des réponses Acquisition / Accompagnement : puces récap
+      // (court) et étapes du loading (en écho, dans une phrase).
+      var ANSWER_TAG_LABELS = {
+        videoIA: { oui: "par l'IA", non: "par toi" },
+        accompagnement: { autonome: "autonome", etapes_cles: "étapes clés", automatisation_max: "automatisation max" }
+      };
+      var ANSWER_ECHO_LABELS = {
+        videoIA: { oui: "avec l'IA", non: "réalisée par toi" },
+        accompagnement: { autonome: "en autonomie", etapes_cles: "sur les étapes clés", automatisation_max: "automatisation maximale" }
       };
       // Ordre d'affichage fixe des tags, indépendant de l'ordre dans lequel
       // les questions ont été répondues.
-      var TAG_ORDER = ["secteur", "temps", "objectifRevenu"];
+      var TAG_ORDER = ["secteur", "temps", "objectifRevenu", "videoIA", "accompagnement"];
 
       function tagValueLabel(id) {
         var value = answers[id];
         if (value === undefined) return null;
         if (id === "temps") return TIME_LABELS[value] || value;
         if (id === "objectifRevenu") return typeof value === "number" && value > 0 && GOAL ? GOAL.formatGoal(value) : null;
+        if (ANSWER_TAG_LABELS[id]) return ANSWER_TAG_LABELS[id][value] || null;
         if (id === "secteur") {
           return (value || []).map(function (v) { return SECTOR_LABELS[v] || v; }).join(" + ") || null;
         }
@@ -10215,21 +10228,25 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
         }
       }
 
-      // Étapes en écho aux réponses : {objectif} et {delai} remplacés, sinon
-      // texte de repli (réponse absente, Mode Vidéo...).
+      // Étapes en écho aux réponses : {objectif}, {delai}, {videoIA},
+      // {accompagnement} remplacés ; texte de repli si une réponse manque
+      // (Mode Vidéo, reprise sur un autre appareil...).
       function fillAssembleSteps(screenEl) {
+        var hasGoal = typeof answers.objectifRevenu === "number" && answers.objectifRevenu > 0 && GOAL;
+        var values = {
+          objectif: hasGoal ? GOAL.formatGoal(answers.objectifRevenu) : null,
+          delai: answers.delai || null,
+          videoIA: ANSWER_ECHO_LABELS.videoIA[answers.videoIA] || null,
+          accompagnement: ANSWER_ECHO_LABELS.accompagnement[answers.accompagnement] || null
+        };
         Array.prototype.forEach.call(screenEl.querySelectorAll("[data-assemble-step]"), function (li) {
           var tpl = li.getAttribute("data-template") || li.textContent;
-          var needsGoal = tpl.indexOf("{objectif}") !== -1;
-          var needsDelay = tpl.indexOf("{delai}") !== -1;
-          var hasGoal = typeof answers.objectifRevenu === "number" && answers.objectifRevenu > 0 && GOAL;
-          if ((needsGoal && !hasGoal) || (needsDelay && !answers.delai)) {
-            li.textContent = li.getAttribute("data-fallback") || tpl;
-            return;
-          }
-          li.textContent = tpl
-            .replace("{objectif}", hasGoal ? GOAL.formatGoal(answers.objectifRevenu) : "")
-            .replace("{delai}", answers.delai || "");
+          var missing = false;
+          var text = tpl.replace(/[{]([a-zA-Z]+)[}]/g, function (match, key) {
+            if (!values[key]) missing = true;
+            return values[key] || "";
+          });
+          li.textContent = missing ? li.getAttribute("data-fallback") || tpl : text;
         });
       }
 
