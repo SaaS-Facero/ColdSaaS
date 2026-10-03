@@ -12019,7 +12019,7 @@ function renderQuizQuestionScreen(question, index) {
     const bars = Array.from({ length: 6 }, (_, i) => `<span class="gate-chart__bar" data-gate-bar="${i}"></span>`).join("");
     return `<div class="quiz-screen quiz-gate" data-screen="question" data-index="${index}" data-id="${question.id}" data-step-name="${question.stepName}"${skipAttrs}>
           <div class="quiz-auth-mesh" aria-hidden="true"></div>
-          <h2 class="quiz-question-title" data-echo="${question.echoTitle}">${question.title}</h2>
+          <h2 class="quiz-question-title"${question.echoTitle ? ` data-echo="${question.echoTitle}"` : ""}>${question.title}</h2>
           <p class="quiz-subtext">${question.subtext}</p>
           <div class="gate-card" aria-label="Projection verrouillée">
             <div class="gate-card__head">
@@ -12322,7 +12322,7 @@ function renderQuizQuestionScreen(question, index) {
       .map((s, i) => `<li class="audit-step" data-assemble-step="${i}">${s}</li>`)
       .join("\n            ");
     return `<div class="quiz-screen quiz-assemble" data-screen="question" data-index="${index}" data-id="${question.id}" data-step-name="${question.stepName}"${skipAttrs} data-slogans='${escAttr(JSON.stringify(question.slogans))}' data-popups='${escAttr(JSON.stringify(question.popups))}'>
-          <h2 class="quiz-question-title" data-echo="${question.echoTitle}">${question.title}</h2>
+          <h2 class="quiz-question-title"${question.echoTitle ? ` data-echo="${question.echoTitle}"` : ""}>${question.title}</h2>
           <p class="assemble-slogan" id="assemble-slogan">${question.slogans[0]}</p>
           <div class="assemble-bar" aria-hidden="true"><div class="assemble-bar__fill" id="assemble-bar-fill"></div></div>
           <p class="assemble-percent" id="assemble-percent" aria-live="polite">0 %</p>
