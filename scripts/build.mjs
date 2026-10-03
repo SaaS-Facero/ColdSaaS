@@ -5,6 +5,7 @@ import vm from "node:vm";
 import { siteFooterCss, siteFooterHtml } from "./site-footer.mjs";
 import { consentPixelsConfig, consentPixelsHtml } from "./consent-pixels.mjs";
 import { dashboardPage } from "./dashboard-page.mjs";
+import { renderQuestionScreen, questionScreenCss, questionScreenClientJs, QUESTION_SCREEN_TYPES } from "./question-screen.mjs";
 import { adminUsersHtml, adminUsersJs, buildAdminLabels, buildScreenList } from "./admin-users.mjs";
 import {
   mentionsLegalesPage,
@@ -2023,46 +2024,66 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
     display: flex;
   }
 
+  /* Lanceur Crisp masqué sur mobile pendant le quiz : il recouvrait le CTA
+     collé en bas d'écran (« Continuer (n) »). Desktop : aucun chevauchement,
+     il reste visible. */
+  @media (max-width: 767px) {
+    body:has(.quiz-overlay.is-open) .crisp-client { display: none !important; }
+  }
+
+  /* En-tête partagé de tous les écrans : retour (icône 40px), barre
+     segmentée discrète au centre, fermer. Le badge « Connecté » flotte
+     sous la ligne pour ne pas rétrécir la barre. */
   .quiz-header {
+    position: relative;
     display: flex;
     align-items: center;
-    gap: 12px;
-    padding: 18px 20px 0;
+    gap: 8px;
+    padding: 16px 16px 0;
   }
 
   .quiz-back {
-    display: flex;
-    align-items: center;
-    gap: 6px;
+    display: grid;
+    place-items: center;
+    width: 40px;
+    height: 40px;
+    flex: none;
+    border-radius: 12px;
     background: none;
     border: none;
-    color: var(--steel);
-    font-size: 14px;
+    color: var(--paper-soft);
     font-family: inherit;
     cursor: pointer;
-    padding: 6px 4px;
+    padding: 0;
     visibility: hidden;
   }
+  .quiz-back svg { width: 20px; height: 20px; }
+  .quiz-header .connected-badge { position: absolute; top: 56px; right: 16px; margin: 0; }
 
   .quiz-back.is-visible {
     visibility: visible;
   }
 
   .quiz-close {
-    margin-left: auto;
+    flex: none;
+    width: 40px;
+    height: 40px;
+    display: grid;
+    place-items: center;
     background: none;
     border: none;
     color: var(--steel);
     cursor: pointer;
-    padding: 6px;
-    display: flex;
+    padding: 0;
   }
 
   .quiz-progress {
+    flex: 1;
+    min-width: 0;
     display: flex;
     align-items: center;
-    gap: 6px;
-    padding: 16px 20px 0;
+    gap: 4px;
+    padding: 0 8px;
   }
 
   /* Segmentée par chapitre plutôt qu'une seule barre continue -- deux
@@ -2071,7 +2092,7 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
   .quiz-progress__group {
     display: flex;
     flex: 1;
-    gap: 6px;
+    gap: 3px;
   }
 
   /* Goal-gradient : les segments du premier chapitre sont plus larges --
@@ -2082,15 +2103,15 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
   }
 
   .quiz-progress__group-gap {
-    width: 10px;
+    width: 8px;
     flex-shrink: 0;
   }
 
   .quiz-progress__seg {
     flex: 1;
-    height: 4px;
+    height: 3px;
     border-radius: 999px;
-    background: rgba(255, 255, 255, 0.1);
+    background: rgba(255, 255, 255, 0.08);
     overflow: hidden;
   }
 
@@ -2868,57 +2889,6 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
     color: var(--steel);
   }
 
-  /* ---- Grandes cartes de choix (Acquisition, Accompagnement) ---------- */
-  .choice-cards { gap: 12px; }
-  .choice-card {
-    position: relative;
-    min-height: 76px;
-    padding: 16px 18px;
-    gap: 14px;
-    align-items: center;
-    text-align: left;
-    transition: transform 420ms cubic-bezier(0.34, 1.56, 0.64, 1), border-color 200ms ease, background 200ms ease;
-  }
-  /* Sélection en spring : léger rebond à l'échelle. Sélecteurs renforcés :
-     la cascade d'apparition du quiz (.quiz-screen.is-active .quiz-option)
-     impose transform: none et un transition-delay par carte. */
-  .quiz-screen.is-active .choice-card:active { transform: scale(0.98); transition-delay: 0ms; }
-  .quiz-screen.is-active .choice-card.is-selected {
-    transform: scale(1.025);
-    transition: transform 420ms cubic-bezier(0.34, 1.56, 0.64, 1), border-color 200ms ease, background 200ms ease;
-    transition-delay: 0ms;
-  }
-  .choice-card__icon {
-    flex: none;
-    width: 48px;
-    height: 48px;
-    border-radius: 14px;
-    display: grid;
-    place-items: center;
-    color: #C8D4FF;
-    background: rgba(0, 71, 255, 0.16);
-    border: 1px solid rgba(61, 107, 255, 0.35);
-    transition: transform 420ms cubic-bezier(0.34, 1.56, 0.64, 1);
-  }
-  .choice-card.is-selected .choice-card__icon { transform: rotate(-6deg) scale(1.08); }
-  .choice-card__body { flex: 1; display: flex; flex-direction: column; gap: 4px; }
-  .choice-card__label { font-size: 16px; font-weight: 700; line-height: 1.35; color: #fff; }
-  .choice-card__badge {
-    align-self: flex-start;
-    padding: 2px 9px;
-    border-radius: 999px;
-    background: var(--cobalt);
-    color: #fff;
-    font-size: 11px;
-    font-weight: 700;
-    letter-spacing: 0.03em;
-  }
-  /* Carte mise en avant : bordure et halo, sans présélection. */
-  .choice-card--featured {
-    border-color: rgba(61, 107, 255, 0.6);
-    background: linear-gradient(150deg, rgba(0, 71, 255, 0.18), rgba(255, 255, 255, 0.03));
-    box-shadow: 0 14px 40px -24px rgba(0, 71, 255, 0.9);
-  }
   /* Icônes animées (transform/opacity). */
   .ci-anim { transform-box: fill-box; transform-origin: center; }
   .ci-spark { animation: ci-twinkle 2.4s ease-in-out infinite; }
@@ -2933,8 +2903,6 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
   @keyframes ci-zap { 0%, 100% { transform: scale(1); opacity: 1; } 45% { transform: scale(1.08); opacity: 0.85; } 55% { transform: scale(0.96); } }
   @media (prefers-reduced-motion: reduce) {
     .ci-anim { animation: none; }
-    .choice-card, .choice-card__icon { transition: none; }
-    .quiz-screen.is-active .choice-card.is-selected, .choice-card.is-selected .choice-card__icon { transform: none; }
   }
 
   .assemble-percent {
@@ -5690,6 +5658,7 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
     padding-bottom: 8px;
     background: linear-gradient(180deg, transparent, var(--ink) 35%);
   }
+${questionScreenCss}
 
   @media (prefers-reduced-motion: reduce) {
     .pause-glow { animation: none; opacity: 0.8; }
@@ -8687,6 +8656,11 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
       }
 
       function updateNextEnabled(screenEl) {
+        // QuestionScreen : ARIA, compteur et CTA gérés par le composant.
+        if (screenEl.classList.contains("qs")) {
+          qsSync(screenEl);
+          return;
+        }
         var nextBtn = screenEl.querySelector(".quiz-next");
         if (!nextBtn) return;
         var id = screenEl.getAttribute("data-id");
@@ -8805,6 +8779,7 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
         var exitTo = direction === "back" ? 24 : -24;
 
         applyEcho(nextEl);
+        if (nextEl.classList.contains("qs")) qsSync(nextEl);
         var nextId = nextEl.getAttribute("data-id");
         overlay.classList.toggle("is-goal-ambient", nextId === "objectifRevenu" || nextId === "revenus");
         if (nextId === "revenus") enterRevenue();
@@ -11220,6 +11195,8 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
           return;
         }
 
+        // Saisie dans la carte « Autre » : ne re-coche pas la carte.
+        if (e.target.closest(".qs-card__other")) return;
         var optBtn = e.target.closest(".quiz-option, .quiz-chip");
         if (optBtn) {
           haptic();
@@ -11280,6 +11257,10 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
           if (multiAdvanceTimer) {
             window.clearTimeout(multiAdvanceTimer);
             multiAdvanceTimer = null;
+          }
+          if (screenEl.classList.contains("qs")) {
+            qsAfterPick(screenEl, optBtn, type);
+            return;
           }
           if (optionsWrap.hasAttribute("data-no-advance")) return;
           if (screenEl.hasAttribute("data-groups") && !allGroupsAnswered(screenEl)) return;
@@ -11421,6 +11402,8 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
         }
       });
 
+
+${questionScreenClientJs}
 
       stage.addEventListener("keydown", function (e) {
         if (e.key !== "Enter") return;
@@ -11979,48 +11962,6 @@ function renderFaqItems(items) {
     .join("\n        ");
 }
 
-function renderQuizOption(opt) {
-  return `<button class="quiz-option${opt.highlight ? " quiz-option--highlight" : ""}" type="button" data-value="${opt.value}"${
-    opt.followup ? ` data-followup="${opt.followup.replace(/"/g, "&quot;")}"` : ""
-  }>
-                ${opt.emoji ? `<span class="quiz-option__emoji" aria-hidden="true">${opt.emoji}</span>` : ""}
-                <span class="quiz-option__body">
-                  <span class="quiz-option__label-row">
-                    <span class="quiz-option__label">${opt.label}</span>
-                    ${opt.badge ? `<span class="quiz-option__badge">${opt.badge}</span>` : ""}
-                  </span>
-                  ${opt.hint ? `<span class="quiz-option__hint">${opt.hint}</span>` : ""}
-                </span>
-                <span class="quiz-option__check" aria-hidden="true">${ICON_CHECK_SMALL}</span>
-              </button>`;
-}
-
-// Groupe d'options supplémentaire sur un écran (écran "groups", puces de
-// délai sous le slider). data-field = clé de réponse du groupe ; sans lui,
-// le moteur client utilise l'id de l'écran. data-no-advance : choisir une
-// option n'avance jamais seul (bouton Continuer à la place).
-function renderOptionGroup(group, { noAdvance = false, extraClass = "" } = {}) {
-  const freeTextOpt = group.options.find((opt) => opt.freeText);
-  const freeTextBlock = freeTextOpt
-    ? `<div class="quiz-freetext" data-freetext-for="${group.field}" hidden>
-                <input type="text" class="quiz-text-input" id="quiz-freetext-${group.field}" maxlength="${freeTextOpt.freeText.maxLength}" placeholder="${freeTextOpt.freeText.placeholder}" autocomplete="off" />
-                <button class="btn btn--primary quiz-next" type="button" disabled>Valider</button>
-              </div>`
-    : "";
-  return `${group.label ? `<p class="quiz-group-label">${group.label}</p>` : ""}
-            <div class="quiz-options${extraClass ? " " + extraClass : ""}" data-quiz-options data-type="single" data-field="${group.field}"${noAdvance ? " data-no-advance" : ""}>
-              ${group.options.map(renderQuizOption).join("\n              ")}
-            </div>
-            ${freeTextBlock}`;
-}
-
-function renderQuizOptions(question) {
-  const type = question.type === "multi" ? "multi" : "single";
-  return `<div class="quiz-options" data-quiz-options data-type="${type}">
-              ${question.options.map(renderQuizOption).join("\n              ")}
-            </div>`;
-}
-
 // Carrousel de fond de l'écran "proof" — 3 bandes de profondeur, chacune
 // une seule timeline CSS (jamais une animation par mini-carte). Contenu tiré
 // de REAL_SAAS_SAMPLE (vraies lignes de saas_listings_public, secteur +
@@ -12219,6 +12160,12 @@ function renderChapterHeader(question) {
 }
 
 function renderQuizQuestionScreen(question, index) {
+  // Écrans de questions à options (choix unique, multiple, groupe unique,
+  // cartes à icône) : un seul composant, voir scripts/question-screen.mjs.
+  if (QUESTION_SCREEN_TYPES.includes(question.type)) {
+    return renderQuestionScreen(question, index, { icons: CHOICE_CARD_ICONS });
+  }
+
   const skipAttrs = question.skipIf
     ? ` data-skip-field="${question.skipIf.field}" data-skip-equals="${question.skipIf.equals}"`
     : "";
@@ -12546,14 +12493,6 @@ function renderQuizQuestionScreen(question, index) {
 
   const chapterDataAttr = question.chapter ? ` data-chapter="${question.chapter}"` : "";
 
-  if (question.type === "groups") {
-    return `<div class="quiz-screen" data-screen="question" data-index="${index}" data-id="${question.id}" data-step-name="${question.stepName}" data-groups="${question.groups.length}"${skipAttrs}${chapterDataAttr}>
-          ${renderChapterHeader(question)}
-          <h2 class="quiz-question-title">${question.title}</h2>
-          ${question.groups.map((group) => renderOptionGroup(group, { extraClass: group.compact ? "quiz-options--chips" : "" })).join("\n          ")}
-        </div>`;
-  }
-
   if (question.type === "text") {
     return `<div class="quiz-screen" data-screen="question" data-index="${index}" data-id="${question.id}" data-step-name="${question.stepName}"${skipAttrs}${chapterDataAttr}>
           ${renderChapterHeader(question)}
@@ -12600,33 +12539,6 @@ function renderQuizQuestionScreen(question, index) {
           </div>
           <div class="quiz-footer">
             <button class="btn btn--primary quiz-next" type="button" hidden>Continuer</button>
-          </div>
-        </div>`;
-  }
-
-  // ---- Grandes cartes de choix (Acquisition, Accompagnement) ---------------
-  // Même moteur que les choix uniques (classe quiz-option, data-type
-  // single) : clic = sélection en spring puis passage automatique. Icône
-  // animée en transform/opacity uniquement ; carte featured = mise en avant
-  // visuelle, jamais présélectionnée.
-  if (question.type === "choice-cards") {
-    const cards = question.options
-      .map(
-        (opt) => `<button class="quiz-option choice-card${opt.featured ? " choice-card--featured" : ""}" type="button" data-value="${opt.value}">
-                <span class="choice-card__icon" aria-hidden="true">${CHOICE_CARD_ICONS[opt.icon] || ""}</span>
-                <span class="choice-card__body">
-                  ${opt.featured ? `<span class="choice-card__badge">${opt.featured}</span>` : ""}
-                  <span class="choice-card__label">${opt.label}</span>
-                </span>
-                <span class="quiz-option__check choice-card__check" aria-hidden="true">${ICON_CHECK_SMALL}</span>
-              </button>`
-      )
-      .join("\n              ");
-    return `<div class="quiz-screen choice-screen" data-screen="question" data-index="${index}" data-id="${question.id}" data-step-name="${question.stepName}"${skipAttrs}${question.chapter ? ` data-chapter="${question.chapter}"` : ""}>
-          ${renderChapterHeader(question)}
-          <h2 class="quiz-question-title">${question.title}</h2>
-          <div class="quiz-options choice-cards" data-quiz-options data-type="single">
-              ${cards}
           </div>
         </div>`;
   }
@@ -12692,34 +12604,7 @@ function renderQuizQuestionScreen(question, index) {
         </div>`;
   }
 
-  const followupBlock =
-    question.id === "dejaCherche" || question.id === "budget"
-      ? `<p class="quiz-followup" id="quiz-followup" aria-live="polite"></p>`
-      : "";
-
-  // Avance automatiquement au clic sur tous les écrans à options (voir le
-  // handler "quiz-option, quiz-chip" plus bas) -- jamais de bouton
-  // "Continuer" a afficher. Le choix multiple (secteur) utilise un delai
-  // plus long (debounce, reinitialise a chaque clic) pour laisser le temps
-  // de cocher plusieurs cases avant de partir.
-  const footerBlock = "";
-
-  const chapterAttr = question.chapter ? ` data-chapter="${question.chapter}"` : "";
-
-  // echoSubtext : texte qui reprend une réponse précédente ({champ}),
-  // résolu côté client à l'entrée de l'écran (voir applyEcho). subtext sert
-  // de repli si la réponse citée manque (reprise de brouillon partielle).
-  const echoAttr = question.echoSubtext ? ` data-echo="${question.echoSubtext.replace(/"/g, "&quot;")}"` : "";
-  const subtextHtml = question.subtext || question.echoSubtext ? `<p class="quiz-subtext"${echoAttr}>${question.subtext || ""}</p>` : "";
-
-  return `<div class="quiz-screen" data-screen="question" data-index="${index}" data-id="${question.id}" data-step-name="${question.stepName}"${skipAttrs}${chapterAttr}>
-          ${renderChapterHeader(question)}
-          <h2 class="quiz-question-title">${question.title}</h2>
-          ${subtextHtml}
-          ${renderQuizOptions(question)}
-          ${followupBlock}
-          ${footerBlock}
-        </div>`;
+  throw new Error(`Type d'écran inconnu : ${question.type} (${question.id})`);
 }
 
 function renderQuizOverlay({ quiz, pricing, stripeLink }) {
@@ -12749,18 +12634,18 @@ function renderQuizOverlay({ quiz, pricing, stripeLink }) {
       <span class="goal-halo" id="goal-halo"></span>
     </div>
     <div class="quiz-header">
-      <button class="quiz-back" id="quiz-back-btn" type="button">${ICON_ARROW_LEFT} Retour</button>
-      <span class="connected-badge" id="quiz-connected-badge" aria-live="polite">${ICON_CHECK_SMALL} Connecté</span>
+      <button class="quiz-back" id="quiz-back-btn" type="button" aria-label="Retour">${ICON_ARROW_LEFT}</button>
+      <div class="quiz-progress" id="quiz-progress" aria-hidden="true">
+        <div class="quiz-progress__group" data-chapter="1">
+          ${renderChapterSegs(chapter1Count)}
+        </div>
+        <div class="quiz-progress__group-gap"></div>
+        <div class="quiz-progress__group" data-chapter="2">
+          ${renderChapterSegs(chapter2Count)}
+        </div>
+      </div>
       <button class="quiz-close" id="quiz-close-btn" type="button" aria-label="Fermer">${ICON_CLOSE}</button>
-    </div>
-    <div class="quiz-progress" id="quiz-progress">
-      <div class="quiz-progress__group" data-chapter="1">
-        ${renderChapterSegs(chapter1Count)}
-      </div>
-      <div class="quiz-progress__group-gap" aria-hidden="true"></div>
-      <div class="quiz-progress__group" data-chapter="2">
-        ${renderChapterSegs(chapter2Count)}
-      </div>
+      <span class="connected-badge" id="quiz-connected-badge" aria-live="polite">${ICON_CHECK_SMALL} Connecté</span>
     </div>
     <div class="quiz-banner quiz-banner--alert" id="quiz-auth-banner" role="alert">
       <span id="quiz-auth-banner-text"></span>
