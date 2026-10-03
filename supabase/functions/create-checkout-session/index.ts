@@ -156,5 +156,15 @@ Deno.serve(async (req) => {
     return json({ error: "Réponse de paiement invalide." }, 502);
   }
 
+  // Lifecycle : checkout ouvert (relance +30 min si pas de paiement, voir
+  // lifecycle-dispatch). Tracé côté serveur, source fiable. Un échec ici ne
+  // bloque jamais le paiement.
+  const { error: eventError } = await supabaseAdmin.from("events").insert({
+    user_id: user.id,
+    type: "checkout_opened",
+    metadata: { duration_months: durationMonths, checkout_session_id: session.id ?? null },
+  });
+  if (eventError) console.warn("[create-checkout-session] événement checkout_opened non tracé :", eventError.message);
+
   return json({ url: session.url });
 });

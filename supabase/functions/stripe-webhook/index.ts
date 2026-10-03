@@ -93,6 +93,46 @@ const SUBSCRIPTION_ACCESS_UPDATES_ENABLED = Deno.env.get("ENABLE_SUBSCRIPTION_AC
 // subscription_data.metadata à la création), donc le même champ suffit
 // pour toute la famille d'évènements, pas besoin de retrouver le profil
 // par stripe_customer_id à chaque fois.
+// ---- Lifecycle ------------------------------------------------------------
+// user_id : metadata de l'objet, sinon metadata de l'abonnement portée par
+// la facture (selon la version d'API), sinon recherche par client Stripe.
+// deno-lint-ignore no-explicit-any
+async function resolveLifecycleUser(supabaseAdmin: any, object: Record<string, unknown>, userId: string | null, customerId: string | null) {
+  if (userId) return userId;
+  const pick = (o: unknown) => ((o as Record<string, unknown> | undefined)?.["metadata"] as Record<string, unknown> | undefined)?.["user_id"];
+  const fromInvoice =
+    pick(object["subscription_details"]) ??
+    pick(((object["parent"] ?? {}) as Record<string, unknown>)["subscription_details"]);
+  if (typeof fromInvoice === "string" && fromInvoice) return fromInvoice;
+  if (!customerId) return null;
+  const { data } = await supabaseAdmin.from("profiles").select("id").eq("stripe_customer_id", customerId).maybeSingle();
+  return data?.id ?? null;
+}
+
+// deno-lint-ignore no-explicit-any
+async function recordLifecycleEvent(supabaseAdmin: any, type: string, object: Record<string, unknown>, userId: string | null, customerId: string | null) {
+  const mapped =
+    type === "checkout.session.completed"
+      ? { type: "payment_succeeded", amount_cents: Number(object["amount_total"]) || null, metadata: { checkout_session_id: object["id"] ?? null } }
+      : type === "invoice.payment_failed"
+        ? {
+            type: "payment_failed",
+            amount_cents: Number(object["amount_due"]) || null,
+            metadata: { invoice_id: object["id"] ?? null, hosted_invoice_url: object["hosted_invoice_url"] ?? null, attempt_count: object["attempt_count"] ?? null },
+          }
+        : type === "customer.subscription.deleted"
+          ? { type: "subscription_canceled", amount_cents: null, metadata: { subscription_id: object["id"] ?? null } }
+          : null;
+  if (!mapped) return;
+  const resolvedUser = await resolveLifecycleUser(supabaseAdmin, object, userId, customerId);
+  if (!resolvedUser) {
+    console.warn(`[stripe-webhook] événement lifecycle ${mapped.type} sans utilisateur identifiable.`);
+    return;
+  }
+  const { error } = await supabaseAdmin.from("events").insert({ user_id: resolvedUser, ...mapped });
+  if (error) console.error("[stripe-webhook] événement lifecycle non enregistré :", error.message);
+}
+
 async function handleSubscriptionEvent(event: { id: string; type: string; data: { object: Record<string, unknown> } }) {
   const supabaseAdmin = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
   const object = event.data.object ?? {};
@@ -132,6 +172,12 @@ async function handleSubscriptionEvent(event: { id: string; type: string; data: 
   console.log(
     `[stripe-webhook] évènement d'abonnement journalisé : ${event.type} (${event.id}), user_id=${userId ?? "inconnu"}, status=${status ?? "n/a"}, subscription_access_updates_enabled=${SUBSCRIPTION_ACCESS_UPDATES_ENABLED}`
   );
+
+  // Lifecycle : paiement réussi / échoué, résiliation -> table events
+  // (déclencheurs, attribution des € récupérés). Après la journalisation
+  // dédoublonnée ci-dessus : un renvoi Stripe ne crée jamais deux
+  // événements. Indépendant du gate SUBSCRIPTION_ACCESS_UPDATES_ENABLED.
+  await recordLifecycleEvent(supabaseAdmin, event.type, object, userId, stripeCustomerId);
 
   // Compteur promo_codes.redemptions -- indépendant du gate
   // SUBSCRIPTION_ACCESS_UPDATES_ENABLED (un simple compteur, aucun octroi

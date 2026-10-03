@@ -1,5 +1,12 @@
 // Supabase Edge Function — vérifie le token de désabonnement (HMAC signé,
 // voir admin-send-campaign/signUnsubscribeToken) et pose unsubscribed_at.
+//
+// Deux appels possibles :
+//   - page /desabonnement : POST JSON { token } ;
+//   - désinscription en 1 clic depuis Gmail / Yahoo (RFC 8058) : POST sur
+//     l'URL de l'en-tête List-Unsubscribe (?token=...), corps
+//     « List-Unsubscribe=One-Click » en form-urlencoded.
+// Dans les deux cas, le consentement marketing est aussi retiré.
 // Endpoint public (--no-verify-jwt) : la sécurité vient de la signature du
 // token, pas d'une session -- quelqu'un qui reçoit l'email n'est pas
 // forcément connecté au moment où il clique.
@@ -55,7 +62,15 @@ Deno.serve(async (req) => {
     return json({ error: "Configuration manquante." }, 500);
   }
 
-  const { token } = await req.json();
+  // Jeton dans l'URL (1 clic) ou dans le corps JSON (page /desabonnement).
+  let token = new URL(req.url).searchParams.get("token");
+  if (!token) {
+    try {
+      token = (await req.json()).token ?? null;
+    } catch {
+      token = null;
+    }
+  }
   if (!token) return json({ error: "Token manquant." }, 400);
 
   const userId = await verifyToken(token, unsubSecret);
@@ -68,7 +83,7 @@ Deno.serve(async (req) => {
 
   const { error } = await supabaseAdmin
     .from("profiles")
-    .update({ unsubscribed_at: new Date().toISOString() })
+    .update({ unsubscribed_at: new Date().toISOString(), marketing_opt_in: false })
     .eq("id", userId);
 
   if (error) {

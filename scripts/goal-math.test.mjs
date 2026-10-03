@@ -97,3 +97,9 @@ test("assistant revenus : bienveillant pour tout montant, sans promesse ni jugem
   assert.match(G.currentEquivalence(0), /Rien pour l'instant/);
   assert.equal(G.currentEquivalence(1400), "≈ un SMIC");
 });
+
+test("copie Edge Functions identique (supabase/functions/_shared/goal-math.js)", () => {
+  const a = readFileSync(new URL("./goal-math.js", import.meta.url), "utf8");
+  const b = readFileSync(new URL("../supabase/functions/_shared/goal-math.js", import.meta.url), "utf8");
+  assert.equal(b, a, "Recopier scripts/goal-math.js vers supabase/functions/_shared/goal-math.js");
+});

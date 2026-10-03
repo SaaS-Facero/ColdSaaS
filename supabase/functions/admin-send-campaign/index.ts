@@ -111,6 +111,11 @@ Deno.serve(async (req) => {
     .single();
   if (callerErr || !callerProfile?.is_admin) return json({ error: "Accès refusé." }, 403);
 
+  // Arrêt d'urgence (lifecycle_settings.kill_switch) : bloque aussi les
+  // campagnes manuelles.
+  const { data: lifecycleSettings } = await supabaseAdmin.from("lifecycle_settings").select("kill_switch").eq("id", true).maybeSingle();
+  if (lifecycleSettings?.kill_switch) return json({ error: "Arrêt d'urgence actif : aucun envoi." }, 423);
+
   const resendApiKey = Deno.env.get("RESEND_API_KEY");
   const unsubSecret = Deno.env.get("UNSUB_SECRET");
   if (!resendApiKey || !unsubSecret) {
@@ -136,6 +141,10 @@ Deno.serve(async (req) => {
     .from("profiles")
     .select("id, prenom, secteur, updated_at")
     .is("unsubscribed_at", null)
+    // Mêmes règles que lifecycle-dispatch (migration 0033) : consentement
+    // marketing explicite, adresse non supprimée (bounce dur / plainte).
+    .eq("marketing_opt_in", true)
+    .is("email_suppressed_at", null)
     .lt("updated_at", cutoff);
 
   if (segment.type === "quiz_abandonne") {
@@ -195,7 +204,19 @@ Deno.serve(async (req) => {
       const emailRes = await fetch("https://api.resend.com/emails", {
         method: "POST",
         headers: { Authorization: `Bearer ${resendApiKey}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ from: FROM_ADDRESS, to: email, subject: renderedSubject, html: renderedBody })
+        body: JSON.stringify({
+          from: FROM_ADDRESS,
+          to: email,
+          subject: renderedSubject,
+          html: renderedBody,
+          // Désinscription en 1 clic depuis la messagerie (RFC 8058, règles
+          // Gmail / Yahoo) ; tag user_id relu par resend-webhook.
+          headers: {
+            "List-Unsubscribe": `<${Deno.env.get("SUPABASE_URL")}/functions/v1/unsubscribe?token=${encodeURIComponent(unsubToken)}>`,
+            "List-Unsubscribe-Post": "List-Unsubscribe=One-Click"
+          },
+          tags: [{ name: "user_id", value: profile.id }, { name: "sequence", value: "campaign" }]
+        })
       });
 
       if (!emailRes.ok) {

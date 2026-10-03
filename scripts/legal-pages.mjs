@@ -970,7 +970,7 @@ export function confidentialitePage({ brand, siteUrl }) {
 }
 
 // ---- 5. Cookies ------------------------------------------------------------------
-export function cookiesPage({ brand, siteUrl }) {
+export function cookiesPage({ brand, siteUrl, ads = { tiktokId: "", metaId: "" } }) {
   const rows = [
     ["Session de connexion (Supabase)", "Stockage local du navigateur", "Te garder connecté", "Strictement nécessaire", "Jusqu'à la déconnexion"],
     ["Brouillon du quiz", "Stockage local", "Reprendre le quiz là où tu t'es arrêté", "Strictement nécessaire (service demandé)", "Jusqu'à la fin du quiz"],
@@ -979,6 +979,13 @@ export function cookiesPage({ brand, siteUrl }) {
     ["Messagerie Crisp", "Cookies et stockage local", "Faire fonctionner la bulle de support et garder l'historique de ta conversation", todo("qualification à valider"), todo("durée")],
     ["Préférence d'administration (ct_vm)", "Cookie", "Réservé aux comptes administrateurs, jamais déposé pour un visiteur", "Strictement nécessaire", "30 jours"]
   ];
+  // Retargeting (scripts/consent-pixels.mjs) : listé seulement s'il est
+  // configuré, et soumis à consentement.
+  if (ads.tiktokId || ads.metaId) {
+    rows.push(["Choix de consentement publicitaire (ct_ads_consent)", "Stockage local", "Mémoriser ton choix Accepter / Refuser", "Strictement nécessaire", "6 mois"]);
+    if (ads.metaId) rows.push(["Pixel Meta (Facebook, Instagram)", "Cookies tiers", "Mesurer les visites et te remontrer ColdTrend sur Meta", "Soumis à ton consentement", "Jusqu'à 13 mois"]);
+    if (ads.tiktokId) rows.push(["Pixel TikTok", "Cookies tiers", "Mesurer les visites et te remontrer ColdTrend sur TikTok", "Soumis à ton consentement", "Jusqu'à 13 mois"]);
+  }
   const tableRows = rows.map((r) => `<tr><td><strong>${r[0]}</strong></td><td>${r[1]}</td><td>${r[2]}</td><td>${r[3]}</td><td>${r[4]}</td></tr>`).join("");
   return legalPage({
     brand,

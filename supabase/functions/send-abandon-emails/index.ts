@@ -26,7 +26,15 @@ function json(body: unknown, status = 200) {
   });
 }
 
+// DÉSACTIVÉE (2026-10-03) : remplacée par lifecycle-dispatch (consentement,
+// désinscription en 1 clic, plafond 24 h, groupe témoin, lien magique
+// valide au clic). Le cron historique (créé à la main dans le dashboard)
+// peut continuer d'appeler cette URL : elle ne fait plus rien. Le code
+// d'origine est conservé ci-dessous pour mémoire, inatteignable.
+const DISABLED = true;
+
 Deno.serve(async (req) => {
+  if (DISABLED) return json({ disabled: true, replacedBy: "lifecycle-dispatch" });
   const cronSecret = Deno.env.get("CRON_SECRET");
   const providedSecret = req.headers.get("x-cron-secret");
   if (!cronSecret || providedSecret !== cronSecret) {

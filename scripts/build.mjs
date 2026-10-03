@@ -3,6 +3,7 @@ import { fileURLToPath } from "node:url";
 import path from "node:path";
 import vm from "node:vm";
 import { siteFooterCss, siteFooterHtml } from "./site-footer.mjs";
+import { consentPixelsConfig, consentPixelsHtml } from "./consent-pixels.mjs";
 import {
   mentionsLegalesPage,
   cgvPage,
@@ -2834,6 +2835,29 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
     transform-origin: left center;
     transform: scaleX(0);
     transition: transform 900ms cubic-bezier(0.3, 0.7, 0.4, 1);
+  }
+
+  /* Opt-in emails de la gate : zone tactile ≥ 44px, case native lisible. */
+  .gate-optin {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    min-height: 44px;
+    margin: 14px 0 0;
+    padding: 6px 0;
+    font-size: 13px;
+    line-height: 1.45;
+    color: var(--paper-soft);
+    text-align: left;
+    cursor: pointer;
+  }
+  .gate-optin input {
+    flex: none;
+    width: 20px;
+    height: 20px;
+    margin: 1px 0 0;
+    accent-color: var(--cobalt);
+    cursor: pointer;
   }
 
   .assemble-note {
@@ -7188,6 +7212,11 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
 
   ${renderQuizOverlay({ quiz, pricing, stripeLink: STRIPE_PAYMENT_LINK })}
 
+  <!-- Retargeting TikTok / Meta : rien n'est rendu tant que TIKTOK_PIXEL_ID /
+       META_PIXEL_ID ne sont pas définis ; ensuite, uniquement après
+       consentement (scripts/consent-pixels.mjs). -->
+  ${consentPixelsHtml(consentPixelsConfig())}
+
   <!-- Le quiz et /inscription résolvent tous les deux l'identité côté
        serveur via supabase/functions/resolve-identity — un seul mécanisme
        d'auth pour toute l'app, quel que soit le point d'entrée. -->
@@ -7833,6 +7862,8 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
         // Acquisition / Accompagnement (migration 0032).
         if (answers.videoIA) fields.wants_ai_video = answers.videoIA === "oui";
         if (answers.accompagnement) fields.support_level = answers.accompagnement;
+        // Frein(s) déclaré(s) au quiz (migration 0033) : email objection.
+        if (Array.isArray(answers.blocage) && answers.blocage.length) fields.blocage = answers.blocage;
         return fields;
       }
 
@@ -9056,6 +9087,28 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
         });
       })();
 
+      // Lifecycle : événement de navigation pour la personne connectée
+      // (table events, RLS : ses propres événements, types limités).
+      // Jamais en Mode Vidéo ; silencieux en cas d'échec.
+      function trackLifecycle(type) {
+        if (demoMode) return;
+        var supabase = window.ColdTrendSupabase;
+        if (!supabase) return;
+        var pending = authResolutionPromise || Promise.resolve(true);
+        pending
+          .then(function () {
+            return supabase.auth.getUser();
+          })
+          .then(function (res) {
+            var user = res.data ? res.data.user : null;
+            if (!user || user.is_anonymous) return;
+            return supabase.from("events").insert({ user_id: user.id, type: type });
+          })
+          .catch(function () {
+            /* la mesure ne bloque jamais le parcours */
+          });
+      }
+
       function goToResult() {
         reachedResult = true;
         transitionTo(resultScreen, "forward");
@@ -9065,6 +9118,7 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
         // complété", plus un vrai comptage de fiches correspondantes.
         answers.matchCount = 1;
         persistQuizAnswers(); // no-op en Mode Vidéo
+        trackLifecycle("result_viewed");
 
         // Projection : même revealDashboard() et même computeProjection()
         // que le public (formule déterministe, fourchette basse, mention
@@ -9113,6 +9167,7 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
 
       function goToPayment() {
         trackEvent("result_cta_clicked", {});
+        trackLifecycle("offers_viewed");
         var teaserEl = document.getElementById("quiz-teaser");
         var conceptName = answers.concept ? answers.concept.concept_name : "ton concept";
         teaserEl.textContent = answers.concept
@@ -10652,6 +10707,9 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
               funnel_last_step: 6,
               converted: true
             };
+            // Consentement emails (case de la gate) : écrit seulement s'il
+            // est donné ; l'horodatage est posé par la base (trigger).
+            if (answers.marketingOptIn === true) update.marketing_opt_in = true;
             // objectif_mensuel, delai_mois, current_revenue : écrans répondus
             // uniquement (voir goalProfileFields).
             var goalFields = goalProfileFields();
@@ -10728,6 +10786,10 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
           }
           if (id === "delai") renderDelay();
           if (id === "revenus") syncRevenueUI();
+          if (id === "auth") {
+            var optInBox = document.getElementById("quiz-optin");
+            if (optInBox) optInBox.checked = answers.marketingOptIn === true;
+          }
           if (id === "auth") return;
           // Chaque groupe d'options de l'écran (plusieurs sur "situation",
           // puces de délai sous le slider) a sa propre clé de réponse.
@@ -11334,6 +11396,12 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
       // pendant le drag) -- la pulsation de confirmation ne doit jouer
       // qu'une fois le choix arrêté.
       stage.addEventListener("change", function (e) {
+        // Opt-in emails (gate).
+        if (e.target.id === "quiz-optin") {
+          answers.marketingOptIn = !!e.target.checked;
+          saveDraftLocally();
+          return;
+        }
         // Fin de saisie du montant (perte de focus) : valeur reformatée.
         if (e.target.id === "goal-amount-input") {
           setGoal(goalFromInput(e.target.value), "commit");
@@ -12273,6 +12341,13 @@ function renderQuizQuestionScreen(question, index) {
             <li>${ICON_CHECK_SMALL} Réponses sauvegardées</li>
             <li>${ICON_CHECK_SMALL} Zéro spam</li>
           </ul>
+          <!-- Consentement aux emails de conseils et de relance : case NON
+               pré-cochée, facultative (ne conditionne pas l'accès). Sans elle,
+               aucune relance marketing n'est envoyée (lifecycle-dispatch). -->
+          <label class="gate-optin" for="quiz-optin">
+            <input type="checkbox" id="quiz-optin" />
+            <span>J'accepte de recevoir par email les conseils et rappels de Max pour lancer mon projet. Désinscription en 1 clic.</span>
+          </label>
           <p class="gate-legal">En continuant, tu confirmes avoir 18 ans ou plus et accepter nos <a href="/mentions-legales" target="_blank" rel="noopener">mentions légales</a>.</p>
         </div>`;
   }
@@ -16091,6 +16166,20 @@ html, body {
   margin-bottom: 24px;
 }
 
+.admin-lc__switches { display: flex; flex-wrap: wrap; gap: 10px 18px; align-items: center; margin: 12px 0; }
+.admin-lc__switch, .admin-lc__field { display: inline-flex; align-items: center; gap: 8px; min-height: 44px; font-size: 14px; }
+.admin-lc__field input { min-height: 36px; padding: 6px 10px; border-radius: 8px; border: 1px solid rgba(255, 255, 255, 0.15); background: rgba(255, 255, 255, 0.04); color: inherit; font: inherit; }
+.admin-lc__field input[type="number"] { width: 70px; }
+.admin-lc__kill { background: #D9605A; color: #fff; border: 0; min-height: 44px; font-weight: 700; }
+.admin-lc__kill.is-on { background: #22C55E; color: #06120A; }
+.admin-lc__test { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin: 14px 0; }
+.admin-lc__test select { min-height: 40px; border-radius: 8px; padding: 6px 10px; font: inherit; }
+.admin-lc__subtitle { margin: 18px 0 8px; font-size: 15px; }
+.admin-lc__table-wrap { overflow-x: auto; margin-bottom: 12px; }
+.admin-lc__table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.admin-lc__table th, .admin-lc__table td { padding: 8px 10px; border-bottom: 1px solid rgba(255, 255, 255, 0.08); text-align: right; white-space: nowrap; }
+.admin-lc__table th:first-child, .admin-lc__table td:first-child { text-align: left; }
+
 /* Mode Vidéo (arme le cookie ct_vm), poussé à droite du header. */
 .admin-demo-btn {
   margin-left: auto;
@@ -17853,6 +17942,33 @@ function adminPage() {
       </span>
     </header>
 
+    <!-- Relances lifecycle (supabase/functions/admin-lifecycle). Démarre
+         désactivé et en mode test : rien ne part tant que ce panneau ne
+         l'a pas décidé. -->
+    <section class="admin-campaign admin-lifecycle" aria-label="Relances" id="lifecycle-section">
+      <h2 class="admin-campaign__title">Relances automatiques</h2>
+      <p class="admin-analytics__note" id="lc-status">Chargement…</p>
+      <div class="admin-lc__switches">
+        <label class="admin-lc__switch"><input type="checkbox" id="lc-enabled" /> Système activé</label>
+        <label class="admin-lc__switch"><input type="checkbox" id="lc-test-mode" /> Mode test (aucun envoi réel)</label>
+        <label class="admin-lc__field">Groupe témoin (%) <input type="number" id="lc-holdout" min="0" max="50" step="1" /></label>
+        <label class="admin-lc__field">Adresse de test <input type="email" id="lc-test-recipient" placeholder="ton email" /></label>
+        <label class="admin-lc__field">Reply-to <input type="email" id="lc-reply-to" /></label>
+        <label class="admin-lc__field">Expéditeur <input type="text" id="lc-from" /></label>
+        <button type="button" class="admin-btn admin-btn--secondary" id="lc-save">Enregistrer</button>
+      </div>
+      <button type="button" class="admin-btn admin-lc__kill" id="lc-kill">Arrêt d'urgence</button>
+      <div class="admin-lc__test">
+        <select id="lc-template" aria-label="Email à tester"></select>
+        <button type="button" class="admin-btn admin-btn--secondary" id="lc-send-test">M'envoyer cet email</button>
+        <span class="admin-campaign__result" id="lc-test-result"></span>
+      </div>
+      <h3 class="admin-lc__subtitle">€ récupérés (60 jours)</h3>
+      <div class="admin-lc__table-wrap"><table class="admin-lc__table" id="lc-sequences"></table></div>
+      <div class="admin-lc__table-wrap"><table class="admin-lc__table" id="lc-emails"></table></div>
+      <p class="admin-analytics__note">Attribution : dernier email réellement envoyé dans les 7 jours avant le paiement. Gain estimé : (€ par personne relancée − € par personne du groupe témoin) × personnes relancées, conversion mesurée à 14 jours. Peu fiable sous 30 personnes témoins.</p>
+    </section>
+
     <section class="admin-campaign admin-analytics" aria-label="Pages vues" id="analytics-section">
       <h2 class="admin-campaign__title">Pages vues</h2>
       <p class="admin-analytics__note">Mesure maison (funnel_events), aucun service tiers, aucun cookie. <span id="analytics-truncated" hidden> — calculé sur les 5000 évènements les plus récents.</span></p>
@@ -18150,6 +18266,128 @@ function adminPage() {
         });
         return res.json();
       }
+
+      // ---- Relances automatiques (admin-lifecycle) -----------------------
+      // Tout passe par la fonction (rôle admin revérifié côté serveur) ;
+      // le jeton du cron n'est jamais renvoyé au navigateur.
+      var LC_LABELS = {
+        "result_unpaid:1": "Résultat non payé · +1 h (concept)",
+        "result_unpaid:2": "Résultat non payé · +24 h (objection)",
+        "result_unpaid:3": "Résultat non payé · +72 h (mini-plan)",
+        "result_unpaid:4": "Résultat non payé · +7 j (rupture)",
+        "checkout_abandon:1": "Checkout ouvert · +30 min",
+        "payment_failed:1": "Paiement échoué (transactionnel)",
+        "quiz_abandon:1": "Quiz arrêté à l'écran N"
+      };
+      var lcKill = false;
+
+      function lcEuros(cents) {
+        return (Math.round(cents) / 100).toLocaleString("fr-FR", { style: "currency", currency: "EUR" });
+      }
+
+      function lcCell(tag, text) {
+        var el = document.createElement(tag);
+        el.textContent = text;
+        return el;
+      }
+
+      function lcTable(table, head, rows) {
+        table.textContent = "";
+        var tr = document.createElement("tr");
+        head.forEach(function (h) { tr.appendChild(lcCell("th", h)); });
+        table.appendChild(tr);
+        rows.forEach(function (r) {
+          var line = document.createElement("tr");
+          r.forEach(function (c) { line.appendChild(lcCell("td", String(c))); });
+          table.appendChild(line);
+        });
+      }
+
+      function lcRender(data) {
+        if (!data || data.error) {
+          document.getElementById("lc-status").textContent = (data && data.error) || "Indisponible.";
+          return;
+        }
+        var s = data.settings || {};
+        document.getElementById("lc-enabled").checked = !!s.enabled;
+        document.getElementById("lc-test-mode").checked = !!s.test_mode;
+        document.getElementById("lc-holdout").value = s.holdout_percent;
+        document.getElementById("lc-test-recipient").value = s.test_recipient || "";
+        document.getElementById("lc-reply-to").value = s.reply_to || "";
+        document.getElementById("lc-from").value = s.from_address || "";
+        lcKill = !!s.kill_switch;
+        var kill = document.getElementById("lc-kill");
+        kill.textContent = lcKill ? "Arrêt d'urgence ACTIF — relancer les envois" : "Arrêt d'urgence";
+        kill.classList.toggle("is-on", lcKill);
+        var v = data.volumes || {};
+        var state = lcKill ? "ARRÊT D'URGENCE" : !s.enabled ? "désactivé" : s.test_mode ? "mode test (aucun envoi réel)" : "ENVOIS RÉELS";
+        document.getElementById("lc-status").textContent =
+          "État : " + state + " · envoyés 24 h : " + v.sent24 + " · simulés 24 h : " + v.test24 +
+          " · envoyés 30 j : " + v.sent30 + " · consentements : " + v.optIns +
+          " · taux de plainte 30 j : " + (data.complaintRate * 100).toFixed(2) + " % (objectif < 0,1 %)";
+        var select = document.getElementById("lc-template");
+        if (!select.options.length) {
+          (data.templates || []).forEach(function (t) {
+            var o = document.createElement("option");
+            o.value = t;
+            o.textContent = LC_LABELS[t] || t;
+            select.appendChild(o);
+          });
+        }
+      }
+
+      async function lcLoad() {
+        lcRender(await callAdminFunction("admin-lifecycle", { action: "get" }));
+        var stats = await callAdminFunction("admin-lifecycle", { action: "stats" });
+        if (!stats || stats.error) return;
+        lcTable(
+          document.getElementById("lc-sequences"),
+          ["Séquence", "Relancés", "Témoin", "Conv. relancés", "Conv. témoin", "€ attribués", "Gain estimé"],
+          Object.keys(stats.bySequence).map(function (k) {
+            var a = stats.bySequence[k];
+            var pct = function (n, d) { return d ? Math.round((n / d) * 1000) / 10 + " %" : "—"; };
+            return [k, a.treated, a.holdout, pct(a.treatedConv, a.treated), pct(a.holdoutConv, a.holdout), lcEuros(a.attributedRevenueCents), a.holdout ? lcEuros(a.incrementalRevenueCents) : "—"];
+          })
+        );
+        lcTable(
+          document.getElementById("lc-emails"),
+          ["Email", "Envoyés", "Simulés", "Témoin", "Échecs", "Clics", "Paiements", "€ attribués"],
+          stats.byEmail.map(function (r) {
+            var key = r.sequence + ":" + r.step;
+            return [LC_LABELS[key] || key, r.sent, r.test, r.holdout, r.failed, r.clicks, r.conversions, lcEuros(r.revenueCents)];
+          })
+        );
+      }
+
+      document.getElementById("lc-save").addEventListener("click", async function () {
+        var enabled = document.getElementById("lc-enabled").checked;
+        var testMode = document.getElementById("lc-test-mode").checked;
+        if (enabled && !testMode && !window.confirm("Activer les ENVOIS RÉELS aux personnes ayant consenti ?")) return;
+        lcRender(
+          await callAdminFunction("admin-lifecycle", {
+            action: "update",
+            enabled: enabled,
+            test_mode: testMode,
+            holdout_percent: Number(document.getElementById("lc-holdout").value),
+            test_recipient: document.getElementById("lc-test-recipient").value.trim() || null,
+            reply_to: document.getElementById("lc-reply-to").value.trim(),
+            from_address: document.getElementById("lc-from").value.trim()
+          })
+        );
+      });
+
+      document.getElementById("lc-kill").addEventListener("click", async function () {
+        lcRender(await callAdminFunction("admin-lifecycle", { action: "update", kill_switch: !lcKill }));
+      });
+
+      document.getElementById("lc-send-test").addEventListener("click", async function () {
+        var out = document.getElementById("lc-test-result");
+        out.textContent = "Envoi…";
+        var res = await callAdminFunction("admin-lifecycle", { action: "send_test", template: document.getElementById("lc-template").value });
+        out.textContent = res && res.sent ? "Envoyé à " + res.to + " : " + res.subject : (res && res.error) || "Échec.";
+      });
+
+      lcLoad();
 
       document.getElementById("campaign-send-btn").addEventListener("click", async function () {
         var segment = document.getElementById("campaign-segment").value;
@@ -18525,7 +18763,7 @@ writeBuiltFile(path.join(OUT_DIR, "conditions-remboursement.html"), garantiePage
 writeBuiltFile(path.join(OUT_DIR, "cgv.html"), cgvPage({ brand, siteUrl: SITE_URL, durationPlans: DURATION_PLANS }));
 writeBuiltFile(path.join(OUT_DIR, "cgu.html"), cguPage({ brand, siteUrl: SITE_URL }));
 writeBuiltFile(path.join(OUT_DIR, "confidentialite.html"), confidentialitePage({ brand, siteUrl: SITE_URL }));
-writeBuiltFile(path.join(OUT_DIR, "cookies.html"), cookiesPage({ brand, siteUrl: SITE_URL }));
+writeBuiltFile(path.join(OUT_DIR, "cookies.html"), cookiesPage({ brand, siteUrl: SITE_URL, ads: consentPixelsConfig() }));
 writeBuiltFile(path.join(OUT_DIR, "resilier.html"), resilierPage({ brand, siteUrl: SITE_URL }));
 writeBuiltFile(path.join(OUT_DIR, "404.html"), notFoundPage({ brand, siteUrl: SITE_URL }));
 writeBuiltFile(path.join(OUT_DIR, "contact.html"), contactPage({ brand, siteUrl: SITE_URL }));
