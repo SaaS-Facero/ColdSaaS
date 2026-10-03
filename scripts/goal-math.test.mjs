@@ -69,3 +69,31 @@ test("assistant : un message par palier, honnête, sans promesse", () => {
   for (const m of msgs) assert.doesNotMatch(m, /tu vas gagner|garanti[e]? |assuré|certain/i);
   assert.match(G.assistantMessage(40000), /rien te garantir/);
 });
+
+test("revenus actuels : échelle 0 -> 3 000 -> 10 000 €, aller-retour stable", () => {
+  const R = G.revenueScale;
+  assert.equal(R.positionToValue(0), 0);
+  assert.equal(R.positionToValue(600), 3000);
+  assert.equal(R.positionToValue(1000), 10000);
+  for (const v of [0, 500, 1500, 3000, 6000, 10000]) assert.equal(R.positionToValue(R.valueToPosition(v)), v);
+});
+
+test("écart objectif / revenus actuels", () => {
+  assert.equal(G.goalGap(3000, 1000), "× 3 tes revenus actuels");
+  assert.equal(G.goalGap(2500, 1000), "× 2,5 tes revenus actuels");
+  assert.equal(G.goalGap(25000, 1000), "× 25 tes revenus actuels");
+  assert.equal(G.goalGap(1000, 1000), "Autant que tes revenus actuels");
+  assert.equal(G.goalGap(500, 1500), "Moins que tes revenus actuels");
+  assert.equal(G.goalGap(3000, 0), "Ton premier objectif");
+  assert.equal(G.goalGap(3000, null), "Ton premier objectif");
+  assert.equal(G.goalGap(3000, undefined), "Ton premier objectif");
+});
+
+test("assistant revenus : bienveillant pour tout montant, sans promesse ni jugement", () => {
+  const cases = [["montant", 0], ["montant", 400], ["montant", 2000], ["montant", 8000], ["non_reponse", null], ["autre", null]];
+  const msgs = cases.map(([m, v]) => G.revenueAssistantMessage(m, v));
+  assert.equal(new Set(msgs).size, 6);
+  for (const m of msgs) assert.doesNotMatch(m, /garanti|tu vas gagner|seulement|insuffisant|trop peu|pas assez/i);
+  assert.match(G.currentEquivalence(0), /Rien pour l'instant/);
+  assert.equal(G.currentEquivalence(1400), "≈ un SMIC");
+});

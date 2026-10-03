@@ -520,10 +520,9 @@ const quiz = {
       subtext: "personnes se sont déjà inscrites sur ColdTrend."
     },
     {
-      // Phase Situation, écran 4 -- fusion "comment tu gagnes ta vie" +
-      // "revenus mensuels" : deux groupes sur le même écran, avance auto
-      // quand les deux sont répondus. "autre" ouvre un champ libre validé
-      // à la main (pas d'avance auto tant qu'il est vide).
+      // Phase Situation, écran 4 -- « comment tu gagnes ta vie ». Les revenus
+      // mensuels, longtemps un second groupe de cet écran, ont désormais
+      // leur écran dédié (id "revenus", juste avant l'objectif).
       id: "situation",
       stepName: "situation",
       chapter: 1,
@@ -540,18 +539,6 @@ const quiz = {
             { value: "independant", label: "Freelance ou indépendant", emoji: "🧑‍💻" },
             { value: "sans_activite", label: "Sans activité pour l'instant", emoji: "🌱" },
             { value: "business_en_ligne", label: "Déjà un business en ligne", emoji: "📈" }
-          ]
-        },
-        {
-          field: "revenus",
-          label: "Et tes revenus par mois ?",
-          compact: true,
-          options: [
-            { value: "zero", label: "Rien pour l'instant" },
-            { value: "100_1000", label: "100 – 1 000 €" },
-            { value: "1000_5000", label: "1 000 – 5 000 €" },
-            { value: "5000_10000", label: "5 000 – 10 000 €" },
-            { value: "autre", label: "Ma réponse n'est pas là", freeText: { placeholder: "Écris ta réponse", maxLength: 60 } }
           ]
         }
       ]
@@ -743,12 +730,31 @@ const quiz = {
       ]
     },
     {
-      // Écran A « Montant » -- concept « Ton espace prend vie » : la
-      // question à gauche, l'aperçu live de l'espace ColdTrend à droite
-      // (au-dessus en mobile), rempli avec les réponses déjà données. Tous
-      // les chiffres (paliers, slider non linéaire, prix moyen, équivalences)
-      // viennent de scripts/goal-math.js. Plus aucune mention de délai ici :
-      // le délai a son propre écran juste après.
+      // Écran « Revenus actuels » -- même niveau de soin que l'écran
+      // Objectif : montant en grand modifiable au tap, raccourcis, slider
+      // non linéaire 0 -> 10 000 € et plus, équivalence SMIC, réaction de
+      // l'assistant (bienveillante quel que soit le montant). « Je préfère
+      // ne pas répondre » toujours visible, « Autre » avec saisie libre.
+      // Calculs et messages : scripts/goal-math.js. Stockage :
+      // profiles.current_revenue (null si pas de montant).
+      id: "revenus",
+      stepName: "revenus-actuels",
+      chapter: 2,
+      chapterLabel: "Tes revenus",
+      chapterIcon: "budget",
+      type: "goal-revenue",
+      title: "Combien gagnes-tu par mois aujourd'hui ?",
+      subtext: "Zéro, c'est un excellent point de départ.",
+      shortcuts: [0, 500, 1500, 3000],
+      cta: "Continuer"
+    },
+    {
+      // Écran A « Montant » -- une colonne centrée (520px) : mini-stepper
+      // « Ton plan » sous les puces récap, montant + écart avec les revenus
+      // actuels, jauge sous le montant, raccourcis, slider, puis la bulle
+      // « Assistant ColdTrend ». Tous les chiffres (paliers, slider non
+      // linéaire, prix moyen, équivalences, écart) viennent de
+      // scripts/goal-math.js. Le délai a son propre écran juste après.
       id: "objectifRevenu",
       stepName: "objectif-revenu",
       chapter: 2,
@@ -779,22 +785,6 @@ const quiz = {
       cta: "Continuer"
     },
     {
-      // Phase Engagement, écran 16 -- remplace la question "persévérance"
-      // (tout le monde répond oui) par un engagement à valider en
-      // maintenant appuyé. Pas de segment de progression : moment de
-      // cadrage, pas une question.
-      id: "engagement",
-      stepName: "engagement",
-      type: "engagement",
-      title: "Avant de construire, un engagement.",
-      subtext: "Ton projet mérite que tu t'y tiennes.",
-      commitments: [
-        { text: "Je bloque du temps chaque semaine pour mon projet.", echo: "Je bloque {temps} par semaine pour mon projet." },
-        { text: "Je publie, même quand ce n'est pas parfait." },
-        { text: "Je ne lâche pas au premier obstacle." }
-      ]
-    },
-    {
       // Phase Loading, écran 17 -- étapes cochées une à une, slogans
       // rotatifs (ex-écrans 15-18), interrompu par 2 pop-ups plein écran.
       // Les réponses (influenceurs, clippers) orientent les canaux du
@@ -819,6 +809,25 @@ const quiz = {
       popups: [
         { field: "influenceurs", atStep: 2, question: "Es-tu prêt à engager des influenceurs ?", hint: "Pour faire parler de ton produit plus vite." },
         { field: "clippers", atStep: 4, question: "Es-tu prêt à engager des clippers ?", hint: "Ils démultiplient ton contenu sur leurs comptes." }
+      ]
+    },
+    {
+      // Engagement (empreinte à maintenir appuyée) -- placé juste APRÈS
+      // « On assemble ton projet » et avant la création de compte : le
+      // projet vient d'être construit, l'engagement porte sur quelque chose
+      // de concret. Seule page d'engagement du funnel (l'ancienne question
+      // « persévérance » a été remplacée par celle-ci). Pas de segment de
+      // progression : moment de cadrage, pas une question. Au retour
+      // arrière, l'assemblage est sauté (voir backBtn).
+      id: "engagement",
+      stepName: "engagement",
+      type: "engagement",
+      title: "Ton projet est prêt. Maintenant, on s'engage ensemble.",
+      subtext: "Trois promesses, à toi-même. On t'aide à les tenir.",
+      commitments: [
+        { text: "Je bloque du temps chaque semaine pour mon projet.", echo: "Je bloque {temps} par semaine pour mon projet." },
+        { text: "Je publie, même quand ce n'est pas parfait." },
+        { text: "Je ne lâche pas au premier obstacle." }
       ]
     },
     {
@@ -2951,23 +2960,6 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
     .goal-screen--amount .goal-footer { background: none; }
   }
 
-  /* -- Écran A : deux colonnes en desktop, aperçu au-dessus en mobile. */
-  .goal-a { display: flex; flex-direction: column; gap: 18px; min-height: 100%; }
-  .goal-a__main { display: flex; flex-direction: column; flex: 1; }
-
-  @media (min-width: 960px) {
-    .quiz-screen.goal-screen--amount { max-width: 1000px; }
-    .goal-a {
-      display: grid;
-      grid-template-columns: minmax(0, 1fr) minmax(0, 440px);
-      grid-template-areas: "main preview";
-      gap: 48px;
-      align-items: start;
-    }
-    .goal-a__main { grid-area: main; min-height: 100%; }
-    .goal-a__preview { grid-area: preview; position: sticky; top: 0; }
-  }
-
   .goal-amount { text-align: center; }
   .goal-amount__badge {
     display: inline-block;
@@ -3204,43 +3196,31 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
   .goal-slider__tick-label { margin-top: 3px; font-size: 11px; color: var(--steel); white-space: nowrap; }
   .goal-slider { padding-bottom: 30px; }
 
-  /* -- Aperçu de l'espace (renderSpacePreview) -- */
-  .space-preview { margin: 0; }
-  .sp-window {
-    position: relative;
-    border-radius: 18px;
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    background: linear-gradient(160deg, rgba(0, 71, 255, 0.12), rgba(10, 14, 26, 0.94) 45%);
-    box-shadow: 0 30px 80px -40px rgba(0, 71, 255, 0.7), inset 0 1px 0 rgba(255, 255, 255, 0.06);
-    overflow: hidden;
-  }
-  .sp-bar {
+  /* -- Mini-stepper « Ton plan » (sous les puces récap). -- */
+  .goal-stepper { margin: 0 0 14px; }
+  .sp-plan__list {
+    list-style: none;
+    margin: 0;
+    padding: 4px;
     display: flex;
     align-items: center;
-    gap: 10px;
-    padding: 10px 14px;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.07);
-    font-size: 12px;
-    color: var(--steel);
+    justify-content: space-between;
+    gap: 4px;
+    border-radius: 999px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    background: rgba(255, 255, 255, 0.03);
   }
-  .sp-bar__dots { display: inline-flex; gap: 5px; }
-  .sp-bar__dots i { width: 8px; height: 8px; border-radius: 50%; background: rgba(255, 255, 255, 0.16); }
-  .sp-body { display: grid; grid-template-columns: 128px minmax(0, 1fr); }
-
-  /* Checklist « Ton plan ». */
-  .sp-plan { padding: 14px 10px 14px 12px; border-right: 1px solid rgba(255, 255, 255, 0.07); }
-  .sp-plan__title { margin: 0 0 10px; font-size: 11px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: #9DB4FF; }
-  .sp-plan__list { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
-  .sp-step { position: relative; display: flex; align-items: center; gap: 8px; padding: 6px 6px; border-radius: 9px; font-size: 13px; color: var(--steel); overflow: hidden; }
-  .sp-step__icon { position: relative; flex: none; width: 18px; height: 18px; border-radius: 50%; border: 1.5px solid rgba(255, 255, 255, 0.22); display: grid; place-items: center; }
+  .sp-step { position: relative; display: flex; align-items: center; gap: 6px; min-height: 32px; padding: 4px 10px 4px 6px; border-radius: 999px; font-size: 12px; color: var(--steel); overflow: hidden; }
+  .sp-step__icon { position: relative; flex: none; width: 16px; height: 16px; border-radius: 50%; border: 1.5px solid rgba(255, 255, 255, 0.22); display: grid; place-items: center; }
   .sp-step__check { position: absolute; inset: -1.5px; display: grid; place-items: center; border-radius: 50%; background: #22C55E; color: #06120A; opacity: 0; transform: scale(0.4); transition: opacity 180ms ease, transform 380ms cubic-bezier(0.34, 1.56, 0.64, 1); }
+  .sp-step__check svg { width: 10px; height: 10px; }
   .sp-step__pulse { position: absolute; inset: 3px; border-radius: 50%; background: var(--cobalt-soft); opacity: 0; }
   .sp-step__lock { display: grid; place-items: center; }
-  .sp-step__lock svg { width: 10px; height: 10px; }
+  .sp-step__lock svg { width: 9px; height: 9px; }
   .sp-step[data-status="done"] { color: var(--paper-soft); }
   .sp-step[data-status="done"] .sp-step__icon { border-color: transparent; }
   .sp-step[data-status="done"] .sp-step__check { opacity: 1; transform: scale(1); }
-  .sp-step[data-status="current"] { color: #fff; background: rgba(0, 71, 255, 0.18); }
+  .sp-step[data-status="current"] { color: #fff; background: rgba(0, 71, 255, 0.22); }
   .sp-step[data-status="current"] .sp-step__icon { border-color: var(--cobalt-soft); }
   .sp-step[data-status="current"] .sp-step__pulse { animation: sp-pulse 1.6s ease-in-out infinite; }
   @keyframes sp-pulse { 0%, 100% { opacity: 0.35; transform: scale(0.7); } 50% { opacity: 1; transform: scale(1); } }
@@ -3255,50 +3235,29 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
   }
   @keyframes sp-shimmer { 60%, 100% { transform: translateX(100%); } }
 
-  .sp-main { padding: 14px; display: grid; gap: 10px; align-content: start; }
-  .sp-welcome { margin: 0; font-size: 14px; font-weight: 700; color: #fff; }
-  .sp-cards { display: grid; gap: 10px; }
-  .sp-card {
-    padding: 12px 14px;
-    border-radius: 14px;
-    border: 1px solid rgba(255, 255, 255, 0.08);
-    background: rgba(255, 255, 255, 0.03);
-    text-align: left;
+  /* -- Ligne d'écart avec les revenus actuels (« × 3 tes revenus actuels »). */
+  .goal-amount__gap {
+    margin: 0 0 4px;
+    font-size: 13px;
+    font-weight: 700;
+    color: #9DB4FF;
+    letter-spacing: 0.01em;
   }
-  .sp-card__title { margin: 0 0 8px; font-size: 13px; font-weight: 700; color: #fff; }
-  .sp-list { margin: 0; display: grid; gap: 7px; }
-  .sp-row { display: flex; justify-content: space-between; align-items: center; gap: 10px; font-size: 13px; }
-  .sp-row dt { color: var(--steel); }
-  .sp-row dd { position: relative; margin: 0; display: flex; align-items: center; gap: 6px; min-height: 18px; }
-  .sp-val { color: var(--paper-soft); font-weight: 600; text-align: right; }
-  .sp-val.is-empty { color: rgba(255, 255, 255, 0.32); font-weight: 400; }
-  .sp-val .sp-char { display: inline-block; white-space: pre; }
-  .sp-skel {
-    position: absolute;
-    right: 24px;
-    width: 70px;
-    height: 10px;
-    border-radius: 5px;
-    background: rgba(255, 255, 255, 0.1);
-    opacity: 0;
-  }
-  .sp-row__check { flex: none; width: 16px; height: 16px; display: grid; place-items: center; border-radius: 50%; background: rgba(34, 197, 94, 0.2); color: #4ADE80; opacity: 0; transform: scale(0.4); }
-  .sp-row.is-filled .sp-row__check { opacity: 1; transform: none; }
-  .sp-row__check svg { width: 10px; height: 10px; }
 
-  /* Jauge (transform only). Cadran : demi-cercle masqué en anneau. */
-  .sp-gauge { position: relative; max-width: 220px; margin: 0 auto; }
+  /* -- Jauge sous le montant (transform only). Cadran : demi-cercle
+     masqué en anneau ; badge de palier au centre. */
+  .sp-gauge { position: relative; width: 100%; max-width: 230px; margin: 14px auto 0; }
   .sp-gauge__dial {
     position: relative;
     width: 100%;
     aspect-ratio: 2 / 1;
     overflow: hidden;
-    -webkit-mask: radial-gradient(circle at 50% 100%, transparent 62%, #000 calc(62% + 1px));
-    mask: radial-gradient(circle at 50% 100%, transparent 62%, #000 calc(62% + 1px));
+    -webkit-mask: radial-gradient(circle at 50% 100%, transparent 66%, #000 calc(66% + 1px));
+    mask: radial-gradient(circle at 50% 100%, transparent 66%, #000 calc(66% + 1px));
   }
   .sp-gauge__track { position: absolute; inset: 0 0 -100% 0; border-radius: 50%; background: rgba(255, 255, 255, 0.1); }
-  /* Demi-disque inférieur, pivot au centre du cercle : rotate(0) = caché,
-     rotate(180deg) = cadran plein. Le JS l'anime en spring. */
+  /* Demi-disque inférieur, pivot au centre du cercle : rotate(0) = vide,
+     rotate(180deg) = plein. Le JS l'anime en ressort. */
   .sp-gauge__sweep {
     position: absolute;
     left: 0;
@@ -3327,21 +3286,19 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
     opacity: 0;
     pointer-events: none;
   }
-  .sp-gauge__value { position: absolute; left: 0; right: 0; bottom: 0; margin: 0; text-align: center; line-height: 1.15; }
-  .sp-gauge__value strong { display: block; font-size: 22px; font-weight: 800; color: #fff; font-variant-numeric: tabular-nums; }
-  .sp-gauge__value span { font-size: 12px; color: var(--paper-soft); }
-  .sp-gauge__scale { display: flex; justify-content: space-between; max-width: 220px; margin: 6px auto 0; font-size: 12px; font-weight: 600; color: var(--paper-soft); }
-  .sp-card__hint { margin: 8px 0 0; font-size: 12px; color: var(--steel); }
+  .sp-gauge__center { position: absolute; left: 0; right: 0; bottom: 2px; display: flex; justify-content: center; }
+  .sp-gauge__center .goal-amount__badge { margin: 0; white-space: nowrap; }
+  .sp-gauge__scale { display: flex; justify-content: space-between; max-width: 230px; margin: 4px auto 0; font-size: 12px; font-weight: 600; color: var(--paper-soft); }
 
-  /* Assistant : présenté comme tel (icône robot, mention « réponses
+  /* -- Assistant : présenté comme tel (icône robot, « réponses
      automatiques »), indicateur de saisie avant chaque réponse. */
-  .sp-assistant { display: flex; align-items: flex-start; gap: 8px; }
-  .sp-assistant__avatar { flex: none; width: 28px; height: 28px; border-radius: 9px; display: grid; place-items: center; background: rgba(0, 71, 255, 0.25); color: #C8D4FF; border: 1px solid rgba(61, 107, 255, 0.4); }
-  .sp-assistant__bubble { position: relative; flex: 1; min-width: 0; padding: 9px 12px; border-radius: 4px 14px 14px 14px; background: rgba(255, 255, 255, 0.06); border: 1px solid rgba(255, 255, 255, 0.08); }
+  .sp-assistant { display: flex; align-items: flex-start; gap: 8px; margin-top: 16px; text-align: left; }
+  .sp-assistant__avatar { flex: none; width: 30px; height: 30px; border-radius: 9px; display: grid; place-items: center; background: rgba(0, 71, 255, 0.25); color: #C8D4FF; border: 1px solid rgba(61, 107, 255, 0.4); }
+  .sp-assistant__bubble { position: relative; flex: 1; min-width: 0; padding: 10px 12px; border-radius: 4px 14px 14px 14px; background: rgba(255, 255, 255, 0.06); border: 1px solid rgba(255, 255, 255, 0.08); }
   .sp-assistant__name { margin: 0 0 3px; font-size: 11px; font-weight: 700; color: #9DB4FF; }
   .sp-assistant__name span { font-weight: 400; color: var(--steel); }
-  .sp-assistant__text { margin: 0; font-size: 13px; line-height: 1.45; color: var(--paper-soft); transition: opacity 220ms ease, transform 220ms ease; }
-  .sp-assistant__typing { position: absolute; left: 12px; bottom: 11px; margin: 0; display: flex; gap: 4px; opacity: 0; transition: opacity 160ms ease; }
+  .sp-assistant__text { margin: 0; font-size: 14px; line-height: 1.45; color: var(--paper-soft); transition: opacity 220ms ease, transform 220ms ease; }
+  .sp-assistant__typing { position: absolute; left: 12px; bottom: 13px; margin: 0; display: flex; gap: 4px; opacity: 0; transition: opacity 160ms ease; }
   .sp-assistant__typing i { width: 6px; height: 6px; border-radius: 50%; background: #9DB4FF; animation: sp-typing 1s ease-in-out infinite; }
   .sp-assistant__typing i:nth-child(2) { animation-delay: 150ms; }
   .sp-assistant__typing i:nth-child(3) { animation-delay: 300ms; }
@@ -3349,51 +3306,56 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
   .sp-assistant[data-state="typing"] .sp-assistant__typing { opacity: 1; }
   .sp-assistant[data-state="typing"] .sp-assistant__text { opacity: 0; transform: translateY(3px); }
 
-  /* Mobile : 1 colonne, aperçu compact -- plan en ligne, cartes côte à
-     côte, assistant sur une bulle courte. */
-  @media (max-width: 959px) {
-    .sp-bar { display: none; }
-    .sp-body { grid-template-columns: 1fr; }
-    .sp-plan { padding: 8px 10px; border-right: 0; border-bottom: 1px solid rgba(255, 255, 255, 0.07); }
-    .sp-plan__title { display: none; }
-    .sp-plan__list { grid-template-columns: repeat(4, auto); justify-content: space-between; gap: 4px; }
-    .sp-step { padding: 4px 6px; font-size: 12px; gap: 5px; }
-    .sp-step__icon { width: 15px; height: 15px; }
-    /* Jauge et assistant côte à côte ; « Ton projet » masqué : les puces
-       Cible / Temps juste au-dessus affichent déjà ces réponses, et le
-       slider doit rester visible au-dessus du CTA sans défiler. */
-    .sp-main { padding: 10px; gap: 8px; grid-template-columns: minmax(0, 1fr) minmax(0, 1.15fr); align-items: stretch; }
-    .sp-welcome { grid-column: 1 / -1; font-size: 13px; }
-    .sp-cards { display: contents; }
-    .sp-card--project { display: none; }
-    /* Le chapitre est déjà porté par la barre de progression et la
-       checklist « Ton plan » : en-tête masqué ici pour garder le slider
-       au-dessus du CTA collé en bas. */
+  /* -- Écran Revenus actuels. -- */
+  /* Montant « en attente » tant que rien n'est choisi, estompé quand une
+     autre réponse (Autre, Je préfère ne pas répondre) est active. */
+  #revenue-amount[data-mode=""] .goal-amount__input { color: rgba(255, 255, 255, 0.55); }
+  #revenue-amount[data-mode="autre"] .goal-amount__field,
+  #revenue-amount[data-mode="non_reponse"] .goal-amount__field,
+  #revenue-amount[data-mode="autre"] .goal-amount__equiv,
+  #revenue-amount[data-mode="non_reponse"] .goal-amount__equiv { opacity: 0.35; transition: opacity 200ms ease; }
+  .revenue-alt { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; margin-top: 14px; }
+  .revenue-alt__btn {
+    min-height: 44px;
+    padding: 10px 16px;
+    border-radius: 999px;
+    border: 1px dashed rgba(255, 255, 255, 0.22);
+    background: transparent;
+    color: var(--paper-soft);
+    font: inherit;
+    font-size: 14px;
+    cursor: pointer;
+    transition: border-color 160ms ease, background 160ms ease, transform 160ms ease;
+  }
+  .revenue-alt__btn:hover { border-color: var(--cobalt-soft); }
+  .revenue-alt__btn:active { transform: scale(0.97); }
+  .revenue-alt__btn[aria-pressed="true"] { border-style: solid; border-color: var(--cobalt); background: rgba(0, 71, 255, 0.2); color: #fff; }
+  .revenue-other { margin-top: 10px; }
+  .revenue-other[hidden] { display: none; }
+  .revenue-other .quiz-text-input { width: 100%; min-height: 48px; }
+
+  /* Zones tactiles : 44px minimum sur ces écrans. */
+  .goal-screen .goal-shortcut { min-height: 44px; }
+
+  /* Mobile (375px de référence) : tout tient en une colonne, le slider
+     reste au-dessus du CTA collé en bas autant que possible. */
+  @media (max-width: 599px) {
     .goal-screen--amount .quiz-chapter-icon,
-    .goal-screen--amount .quiz-chapter-label { display: none; }
-    .goal-screen--amount .quiz-question-title { margin-bottom: 8px; }
-    .sp-plan { padding: 6px 8px; }
-    .sp-main { gap: 6px; }
-    .sp-card { padding: 9px 10px; }
-    .sp-card__title { font-size: 12px; margin-bottom: 4px; }
-    .sp-row { flex-direction: column; align-items: flex-start; gap: 0; font-size: 12px; }
-    .sp-row dt { font-size: 11px; }
-    .sp-val { text-align: left; font-size: 12px; }
-    .sp-row__check { display: none; }
-    .sp-skel { left: 0; right: auto; }
-    .sp-card__hint { display: none; }
-    .sp-gauge { max-width: 140px; }
-    .sp-gauge__value strong { font-size: 17px; }
-    .sp-gauge__value span { font-size: 11px; }
-    .sp-gauge__scale { max-width: 140px; font-size: 11px; margin-top: 3px; }
-    .sp-assistant { align-items: stretch; }
-    .sp-assistant__name { display: none; }
-    .sp-assistant__avatar { display: none; }
-    .sp-assistant__bubble { padding: 8px 10px; border-radius: 14px; display: flex; flex-direction: column; justify-content: center; }
-    /* Mention « assistant » gardée en mobile, sur une ligne. */
-    .sp-assistant__bubble::before { content: "Assistant · automatique"; margin-bottom: 3px; font-size: 10px; font-weight: 700; letter-spacing: 0.04em; color: #9DB4FF; }
-    .sp-assistant__text { font-size: 12px; line-height: 1.4; }
-    .sp-card--goal .sp-card__title { font-size: 11px; }
+    .goal-screen--amount .quiz-chapter-label,
+    .goal-screen--revenue .quiz-chapter-icon { display: none; }
+    .goal-screen--amount .quiz-question-title { margin-bottom: 6px; }
+    .goal-screen .goal-lead { margin-bottom: 10px; font-size: 14px; }
+    .goal-stepper { margin-bottom: 10px; }
+    .sp-step { padding: 4px 8px 4px 5px; font-size: 11px; gap: 4px; }
+    .sp-step__icon { width: 14px; height: 14px; }
+    .sp-gauge { max-width: 190px; margin-top: 10px; }
+    .sp-gauge__scale { max-width: 190px; }
+    .goal-screen .goal-shortcuts { margin-top: 12px; }
+    .goal-screen .goal-slider { margin-top: 10px; }
+    .sp-assistant { margin-top: 12px; }
+    .sp-assistant__avatar { width: 26px; height: 26px; }
+    .sp-assistant__bubble { padding: 8px 10px; }
+    .sp-assistant__text { font-size: 13px; }
   }
 
   @media (prefers-reduced-motion: reduce) {
@@ -3401,7 +3363,7 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
     .goal-halo { display: none; }
     .sp-step__shimmer, .sp-assistant__typing i { animation: none; }
     .sp-step[data-status="current"] .sp-step__pulse { animation: none; opacity: 0.8; transform: none; }
-    .goal-xfade__item, .goal-cta__label, .goal-cta__check, .sp-step__check, .sp-gauge__tone, .sp-assistant__text, .goal-amount__glow { transition: none; }
+    .goal-xfade__item, .goal-cta__label, .goal-cta__check, .sp-step__check, .sp-gauge__tone, .sp-assistant__text, .goal-amount__glow, .revenue-alt__btn { transition: none; }
   }
 
   /* -- Écran B : frise de 6 jalons. -- */
@@ -7662,62 +7624,47 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
       // toute adresse contenant la lettre "s" était refusée).
       var EMAIL_RE = /^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/;
 
-      // ---- Écrans objectif : A « Montant » et B « Délai » -----------------
+      // ---- Écrans Revenus actuels, Objectif (A) et Délai (B) ----------------
       // Tous les chiffres et les messages de l'assistant viennent de
       // window.ColdTrendGoal (scripts/goal-math.js, servi en
       // /js/goal-math.js). Ici : affichage et mouvement uniquement.
       //
-      // Règles de mouvement (écran A) : seules transform et opacity sont
-      // animées (WAAPI, transitions CSS ou rAF qui écrit un transform) ;
-      // le texte change par contenu (count-up), jamais par une propriété
-      // animée coûteuse. prefers-reduced-motion : état final immédiat, pas
-      // de vol, pas de halo, pas de ressort.
+      // Règles de mouvement : seules transform et opacity sont animées
+      // (WAAPI, transitions CSS ou rAF qui écrit un transform) ; le texte
+      // change par contenu (count-up). prefers-reduced-motion : état final
+      // immédiat, pas de vol, pas de halo, pas de ressort.
       //
-      // TIMELINE D'ENTRÉE (playSpaceIntro, t = arrivée sur l'écran A, < 1,2 s)
-      //   0 ms     fenêtre « Ton espace » : opacity 0 -> 1, translateY 14 -> 0,
-      //            scale .97 -> 1 (320 ms, ease-out expo)
-      //   80 ms    checklist « Ton plan » : translateX -18 -> 0 (320 ms)
-      //   120 ms   étapes Profil / Objectif / Délai / Concept en cascade,
-      //            +50 ms chacune (260 ms)
-      //   160 ms   cartes « Ton projet » puis « Objectif mensuel », +80 ms
-      //            (320 ms) ; squelettes visibles dans « Ton projet »
-      //   240 ms   jauge : ressort 0 -> objectif ; montant en count-up
-      //   380 ms   réponse 1 écrite lettre par lettre (fondu + translateY),
-      //            squelette qui s'efface, check en ressort à +140 ms ;
-      //            réponses 2 et 3 à 500 et 620 ms
-      //   760 ms   message d'accueil (prénom Google si connu)
-      //   820 ms   bulle Assistant : apparition + indicateur de saisie
-      //   1000 ms  texte de l'assistant (fondu 220 ms) -> fin à ~1,22 s
+      // TIMELINE D'ENTRÉE — écran Objectif (playGoalIntro, < 1,2 s)
+      //   0 ms     stepper « Ton plan » : opacity 0 -> 1, translateY -6 -> 0
+      //            (260 ms) ; étapes en cascade +50 ms (translateX -8 -> 0)
+      //   140 ms   titre, 200 ms sous-titre, 220 ms bloc montant (cascade CSS
+      //            commune à tout le quiz, voir .quiz-screen.is-active)
+      //   240 ms   jauge : ressort 0 -> objectif (raideur 170, amort. 18)
+      //   700 ms   bulle Assistant : apparition (translateY 8 -> 0, 260 ms)
+      //            + indicateur de saisie
+      //   900 ms   texte de l'assistant (fondu 220 ms) -> fin à ~1,12 s
       //
-      // TIMELINE DE VALIDATION (playGoalValidation, t = clic)
+      // TIMELINE D'ENTRÉE — écran Revenus (playRevenueIntro, < 1 s)
+      //   220 ms   bloc montant (cascade CSS)
+      //   560 ms   bulle Assistant + saisie ; 760 ms texte -> fin à ~0,98 s
+      //
+      // TIMELINE DE VALIDATION — écran Objectif (playGoalValidation, t = clic)
       //   0 ms     bouton -> check (libellé opacity 0, check scale .3 -> 1)
       //   160 ms   le montant « vole » vers la puce récap et vers l'étape
-      //            Objectif de la checklist (650 ms, ease-out)
-      //   ~810 ms  atterrissage : puce en scale 1.15 -> 1, Objectif coché,
-      //            Délai passe « en cours »
-      //   820 ms   transition partagée vers l'écran B (slide horizontal du
-      //            quiz ; la puce récap reste en place d'un écran à l'autre)
+      //            Objectif du stepper (650 ms, ease-out)
+      //   ~810 ms  atterrissage : puce scale 1.15 -> 1, Objectif coché,
+      //            Délai « en cours »
+      //   820 ms   transition partagée vers l'écran Délai (slide du quiz ;
+      //            la puce récap reste en place d'un écran à l'autre)
       var GOAL = window.ColdTrendGoal;
       var GOAL_EASE = "cubic-bezier(0.16, 1, 0.3, 1)";
       var GOAL_SPRING = "cubic-bezier(0.34, 1.56, 0.64, 1)";
-      var GOAL_PREVIEW_ID = "goal-preview";
       var goalTierIndex = null;
       var goalBadgeTimer = null;
-      var goalAssistantTimer = null;
-      var goalAssistantSaid = "";
       var goalIntroPlayed = false;
-      var goalIntroRunning = false;
       var goalValidating = false;
+      var revenueIntroPlayed = false;
       var welcomeFirstName = null;
-
-      // Libellés de l'aperçu (réponses réelles uniquement).
-      var PREVIEW_PLATFORM_LABELS = {
-        aucune: "Aucune pour l'instant",
-        "1": "1 plateforme",
-        "2": "2 plateformes",
-        "3": "3 plateformes",
-        "4_plus": "4 ou plus"
-      };
 
       function goalVibrate(pattern) {
         try {
@@ -7732,31 +7679,49 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
         if (el && el.textContent !== text) el.textContent = text;
       }
 
-      function goalPreview() {
-        return document.getElementById(GOAL_PREVIEW_ID);
+      function goalScreen() {
+        return stage.querySelector('[data-id="objectifRevenu"]');
       }
 
-      // Valeur par défaut de l'écran A : celle rendue au build (attribut
-      // value d'origine du slider), jamais une valeur codée deux fois.
+      function revenueScreen() {
+        return stage.querySelector('[data-id="revenus"]');
+      }
+
+      // Valeur par défaut de l'écran Objectif : celle rendue au build
+      // (attribut value d'origine du slider), jamais codée deux fois.
       function defaultGoal() {
         var slider = document.getElementById("goal-slider");
         return slider && GOAL ? GOAL.positionToValue(slider.defaultValue) : 1000;
       }
 
-      // Les deux réponses, telles que stockées dans profiles (migration
-      // 0030) : objectif_mensuel (euros) et delai_mois (1 à 6). null tant
-      // que l'écran n'a pas été répondu.
-      function goalProfileFields() {
-        return {
-          objectif_mensuel: typeof answers.objectifRevenu === "number" ? answers.objectifRevenu : null,
-          delai_mois: answers.delai ? parseInt(answers.delai, 10) : null
-        };
+      // Revenus actuels utilisés pour l'écart « × 3 tes revenus actuels » :
+      // uniquement un montant déclaré ; sinon null (-> « Ton premier
+      // objectif »).
+      function declaredRevenue() {
+        return answers.revenus === "montant" && typeof answers.revenuActuel === "number" ? answers.revenuActuel : null;
       }
 
-      // Saisie au clavier : chiffres uniquement, plafonnée au maximum.
-      function goalFromInput(raw) {
+      // Colonnes profiles (migrations 0030 et 0031) des écrans répondus
+      // UNIQUEMENT : une colonne absente n'est pas écrite (jamais un null
+      // par-dessus une valeur déjà en base). current_revenue vaut null quand
+      // l'écran Revenus a été répondu sans montant (Autre, pas de réponse) :
+      // là, l'effacement est voulu.
+      function goalProfileFields() {
+        var fields = {};
+        if (typeof answers.objectifRevenu === "number") fields.objectif_mensuel = answers.objectifRevenu;
+        if (answers.delai) fields.delai_mois = parseInt(answers.delai, 10);
+        if (answers.revenus) fields.current_revenue = declaredRevenue();
+        return fields;
+      }
+
+      // Saisie au clavier : chiffres uniquement, plafonnée.
+      function amountFromInput(raw, max) {
         var digits = String(raw || "").replace(/[^0-9]/g, "");
-        return Math.min(GOAL ? GOAL.MAX : 50000, Number(digits) || 0);
+        return Math.min(max, Number(digits) || 0);
+      }
+
+      function goalFromInput(raw) {
+        return amountFromInput(raw, GOAL ? GOAL.MAX : 50000);
       }
 
       // ---- Briques de mouvement -------------------------------------------
@@ -7809,6 +7774,37 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
         on.setAttribute("aria-hidden", "true");
       }
 
+      // ---- Bulle de l'assistant (composant renderAssistantBubble) ----------
+      // Indicateur de saisie, puis le texte. Un minuteur par bulle.
+      function assistantSay(box, text, typingMs) {
+        if (!box) return;
+        var textEl = box.querySelector(".sp-assistant__text");
+        box._said = text;
+        window.clearTimeout(box._timer);
+        if (reduceMotion || !typingMs) {
+          textEl.textContent = text;
+          box.setAttribute("data-state", "idle");
+          return;
+        }
+        box.setAttribute("data-state", "typing");
+        box._timer = window.setTimeout(function () {
+          textEl.textContent = text;
+          box.setAttribute("data-state", "idle");
+        }, typingMs);
+      }
+
+      // Réaction une fois le geste posé (650 ms sans changement), et
+      // seulement si le message change. Rien pendant une chorégraphie
+      // d'entrée (box._intro).
+      function scheduleAssistant(box, message) {
+        if (!box || box._intro) return;
+        window.clearTimeout(box._timer);
+        if (message === box._said) return;
+        box._timer = window.setTimeout(function () {
+          assistantSay(box, message, 450);
+        }, 650);
+      }
+
       // ---- Jauge en ressort (rAF -> transform: rotate uniquement) ---------
       // Raideur 170, amortissement 18 : rapport ≈ 0,69, léger dépassement
       // (~5 %) puis stabilisation. Sous Mode Vidéo ralenti, l'horloge rAF
@@ -7840,9 +7836,9 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
       }
 
       function gaugeTo(ratio, immediate) {
-        var root = goalPreview();
-        if (!root) return;
-        gaugeSpring.el = root.querySelector(".sp-gauge__sweep");
+        var screenEl = goalScreen();
+        if (!screenEl) return;
+        gaugeSpring.el = screenEl.querySelector(".sp-gauge__sweep");
         gaugeSpring.target = ratio;
         if (gaugeSpring.pos === null || immediate || reduceMotion) {
           if (gaugeSpring.raf) window.cancelAnimationFrame(gaugeSpring.raf);
@@ -7858,119 +7854,15 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
         }
       }
 
-      // ---- Aperçu : checklist, réponses, objectif, assistant ---------------
-      function setPlanStep(step, status) {
-        var root = goalPreview();
-        var el = root && root.querySelector('.sp-step[data-step="' + step + '"]');
-        if (el) el.setAttribute("data-status", status);
-      }
-
-      // Réponses réelles de « Ton projet ». Une réponse absente reste
-      // « À définir », jamais une valeur inventée.
-      function spaceRowValues() {
-        return {
-          secteur:
-            answers.secteur && answers.secteur.length
-              ? answers.secteur.map(function (v) { return SECTOR_LABELS[v] || v; }).join(" + ")
-              : null,
-          temps: answers.temps ? TIME_LABELS[answers.temps] || null : null,
-          plateformes: answers.plateformes ? PREVIEW_PLATFORM_LABELS[answers.plateformes] || null : null
-        };
-      }
-
-      function fillSpaceRows(root) {
-        var values = spaceRowValues();
-        Array.prototype.forEach.call(root.querySelectorAll(".sp-row"), function (row) {
-          var key = row.getAttribute("data-row");
-          var val = row.querySelector(".sp-val");
-          val.textContent = values[key] || "À définir";
-          val.classList.toggle("is-empty", !values[key]);
-          row.classList.toggle("is-filled", !!values[key]);
-        });
-        var anyAnswer = values.secteur || values.temps || values.plateformes;
-        setPlanStep("profil", anyAnswer ? "done" : "todo");
-        var welcome = root.querySelector("[data-sp-welcome]");
-        if (welcome) {
-          welcome.textContent = welcomeFirstName
-            ? "Bienvenue " + welcomeFirstName + ", ton espace est prêt."
-            : "Bienvenue, ton espace est prêt.";
-        }
-      }
-
-      // Une réponse « s'écrit » : lettres en fondu + translateY, décalées,
-      // le tout en moins de 160 ms quelle que soit la longueur.
-      function writeRowValue(row, delay) {
-        var val = row.querySelector(".sp-val");
-        var text = val.textContent;
-        var filled = row.classList.contains("is-filled");
-        var skel = row.querySelector(".sp-skel");
-        if (skel && skel.animate) {
-          skel.animate(
-            [{ opacity: 0 }, { opacity: 1, offset: 0.15 }, { opacity: 1, offset: 0.7 }, { opacity: 0 }],
-            { duration: delay - 120, delay: 200, easing: "linear" }
-          );
-        }
-        if (!filled || !val.animate) return;
-        val.textContent = "";
-        var step = Math.min(14, 140 / Math.max(1, text.length));
-        for (var i = 0; i < text.length; i += 1) {
-          var ch = document.createElement("span");
-          ch.className = "sp-char";
-          ch.textContent = text.charAt(i);
-          val.appendChild(ch);
-          animateFrom(ch, { opacity: 0, transform: "translateY(4px)" }, delay + i * step, 160);
-        }
-        animateFrom(row.querySelector(".sp-row__check"), { opacity: 0, transform: "scale(0.4)" }, delay + 140, 320, GOAL_SPRING);
-      }
-
-      // Bulle de l'assistant : indicateur de saisie, puis le texte.
-      function assistantSay(text, typingMs) {
-        var root = goalPreview();
-        var box = root && root.querySelector(".sp-assistant");
-        if (!box) return;
-        var textEl = box.querySelector(".sp-assistant__text");
-        goalAssistantSaid = text;
-        window.clearTimeout(goalAssistantTimer);
-        if (reduceMotion) {
-          textEl.textContent = text;
-          box.setAttribute("data-state", "idle");
-          return;
-        }
-        box.setAttribute("data-state", "typing");
-        goalAssistantTimer = window.setTimeout(function () {
-          textEl.textContent = text;
-          box.setAttribute("data-state", "idle");
-        }, typingMs);
-      }
-
-      // L'assistant réagit au montant une fois le geste posé (650 ms sans
-      // changement), et seulement si son message change (palier différent).
-      function scheduleAssistantReaction(goal) {
-        if (goalIntroRunning || !GOAL) return;
-        window.clearTimeout(goalAssistantTimer);
-        var message = GOAL.assistantMessage(goal);
-        if (message === goalAssistantSaid) return;
-        goalAssistantTimer = window.setTimeout(function () {
-          assistantSay(message, 450);
-        }, 650);
-      }
-
-      // Objectif dans l'aperçu : jauge en ressort, montant en count-up,
-      // couleur de palier en fondu, impulsion lumineuse au franchissement.
-      function updateSpaceGoal(goal, tierChanged) {
-        var root = goalPreview();
-        if (!root || !GOAL) return;
-        gaugeTo(GOAL.valueToRatio(goal));
-        countTo(root.querySelector('[data-sp="goal"]'), goal, function (v) {
-          return GOAL.formatEuro(Math.round(v / 10) * 10);
-        });
-        var idx = GOAL.tierIndex(goal);
-        root.setAttribute("data-tier", GOAL.TIERS[idx].id);
-        Array.prototype.forEach.call(root.querySelectorAll(".sp-gauge__tone"), function (tone) {
+      // Couleur de palier (calques en fondu) + impulsion au franchissement.
+      function paintGaugeTier(idx, tierChanged) {
+        var screenEl = goalScreen();
+        if (!screenEl) return;
+        Array.prototype.forEach.call(screenEl.querySelectorAll(".sp-gauge__tone"), function (tone) {
           tone.style.opacity = Number(tone.getAttribute("data-tone")) === idx ? "1" : "0";
         });
         if (tierChanged && !reduceMotion) {
-          var pulse = root.querySelector(".sp-gauge__pulse");
+          var pulse = screenEl.querySelector(".sp-gauge__pulse");
           if (pulse && pulse.animate) {
             pulse.animate(
               [{ opacity: 0, transform: "scale(0.8)" }, { opacity: 0.9, transform: "scale(1)", offset: 0.35 }, { opacity: 0, transform: "scale(1.25)" }],
@@ -7980,7 +7872,143 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
         }
       }
 
-      // ---- Écran A : état complet pour une valeur ---------------------------
+      // ---- Stepper « Ton plan » ---------------------------------------------
+      function setPlanStep(step, status) {
+        var screenEl = goalScreen();
+        var el = screenEl && screenEl.querySelector('.sp-step[data-step="' + step + '"]');
+        if (el) el.setAttribute("data-status", status);
+      }
+
+      function syncPlan() {
+        var answered = answers.situation || answers.secteur || answers.temps || answers.plateformes || answers.revenus;
+        setPlanStep("profil", answered ? "done" : "todo");
+        setPlanStep("objectif", "current");
+        setPlanStep("delai", "todo");
+      }
+
+      // ==== Écran Revenus actuels ==============================================
+      // answers.revenus : "montant" | "non_reponse" | "autre" (absent tant
+      // que rien n'est choisi). answers.revenuActuel : euros si "montant".
+      // answers.revenusAutre : saisie libre si "autre".
+      function revenueAssistantBox() {
+        return document.getElementById("revenue-assistant");
+      }
+
+      function renderRevenue() {
+        var screenEl = revenueScreen();
+        if (!screenEl || !GOAL) return;
+        var R = GOAL.revenueScale;
+        var mode = answers.revenus || "";
+        var v = typeof answers.revenuActuel === "number" ? answers.revenuActuel : 0;
+        var ratio = R.valueToRatio(v);
+
+        var amount = document.getElementById("revenue-amount");
+        if (amount) amount.setAttribute("data-mode", mode);
+        var slider = document.getElementById("revenue-slider");
+        if (slider) {
+          slider.setAttribute("aria-valuetext", v >= GOAL.REVENUE_MAX ? GOAL.formatEuro(v) + " par mois (10 000 € et plus)" : GOAL.formatEuro(v) + " par mois");
+          slider.parentNode.style.setProperty("--goal-ratio", ratio.toFixed(4));
+        }
+        var glow = screenEl.querySelector(".goal-amount__glow");
+        if (glow) glow.style.opacity = (0.25 + ratio * 0.6).toFixed(3);
+        crossfadeText(
+          document.getElementById("revenue-equivalence"),
+          mode === "non_reponse" ? "Pas de souci, c'est facultatif" : mode === "autre" ? "Dis-nous en quelques mots" : GOAL.currentEquivalence(v)
+        );
+        Array.prototype.forEach.call(screenEl.querySelectorAll("[data-revenue-shortcut]"), function (btn) {
+          btn.classList.toggle("is-selected", mode === "montant" && Number(btn.getAttribute("data-revenue-shortcut")) === v);
+        });
+        Array.prototype.forEach.call(screenEl.querySelectorAll("[data-revenue-mode]"), function (btn) {
+          btn.setAttribute("aria-pressed", btn.getAttribute("data-revenue-mode") === mode ? "true" : "false");
+        });
+        var other = document.getElementById("revenue-other");
+        if (other) other.hidden = mode !== "autre";
+        updateNextEnabled(screenEl);
+        scheduleAssistant(revenueAssistantBox(), GOAL.revenueAssistantMessage(mode || "montant", v));
+      }
+
+      // source : "slider" | "input" | "commit" | "shortcut" | "restore"
+      // (même contrat que setGoal).
+      function setRevenue(value, source) {
+        if (!GOAL) return;
+        var R = GOAL.revenueScale;
+        // Le slider s'arrête à 10 000 € ; la saisie accepte davantage.
+        var v = source === "slider" ? R.snap(value) : Math.max(0, Math.min(GOAL.REVENUE_INPUT_MAX, Math.round(Number(value) || 0)));
+        answers.revenus = "montant";
+        answers.revenuActuel = v;
+        delete answers.revenusAutre;
+        var slider = document.getElementById("revenue-slider");
+        if (slider && source !== "slider") slider.value = String(R.valueToPosition(v));
+        var input = document.getElementById("revenue-amount-input");
+        if (input && source !== "input") input.value = GOAL.formatNumber(v);
+        renderRevenue();
+      }
+
+      // « Autre » / « Je préfère ne pas répondre » : un second appui revient
+      // au montant (s'il y en avait un) ou à « rien de choisi ».
+      function toggleRevenueMode(mode) {
+        if (answers.revenus === mode) {
+          if (typeof answers.revenuActuel === "number") answers.revenus = "montant";
+          else delete answers.revenus;
+        } else {
+          answers.revenus = mode;
+        }
+        if (answers.revenus !== "autre") delete answers.revenusAutre;
+        renderRevenue();
+        if (answers.revenus === "autre") {
+          var input = document.getElementById("revenue-other-input");
+          if (input) {
+            input.value = answers.revenusAutre || "";
+            window.setTimeout(function () {
+              input.focus();
+            }, 60);
+          }
+        }
+      }
+
+      function playRevenueIntro() {
+        var box = revenueAssistantBox();
+        var message = GOAL.revenueAssistantMessage(answers.revenus || "montant", answers.revenuActuel || 0);
+        if (reduceMotion || !box || !box.animate) {
+          assistantSay(box, message, 0);
+          return;
+        }
+        box._intro = true;
+        animateFrom(box, { opacity: 0, transform: "translateY(8px)" }, 560, 260);
+        window.setTimeout(function () {
+          box._intro = false;
+          assistantSay(box, message, 200);
+        }, 560);
+      }
+
+      // Champs de l'écran Revenus alignés sur answers (entrée, retour
+      // arrière, reprise de brouillon), sans chorégraphie.
+      function syncRevenueUI() {
+        var input = document.getElementById("revenue-amount-input");
+        var slider = document.getElementById("revenue-slider");
+        var v = typeof answers.revenuActuel === "number" ? answers.revenuActuel : 0;
+        if (input) input.value = GOAL.formatNumber(v);
+        if (slider) slider.value = String(GOAL.revenueScale.valueToPosition(v));
+        var otherInput = document.getElementById("revenue-other-input");
+        if (otherInput) otherInput.value = answers.revenusAutre || "";
+        renderRevenue();
+      }
+
+      function enterRevenue() {
+        var box = revenueAssistantBox();
+        if (box && !revenueIntroPlayed) box._intro = true;
+        syncRevenueUI();
+        if (!revenueIntroPlayed) {
+          revenueIntroPlayed = true;
+          playRevenueIntro();
+        }
+      }
+
+      // ==== Écran Objectif =====================================================
+      function goalAssistantBox() {
+        return document.getElementById("goal-assistant");
+      }
+
       // source :
       //   "slider"   -> ne réécrit pas la position (évite les sauts), vibre
       //                 au passage d'un palier ;
@@ -8004,8 +8032,11 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
         var glow = document.getElementById("goal-glow");
         if (glow) glow.style.opacity = (0.25 + ratio * 0.75).toFixed(3);
 
-        // Palier : badge en fondu croisé + impulsion, vibration au
-        // franchissement pendant le glissé (jamais au premier affichage).
+        // Écart avec les revenus actuels (« × 3 tes revenus actuels »).
+        setTextById("goal-gap", GOAL.goalGap(v, declaredRevenue()));
+
+        // Palier : badge (au centre de la jauge) en fondu croisé +
+        // impulsion, vibration au franchissement pendant le glissé.
         var idx = GOAL.tierIndex(v);
         var tierChanged = goalTierIndex !== null && idx !== goalTierIndex;
         var badge = document.getElementById("goal-badge");
@@ -8029,6 +8060,8 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
             badge.animate([{ transform: "scale(1)" }, { transform: "scale(1.14)" }, { transform: "scale(1)" }], { duration: 420, easing: GOAL_SPRING });
           }
         }
+        gaugeTo(ratio);
+        paintGaugeTier(idx, tierChanged);
 
         var price = GOAL.averagePrice(answers.secteur);
         var clients = GOAL.clientsNeeded(v, price);
@@ -8047,61 +8080,45 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
           btn.classList.toggle("is-selected", Number(btn.getAttribute("data-goal-shortcut")) === v);
         });
 
-        updateSpaceGoal(v, tierChanged);
-        scheduleAssistantReaction(v);
+        scheduleAssistant(goalAssistantBox(), GOAL.assistantMessage(v));
         if (quizTagsEl && quizTagsEl.querySelector('[data-tag-id="objectifRevenu"]')) renderTags();
         else refreshEditBar();
-        var screenEl = stage.querySelector('[data-id="objectifRevenu"]');
+        var screenEl = goalScreen();
         if (screenEl) updateNextEnabled(screenEl);
       }
 
-      // ---- Chorégraphie d'entrée (voir TIMELINE ci-dessus) ----------------
-      function playSpaceIntro() {
-        var root = goalPreview();
-        if (!root || !GOAL) return;
+      // Chorégraphie d'entrée (voir TIMELINE ci-dessus).
+      function playGoalIntro() {
+        var screenEl = goalScreen();
+        if (!screenEl || !GOAL) return;
         var goal = typeof answers.objectifRevenu === "number" ? answers.objectifRevenu : defaultGoal();
-        fillSpaceRows(root);
-        setPlanStep("objectif", "current");
-        setPlanStep("delai", "todo");
-        var message = GOAL.assistantMessage(goal);
-
-        if (reduceMotion || !root.animate) {
+        var box = goalAssistantBox();
+        // Accueil avec le prénom Google s'il existe, puis la réaction au
+        // montant (messages fixes de goal-math.js).
+        var message = (welcomeFirstName ? "Bienvenue " + welcomeFirstName + " ! " : "") + GOAL.assistantMessage(goal);
+        syncPlan();
+        if (reduceMotion || !screenEl.animate) {
           gaugeTo(GOAL.valueToRatio(goal), true);
-          assistantSay(message, 0);
+          assistantSay(box, message, 0);
           return;
         }
-
-        goalIntroRunning = true;
-        window.clearTimeout(goalAssistantTimer);
-        animateFrom(root.querySelector(".sp-window"), { opacity: 0, transform: "translateY(14px) scale(0.97)" }, 0, 320);
-        animateFrom(root.querySelector(".sp-plan"), { opacity: 0, transform: "translateX(-18px)" }, 80, 320);
-        Array.prototype.forEach.call(root.querySelectorAll(".sp-step"), function (el, i) {
-          animateFrom(el, { opacity: 0, transform: "translateX(-8px)" }, 120 + i * 50, 260);
+        var stepper = screenEl.querySelector(".goal-stepper");
+        animateFrom(stepper, { opacity: 0, transform: "translateY(-6px)" }, 0, 260);
+        Array.prototype.forEach.call(screenEl.querySelectorAll(".sp-step"), function (el, i) {
+          animateFrom(el, { opacity: 0, transform: "translateX(-8px)" }, 60 + i * 50, 240);
         });
-        Array.prototype.forEach.call(root.querySelectorAll(".sp-card"), function (el, i) {
-          animateFrom(el, { opacity: 0, transform: "translateY(12px)" }, 160 + i * 80, 320);
-        });
-        // Jauge et montant partent de 0.
         gaugeTo(0, true);
-        var goalEl = root.querySelector('[data-sp="goal"]');
-        if (goalEl) {
-          goalEl._ctValue = 0;
-          goalEl.textContent = GOAL.formatEuro(0);
-        }
         window.setTimeout(function () {
-          updateSpaceGoal(goal, false);
+          gaugeTo(GOAL.valueToRatio(typeof answers.objectifRevenu === "number" ? answers.objectifRevenu : goal));
         }, 240);
-        Array.prototype.forEach.call(root.querySelectorAll(".sp-row"), function (row, i) {
-          writeRowValue(row, 380 + i * 120);
-        });
-        animateFrom(root.querySelector("[data-sp-welcome]"), { opacity: 0, transform: "translateY(6px)" }, 760, 280);
-        animateFrom(root.querySelector(".sp-assistant"), { opacity: 0, transform: "translateY(8px) scale(0.98)" }, 820, 260);
-        window.setTimeout(function () {
-          assistantSay(message, 180);
-        }, 820);
-        window.setTimeout(function () {
-          goalIntroRunning = false;
-        }, 1200);
+        if (box) {
+          box._intro = true;
+          animateFrom(box, { opacity: 0, transform: "translateY(8px)" }, 700, 260);
+          window.setTimeout(function () {
+            box._intro = false;
+            assistantSay(box, message, 200);
+          }, 700);
+        }
       }
 
       // Prénom Google pour l'accueil : uniquement s'il existe dans la
@@ -8121,36 +8138,51 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
         });
       }
 
-      // Entrée sur l'écran A : chorégraphie complète la première fois,
-      // simple remise à jour ensuite (retour arrière, édition).
+      // Entrée sur l'écran Objectif : chorégraphie complète la première
+      // fois, simple remise à jour ensuite (retour arrière, édition).
       function enterGoalAmount() {
         goalTierIndex = null;
         goalValidating = false;
-        var cta = stage.querySelector('[data-id="objectifRevenu"] .goal-cta');
+        var screenEl = goalScreen();
+        var cta = screenEl && screenEl.querySelector(".goal-cta");
         if (cta) cta.classList.remove("is-validated");
+        var box = goalAssistantBox();
+        if (box) box._intro = !goalIntroPlayed;
         setGoal(typeof answers.objectifRevenu === "number" ? answers.objectifRevenu : defaultGoal(), "restore");
         if (!goalIntroPlayed) {
           goalIntroPlayed = true;
-          playSpaceIntro();
+          playGoalIntro();
         } else {
-          var root = goalPreview();
-          if (root) fillSpaceRows(root);
-          setPlanStep("objectif", "current");
-          setPlanStep("delai", "todo");
+          syncPlan();
         }
       }
 
       // Remise à zéro à l'ouverture du quiz, SANS écrire de réponse :
-      // objectif_mensuel n'est enregistré que si l'écran a vraiment été vu.
+      // objectif_mensuel / current_revenue ne sont enregistrés que si
+      // l'écran a vraiment été répondu.
       function resetGoalScreens() {
         if (!GOAL) return;
         goalTierIndex = null;
         goalIntroPlayed = false;
-        goalAssistantSaid = "";
+        revenueIntroPlayed = false;
+        [goalAssistantBox(), revenueAssistantBox()].forEach(function (box) {
+          if (!box) return;
+          window.clearTimeout(box._timer);
+          box._said = "";
+          box._intro = false;
+          box.setAttribute("data-state", "idle");
+        });
         resolveWelcomeName();
         setGoal(defaultGoal(), "restore");
         delete answers.objectifRevenu;
         renderDelay();
+        var slider = document.getElementById("revenue-slider");
+        if (slider) slider.value = "0";
+        var input = document.getElementById("revenue-amount-input");
+        if (input) input.value = "0";
+        var otherInput = document.getElementById("revenue-other-input");
+        if (otherInput) otherInput.value = "";
+        renderRevenue();
       }
 
       // Bandeau « Tu modifies » : visible seulement en mode édition (voir
@@ -8165,35 +8197,37 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
         textEl.textContent = "Tu modifies : " + (QUESTION_LABELS[id] || id) + (value ? " · " + value : "");
       }
 
-      // Halo qui suit le curseur (desktop, pointeur précis, mouvement
-      // autorisé). Écrit un transform au plus une fois par frame.
+      // Halo qui suit le curseur sur les écrans Revenus et Objectif (desktop,
+      // pointeur précis, mouvement autorisé). Un transform par frame au plus.
       (function initGoalHalo() {
-        var screenEl = stage.querySelector('[data-id="objectifRevenu"]');
         var halo = document.getElementById("goal-halo");
-        if (!screenEl || !halo) return;
+        if (!halo) return;
         if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
         if (!window.matchMedia("(hover: hover) and (pointer: fine)").matches) return;
         var x = 0;
         var y = 0;
         var frame = null;
-        screenEl.addEventListener("pointermove", function (e) {
-          // Le halo vit dans l'overlay (fixed, plein écran) : coordonnées
-          // directes de la fenêtre.
-          x = e.clientX;
-          y = e.clientY;
-          halo.classList.add("is-on");
-          if (frame) return;
-          frame = window.requestAnimationFrame(function () {
-            frame = null;
-            halo.style.transform = "translate3d(" + x.toFixed(0) + "px, " + y.toFixed(0) + "px, 0)";
+        [goalScreen(), revenueScreen()].forEach(function (screenEl) {
+          if (!screenEl) return;
+          screenEl.addEventListener("pointermove", function (e) {
+            // Le halo vit dans l'overlay (fixed, plein écran) : coordonnées
+            // directes de la fenêtre.
+            x = e.clientX;
+            y = e.clientY;
+            halo.classList.add("is-on");
+            if (frame) return;
+            frame = window.requestAnimationFrame(function () {
+              frame = null;
+              halo.style.transform = "translate3d(" + x.toFixed(0) + "px, " + y.toFixed(0) + "px, 0)";
+            });
           });
-        });
-        screenEl.addEventListener("pointerleave", function () {
-          halo.classList.remove("is-on");
+          screenEl.addEventListener("pointerleave", function () {
+            halo.classList.remove("is-on");
+          });
         });
       })();
 
-      // ---- Validation (voir TIMELINE ci-dessus) ----------------------------
+      // ---- Validation de l'objectif (voir TIMELINE ci-dessus) ---------------
       // Le montant « vole » vers une cible. hideTarget : la cible reste
       // invisible jusqu'à l'atterrissage (puce récap qui vient d'apparaître).
       function flyGoalTo(target, hideTarget, onLand) {
@@ -8246,7 +8280,7 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
       }
 
       function playGoalValidation(done) {
-        var screenEl = stage.querySelector('[data-id="objectifRevenu"]');
+        var screenEl = goalScreen();
         var cta = screenEl && screenEl.querySelector(".goal-cta");
         if (goalValidating || !cta || cta.disabled) return;
         goalValidating = true;
@@ -8266,10 +8300,7 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
         window.setTimeout(function () {
           var tag = quizTagsEl ? quizTagsEl.querySelector('[data-tag-id="objectifRevenu"]') : null;
           if (tag) flyGoalTo(tag, true, null);
-          var root = goalPreview();
-          var stepIcon = root && root.querySelector('.sp-step[data-step="objectif"] .sp-step__icon');
-          // Étape visible seulement si la checklist l'est (desktop et mobile
-          // compact) ; sinon elle est simplement cochée.
+          var stepIcon = screenEl.querySelector('.sp-step[data-step="objectif"] .sp-step__icon');
           if (stepIcon && stepIcon.getBoundingClientRect().width) flyGoalTo(stepIcon, false, markDone);
           else markDone();
         }, 160);
@@ -8535,8 +8566,18 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
         }
 
         if (id === "situation") {
-          // Seul bouton de cet écran : "Valider" du champ libre revenus.
-          nextBtn.disabled = !(answers.situation && answers.revenusAutre && answers.revenusAutre.trim());
+          nextBtn.disabled = !answers.situation;
+          return;
+        }
+
+        if (id === "revenus") {
+          // Jamais de 0 enregistré par défaut : il faut un vrai choix.
+          var revenueMode = answers.revenus;
+          nextBtn.disabled = !(
+            revenueMode === "montant" ||
+            revenueMode === "non_reponse" ||
+            (revenueMode === "autre" && answers.revenusAutre && answers.revenusAutre.trim())
+          );
           return;
         }
 
@@ -8590,8 +8631,10 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
         var exitTo = direction === "back" ? 24 : -24;
 
         applyEcho(nextEl);
-        overlay.classList.toggle("is-goal-ambient", nextEl.getAttribute("data-id") === "objectifRevenu");
-        if (nextEl.getAttribute("data-id") === "objectifRevenu") enterGoalAmount();
+        var nextId = nextEl.getAttribute("data-id");
+        overlay.classList.toggle("is-goal-ambient", nextId === "objectifRevenu" || nextId === "revenus");
+        if (nextId === "revenus") enterRevenue();
+        if (nextId === "objectifRevenu") enterGoalAmount();
         if (nextEl.getAttribute("data-id") === "delai") renderDelay();
         if (nextEl.getAttribute("data-id") === "engagement") syncEngagementUI();
         if (nextEl.getAttribute("data-id") === "auth") renderGateProjection();
@@ -8703,6 +8746,7 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
           situation: ans.situation || null,
           revenus: ans.revenus || null,
           revenusAutre: ans.revenusAutre || null,
+          revenuActuel: ans.revenus === "montant" && typeof ans.revenuActuel === "number" ? ans.revenuActuel : null,
           passif: ans.passif || null,
           anciennete: ans.anciennete || null,
           plateformes: ans.plateformes || null,
@@ -10408,22 +10452,27 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
           .then(function (userRes) {
             var user = userRes.data ? userRes.data.user : null;
             if (!user) return;
+            var update = {
+              intention: answers.intention || null,
+              temps: answers.temps || null,
+              secteur: answers.secteur || [],
+              // Pivot : match_count reste la colonne DB historique (pas de
+              // migration pour ce détail), mais sa sémantique n'est plus un
+              // vrai comptage de fiches correspondantes -- juste un flag
+              // "quiz complété" (toujours 1 une fois goToResult() atteint).
+              match_count: answers.matchCount,
+              funnel_last_step: 6,
+              converted: true
+            };
+            // objectif_mensuel, delai_mois, current_revenue : écrans répondus
+            // uniquement (voir goalProfileFields).
+            var goalFields = goalProfileFields();
+            Object.keys(goalFields).forEach(function (key) {
+              update[key] = goalFields[key];
+            });
             return supabase
               .from("profiles")
-              .update({
-                intention: answers.intention || null,
-                temps: answers.temps || null,
-                secteur: answers.secteur || [],
-                objectif_mensuel: goalProfileFields().objectif_mensuel,
-                delai_mois: goalProfileFields().delai_mois,
-                // Pivot : match_count reste la colonne DB historique (pas de
-                // migration pour ce détail), mais sa sémantique n'est plus un
-                // vrai comptage de fiches correspondantes -- juste un flag
-                // "quiz complété" (toujours 1 une fois goToResult() atteint).
-                match_count: answers.matchCount,
-                funnel_last_step: 6,
-                converted: true
-              })
+              .update(update)
               .eq("id", user.id)
               .then(function (res) {
                 if (res.error) {
@@ -10469,7 +10518,7 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
             // jamais écraser une valeur déjà en base avec un null.
             var goalFields = goalProfileFields();
             Object.keys(goalFields).forEach(function (key) {
-              if (goalFields[key] !== null) update[key] = goalFields[key];
+              update[key] = goalFields[key];
             });
             return supabase.from("profiles").update(update).eq("id", user.id);
           })
@@ -10490,6 +10539,7 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
             setGoal(answers.objectifRevenu, "restore");
           }
           if (id === "delai") renderDelay();
+          if (id === "revenus") syncRevenueUI();
           if (id === "auth") return;
           // Chaque groupe d'options de l'écran (plusieurs sur "situation",
           // puces de délai sous le slider) a sa propre clé de réponse.
@@ -10708,7 +10758,7 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
             showConnectedBadge();
             return supabase
               .from("profiles")
-              .select("intention, budget, temps, secteur, deja_cherche, funnel_last_step, objectif_mensuel, delai_mois")
+              .select("intention, budget, temps, secteur, deja_cherche, funnel_last_step, objectif_mensuel, delai_mois, current_revenue")
               .eq("id", user.id)
               .single()
               .then(function (profileRes) {
@@ -10723,6 +10773,12 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
                 // Écrans A/B (migration 0030) : reprise sur un autre appareil.
                 if (typeof profile.objectif_mensuel === "number") answers.objectifRevenu = profile.objectif_mensuel;
                 if (profile.delai_mois) answers.delai = String(profile.delai_mois);
+                // Revenus actuels (migration 0031) : seul un montant est
+                // stocké ; « Autre » / pas de réponse ne se reprennent pas.
+                if (typeof profile.current_revenue === "number") {
+                  answers.revenus = "montant";
+                  answers.revenuActuel = profile.current_revenue;
+                }
                 navHistory = buildNavHistoryUpTo(lastStep);
                 restoreAnswersUI();
                 updateBackVisibility();
@@ -10870,7 +10926,20 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
       }
 
       stage.addEventListener("click", function (e) {
-        // Écran A : raccourcis de montant.
+        // Écran Revenus : raccourcis, « Autre », « Je préfère ne pas répondre ».
+        var revenueShortcut = e.target.closest("[data-revenue-shortcut]");
+        if (revenueShortcut) {
+          haptic();
+          setRevenue(Number(revenueShortcut.getAttribute("data-revenue-shortcut")), "shortcut");
+          return;
+        }
+        var revenueMode = e.target.closest("[data-revenue-mode]");
+        if (revenueMode) {
+          haptic();
+          toggleRevenueMode(revenueMode.getAttribute("data-revenue-mode"));
+          return;
+        }
+        // Écran Objectif : raccourcis de montant.
         var goalShortcut = e.target.closest("[data-goal-shortcut]");
         if (goalShortcut) {
           haptic();
@@ -11057,6 +11126,18 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
         if (e.target.id === "goal-amount-input") {
           setGoal(goalFromInput(e.target.value), "input");
         }
+        if (e.target.id === "revenue-slider" && GOAL) {
+          setRevenue(GOAL.revenueScale.positionToValue(e.target.value), "slider");
+        }
+        if (e.target.id === "revenue-amount-input" && GOAL) {
+          setRevenue(amountFromInput(e.target.value, GOAL.REVENUE_INPUT_MAX), "input");
+        }
+        if (e.target.id === "revenue-other-input") {
+          answers.revenus = "autre";
+          answers.revenusAutre = e.target.value;
+          var revenueScreenEl = revenueScreen();
+          if (revenueScreenEl) updateNextEnabled(revenueScreenEl);
+        }
       });
 
       // "change" (relâchement du drag/du clavier), distinct de "input" (live
@@ -11066,6 +11147,9 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
         // Fin de saisie du montant (perte de focus) : valeur reformatée.
         if (e.target.id === "goal-amount-input") {
           setGoal(goalFromInput(e.target.value), "commit");
+        }
+        if (e.target.id === "revenue-amount-input" && GOAL) {
+          setRevenue(amountFromInput(e.target.value, GOAL.REVENUE_INPUT_MAX), "commit");
         }
       });
 
@@ -11085,9 +11169,16 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
         }
         // Montant saisi au clavier : Entrée valide la saisie (ferme le
         // clavier mobile), sans passer à l'écran suivant.
-        if (e.target.id === "goal-amount-input") {
+        if (e.target.id === "goal-amount-input" || e.target.id === "revenue-amount-input") {
           e.preventDefault();
           e.target.blur();
+          return;
+        }
+        // « Autre » rempli : Entrée valide l'écran Revenus.
+        if (e.target.id === "revenue-other-input") {
+          e.preventDefault();
+          var revenueNext = revenueScreen() && revenueScreen().querySelector(".quiz-next");
+          if (revenueNext && !revenueNext.disabled) goForwardFromQuestion();
           return;
         }
         var isFreeText = (e.target.id || "").indexOf("quiz-freetext-") === 0;
@@ -11119,6 +11210,9 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
           renderTags();
         }
         var prevIndex = navHistory.pop();
+        if (questionScreens[prevIndex] && questionScreens[prevIndex].getAttribute("data-id") === "assemblage" && navHistory.length > 0) {
+          prevIndex = navHistory.pop();
+        }
         currentQuestionIndex = prevIndex;
         setProgress(progressFillCount(prevIndex), true);
         updateBackVisibility();
@@ -11753,98 +11847,81 @@ const QUIZ_CHAPTER_ICONS = {
 };
 
 // ---------------------------------------------------------------------------
-// Composant « aperçu de ton espace » (effet de dotation) -- réutilisable.
+// Composants des écrans Revenus / Objectif (réutilisables, rendus à leur
+// état final : sans JS tout reste lisible ; mouvement et mises à jour côté
+// client).
 //
-// Fenêtre « Ton espace ColdTrend » : checklist « Ton plan » à gauche
-// (Profil / Objectif / Délai / Concept), carte « Ton projet » (réponses
-// réelles écrites une à une, validées par un check), carte « Objectif
-// mensuel » (jauge), bulle « Assistant ColdTrend » (réponses automatiques,
-// jamais présentée comme un humain).
+// - renderPlanStepper : mini-stepper horizontal « Ton plan » (Profil /
+//   Objectif / Délai / Concept), placé sous les puces récap.
+// - renderGoalGauge : jauge demi-cercle 100 % transform (demi-disque tourné
+//   de 0 à 180° dans un cadran masqué en anneau, couleurs de palier en
+//   calques superposés), badge de palier au centre.
+// - renderAssistantBubble : bulle « Assistant ColdTrend », présentée comme
+//   un assistant à réponses automatiques, jamais comme un humain.
 //
-// Ne montre QUE des données réelles : réponses déjà données, objectif
-// choisi, prénom Google s'il existe. Jamais de revenu, de courbe de ventes
-// ou de notification inventés. La jauge représente l'objectif visé ; le
-// point de départ affiché est 0 €.
-//
-// Jauge : 100 % transform. Le « balayage » est un demi-disque tourné de
-// 0 à 180° (rotate) dans un cadran masqué en anneau (mask statique) ; les
-// couleurs de palier sont 4 calques superposés en fondu d'opacité.
-//
-// Rendu ici à l'état final (sans JS, tout est lisible) ; la chorégraphie
-// d'entrée et les mises à jour vivent côté client (playSpaceIntro,
-// fillSpaceRows, updateSpaceGoal ; instance pilotée : GOAL_PREVIEW_ID).
+// Aucune donnée fictive : réponses réelles, objectif choisi, messages fixes
+// de scripts/goal-math.js. Jamais de revenu, de courbe de ventes ni de
+// notification inventés.
 // ---------------------------------------------------------------------------
 const SPACE_CHECK_SVG =
   '<svg viewBox="0 0 24 24" width="12" height="12" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg>';
 const SPACE_BOT_SVG =
   '<svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="8" width="16" height="11" rx="3"/><path d="M12 4v4M9 13h.01M15 13h.01M9.5 16.5h5"/></svg>';
 
-function renderSpacePreview({ id, goal }) {
-  const tierInfo = GOAL.tier(goal);
-  const step = (key, label, status, extra = "") =>
+function renderPlanStepper({ id }) {
+  const step = (key, label, status) =>
     `<li class="sp-step" data-step="${key}" data-status="${status}">
-                        <span class="sp-step__icon" aria-hidden="true"><span class="sp-step__pulse"></span><span class="sp-step__check">${SPACE_CHECK_SVG}</span>${key === "concept" ? `<span class="sp-step__lock">${ICON_LOCK}</span>` : ""}</span>
-                        <span class="sp-step__label">${label}</span>${extra}
-                      </li>`;
-  const row = (key, label) =>
-    `<div class="sp-row" data-row="${key}">
-                            <dt>${label}</dt>
-                            <dd><span class="sp-skel" aria-hidden="true"></span><span class="sp-val" data-sp="${key}">À définir</span><span class="sp-row__check" aria-hidden="true">${SPACE_CHECK_SVG}</span></dd>
-                          </div>`;
-  const tones = [0, 1, 2, 3].map((i) => `<span class="sp-gauge__tone" data-tone="${i}"${GOAL.tierIndex(goal) === i ? ' style="opacity:1"' : ""}></span>`).join("");
-  return `<figure class="space-preview" id="${id}" data-tier="${tierInfo.id}">
-                <div class="sp-window">
-                  <div class="sp-bar" aria-hidden="true">
-                    <span class="sp-bar__dots"><i></i><i></i><i></i></span>
-                    <span class="sp-bar__title">Ton espace ${brand.name}</span>
+                <span class="sp-step__icon" aria-hidden="true"><span class="sp-step__pulse"></span><span class="sp-step__check">${SPACE_CHECK_SVG}</span>${key === "concept" ? `<span class="sp-step__lock">${ICON_LOCK}</span>` : ""}</span>
+                <span class="sp-step__label">${label}</span>${key === "concept" ? '<span class="sp-step__shimmer" aria-hidden="true"></span>' : ""}
+              </li>`;
+  return `<nav class="goal-stepper" id="${id}" aria-label="Ton plan">
+              <ol class="sp-plan__list">
+              ${step("profil", "Profil", "done")}
+              ${step("objectif", "Objectif", "current")}
+              ${step("delai", "Délai", "todo")}
+              ${step("concept", "Concept", "locked")}
+              </ol>
+            </nav>`;
+}
+
+function renderGoalGauge({ goal }) {
+  const tierInfo = GOAL.tier(goal);
+  const tones = [0, 1, 2, 3]
+    .map((i) => `<span class="sp-gauge__tone" data-tone="${i}"${GOAL.tierIndex(goal) === i ? ' style="opacity:1"' : ""}></span>`)
+    .join("");
+  return `<div class="sp-gauge goal-gauge" data-tier="${tierInfo.id}">
+                  <div class="sp-gauge__dial" aria-hidden="true">
+                    <span class="sp-gauge__track"></span>
+                    <span class="sp-gauge__sweep" style="transform:rotate(${(GOAL.valueToRatio(goal) * 180).toFixed(1)}deg)">${tones}</span>
                   </div>
-                  <div class="sp-body">
-                    <aside class="sp-plan" aria-label="Ton plan">
-                      <p class="sp-plan__title">Ton plan</p>
-                      <ol class="sp-plan__list">
-                      ${step("profil", "Profil", "done")}
-                      ${step("objectif", "Objectif", "current")}
-                      ${step("delai", "Délai", "todo")}
-                      ${step("concept", "Concept", "locked", '<span class="sp-step__shimmer" aria-hidden="true"></span>')}
-                      </ol>
-                    </aside>
-                    <div class="sp-main">
-                      <p class="sp-welcome" data-sp-welcome>Bienvenue, ton espace est prêt.</p>
-                      <div class="sp-cards">
-                        <section class="sp-card sp-card--project">
-                          <h3 class="sp-card__title">Ton projet</h3>
-                          <dl class="sp-list">
-                          ${row("secteur", "Cible")}
-                          ${row("temps", "Temps")}
-                          ${row("plateformes", "Plateformes")}
-                          </dl>
-                        </section>
-                        <section class="sp-card sp-card--goal">
-                          <h3 class="sp-card__title">Objectif mensuel</h3>
-                          <div class="sp-gauge">
-                            <div class="sp-gauge__dial" aria-hidden="true">
-                              <span class="sp-gauge__track"></span>
-                              <span class="sp-gauge__sweep" style="transform:rotate(${(GOAL.valueToRatio(goal) * 180).toFixed(1)}deg)">${tones}</span>
-                            </div>
-                            <span class="sp-gauge__pulse" aria-hidden="true"></span>
-                            <p class="sp-gauge__value"><strong data-sp="goal">${GOAL.formatEuro(goal)}</strong><span>par mois visés</span></p>
-                          </div>
-                          <p class="sp-gauge__scale" aria-hidden="true"><span>0 €</span><span>${GOAL.formatEuro(GOAL.MAX)}</span></p>
-                          <p class="sp-card__hint">Point de départ : 0 €. Un objectif, pas un résultat.</p>
-                        </section>
-                      </div>
-                      <div class="sp-assistant" data-state="idle">
-                        <span class="sp-assistant__avatar" aria-hidden="true">${SPACE_BOT_SVG}</span>
-                        <div class="sp-assistant__bubble">
-                          <p class="sp-assistant__name">Assistant ${brand.name} <span>· réponses automatiques</span></p>
-                          <p class="sp-assistant__typing" aria-hidden="true"><i></i><i></i><i></i></p>
-                          <p class="sp-assistant__text" aria-live="polite">${GOAL.assistantMessage(goal)}</p>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
+                  <span class="sp-gauge__pulse" aria-hidden="true"></span>
+                  <div class="sp-gauge__center"><p class="goal-amount__badge" id="goal-badge" data-tier="${tierInfo.id}">${tierInfo.label}</p></div>
                 </div>
-              </figure>`;
+                <p class="sp-gauge__scale" aria-hidden="true"><span>0 €</span><span>${GOAL.formatEuro(GOAL.MAX)}</span></p>`;
+}
+
+function renderAssistantBubble({ id, text }) {
+  return `<div class="sp-assistant" id="${id}" data-state="idle">
+                <span class="sp-assistant__avatar" aria-hidden="true">${SPACE_BOT_SVG}</span>
+                <div class="sp-assistant__bubble">
+                  <p class="sp-assistant__name">Assistant ${brand.name} <span>· réponses automatiques</span></p>
+                  <p class="sp-assistant__typing" aria-hidden="true"><i></i><i></i><i></i></p>
+                  <p class="sp-assistant__text" aria-live="polite">${text}</p>
+                </div>
+              </div>`;
+}
+
+// Graduations d'un slider non linéaire : trait exact sous chaque valeur,
+// libellés des extrémités alignés vers l'intérieur. ratio = fonction
+// valeur -> 0..1 de l'échelle (GOAL.valueToRatio ou revenueScale).
+function renderSliderTicks(values, ratio, lastLabel) {
+  return values
+    .map((v, i) => {
+      const edge = i === 0 ? " is-first" : i === values.length - 1 ? " is-last" : "";
+      const label = i === values.length - 1 && lastLabel ? lastLabel : v >= 1000 ? `${String(v / 1000).replace(".", ",")} k€` : `${v} €`;
+      return `<span class="goal-slider__tick${edge}" style="left:${(ratio(v) * 100).toFixed(2)}%"><span class="goal-slider__tick-mark"></span><span class="goal-slider__tick-label">${label}</span></span>`;
+    })
+    .join("");
 }
 
 // Icône + libellé de chapitre au-dessus du titre -- absent sur les
@@ -12048,57 +12125,93 @@ function renderQuizQuestionScreen(question, index) {
         </div>`;
   }
 
-  // ---- Écran A « Montant » ------------------------------------------------
-  // Valeurs initiales calculées au build avec le même module que le client
-  // (GOAL = scripts/goal-math.js) : l'écran s'affiche juste, sans attendre
-  // le JS. Le slider va de 0 à GOAL.SLIDER_POSITIONS (échelle non linéaire,
-  // convertie en euros par GOAL.positionToValue).
+  // ---- Écran « Revenus actuels » -------------------------------------------
+  // Une colonne, même grammaire que l'écran Objectif. Aucune valeur n'est
+  // pré-sélectionnée : le CTA reste désactivé tant qu'il n'y a pas de
+  // réponse (montant touché, raccourci, « Autre » rempli, ou « Je préfère
+  // ne pas répondre »), pour ne jamais enregistrer un 0 par défaut.
+  if (question.type === "goal-revenue") {
+    const R = GOAL.revenueScale;
+    const shortcuts = question.shortcuts
+      .map((v) => `<button type="button" class="goal-shortcut" data-revenue-shortcut="${v}">${GOAL.formatEuro(v)}</button>`)
+      .join("");
+    const ticks = renderSliderTicks([0, 1000, 3000, 6000, 10000], (v) => R.valueToRatio(v), "10 k€ +");
+    return `<div class="quiz-screen goal-screen goal-screen--revenue" data-screen="question" data-index="${index}" data-id="${question.id}" data-step-name="${question.stepName}"${skipAttrs}${question.chapter ? ` data-chapter="${question.chapter}"` : ""}>
+          ${renderChapterHeader(question)}
+          <h2 class="quiz-question-title">${question.title}</h2>
+          <p class="goal-lead">${question.subtext}</p>
+          <div class="goal-amount goal-block" id="revenue-amount" data-mode="">
+            <label class="goal-amount__field" for="revenue-amount-input">
+              <span class="goal-amount__glow" aria-hidden="true" style="opacity:0.25"></span>
+              <span class="goal-sr">Revenus mensuels actuels, en euros. Touche pour les saisir.</span>
+              <input class="goal-amount__input" id="revenue-amount-input" type="text" inputmode="numeric" autocomplete="off" enterkeyhint="done" maxlength="9" value="0" aria-describedby="revenue-equivalence" />
+              <span class="goal-amount__unit" aria-hidden="true">€ / mois</span>
+            </label>
+            <p class="goal-amount__equiv goal-xfade" id="revenue-equivalence" aria-live="polite"><span class="goal-xfade__item is-on">${GOAL.currentEquivalence(0)}</span><span class="goal-xfade__item"></span></p>
+            <div class="goal-shortcuts" role="group" aria-label="Montants rapides">${shortcuts}</div>
+            <div class="goal-slider" style="--goal-ratio:0">
+              <div class="goal-slider__track" aria-hidden="true"><div class="goal-slider__fill"></div></div>
+              <input class="goal-slider__input" id="revenue-slider" type="range" min="0" max="${GOAL.SLIDER_POSITIONS}" step="1" value="0" aria-label="Revenus mensuels actuels" aria-valuetext="0 € par mois" />
+              <div class="goal-slider__ticks" aria-hidden="true">${ticks}</div>
+            </div>
+          </div>
+          <div class="revenue-alt goal-block">
+            <button type="button" class="revenue-alt__btn" data-revenue-mode="autre" aria-pressed="false" aria-controls="revenue-other">Autre</button>
+            <button type="button" class="revenue-alt__btn" data-revenue-mode="non_reponse" aria-pressed="false">Je préfère ne pas répondre</button>
+          </div>
+          <div class="revenue-other" id="revenue-other" hidden>
+            <label class="goal-sr" for="revenue-other-input">Décris ta situation</label>
+            <input class="quiz-text-input" id="revenue-other-input" type="text" maxlength="60" placeholder="Ex : variable selon les mois" autocomplete="off" />
+          </div>
+          ${renderAssistantBubble({ id: "revenue-assistant", text: GOAL.revenueAssistantMessage("montant", 0) })}
+          <div class="quiz-footer goal-footer">
+            <button class="btn btn--primary quiz-next" type="button" disabled>${question.cta}</button>
+          </div>
+        </div>`;
+  }
+
+  // ---- Écran A « Montant » (objectif) --------------------------------------
+  // Une colonne centrée (520px) sur toutes les tailles : stepper « Ton
+  // plan », titre, montant + écart avec les revenus actuels, jauge,
+  // raccourcis, slider, assistant, CTA collé en bas. Valeurs initiales
+  // calculées au build avec le même module que le client (GOAL).
   if (question.type === "goal-amount") {
     const initial = GOAL.snap(question.initial);
     const initialPos = GOAL.valueToPosition(initial);
-    // Repères choisis pour être lisibles sur l'échelle non linéaire :
-    // 0 % / 30 % / 60 % (coude à 5 000 €) / 78 % / 100 % de la course.
-    const TICK_VALUES = [0, 2500, 5000, 25000, 50000];
-    const ticks = TICK_VALUES.map((v, i) => {
-      const edge = i === 0 ? " is-first" : i === TICK_VALUES.length - 1 ? " is-last" : "";
-      const label = v >= 1000 ? `${(v / 1000).toLocaleString("fr-FR")} k€` : `${v} €`;
-      return `<span class="goal-slider__tick${edge}" style="left:${(GOAL.valueToRatio(v) * 100).toFixed(2)}%"><span class="goal-slider__tick-mark"></span><span class="goal-slider__tick-label">${label}</span></span>`;
-    }).join("");
+    // Repères lisibles sur l'échelle non linéaire : 0 % / 30 % / 60 %
+    // (coude à 5 000 €) / 78 % / 100 % de la course.
+    const ticks = renderSliderTicks([0, 2500, 5000, 25000, 50000], (v) => GOAL.valueToRatio(v));
     const shortcuts = question.shortcuts
       .map((v) => `<button type="button" class="goal-shortcut" data-goal-shortcut="${v}">${GOAL.formatEuro(v)}</button>`)
       .join("");
     const price = GOAL.averagePrice();
     const clients = GOAL.clientsNeeded(initial, price);
     return `<div class="quiz-screen goal-screen goal-screen--amount" data-screen="question" data-index="${index}" data-id="${question.id}" data-step-name="${question.stepName}"${skipAttrs}${question.chapter ? ` data-chapter="${question.chapter}"` : ""}>
-          <div class="goal-a">
-            <div class="goal-a__preview">
-              ${renderSpacePreview({ id: "goal-preview", goal: initial })}
+          ${renderPlanStepper({ id: "goal-stepper" })}
+          ${renderChapterHeader(question)}
+          <h2 class="quiz-question-title">${question.title}</h2>
+          <p class="goal-lead">${question.lead}</p>
+          <div class="goal-amount goal-block">
+            <p class="goal-amount__gap" id="goal-gap">${GOAL.goalGap(initial, null)}</p>
+            <label class="goal-amount__field" for="goal-amount-input">
+              <span class="goal-amount__glow" id="goal-glow" aria-hidden="true" style="opacity:${(0.25 + GOAL.valueToRatio(initial) * 0.75).toFixed(3)}"></span>
+              <span class="goal-sr">Montant mensuel visé, en euros. Touche pour le saisir.</span>
+              <input class="goal-amount__input" id="goal-amount-input" type="text" inputmode="numeric" autocomplete="off" enterkeyhint="done" maxlength="7" value="${GOAL.formatNumber(initial)}" aria-describedby="goal-gap goal-equivalence goal-clients" />
+              <span class="goal-amount__unit" aria-hidden="true">€ / mois</span>
+            </label>
+            <p class="goal-amount__equiv goal-xfade" id="goal-equivalence" aria-live="polite"><span class="goal-xfade__item is-on">${GOAL.equivalence(initial)}</span><span class="goal-xfade__item"></span></p>
+            <p class="goal-amount__clients" id="goal-clients">≈ <span id="goal-clients-n">${GOAL.formatNumber(clients)}</span> <span id="goal-clients-rest">client${clients > 1 ? "s" : ""} à ${price} €/mois</span></p>
+            ${renderGoalGauge({ goal: initial })}
+            <div class="goal-shortcuts" role="group" aria-label="Montants rapides">${shortcuts}</div>
+            <div class="goal-slider" style="--goal-ratio:${GOAL.valueToRatio(initial).toFixed(4)}">
+              <div class="goal-slider__track" aria-hidden="true"><div class="goal-slider__fill"></div></div>
+              <input class="goal-slider__input" id="goal-slider" type="range" min="0" max="${GOAL.SLIDER_POSITIONS}" step="1" value="${initialPos}" aria-label="Objectif mensuel" aria-valuetext="${GOAL.formatGoal(initial)}" />
+              <div class="goal-slider__ticks" aria-hidden="true">${ticks}</div>
             </div>
-            <div class="goal-a__main">
-              ${renderChapterHeader(question)}
-              <h2 class="quiz-question-title">${question.title}</h2>
-              <p class="goal-lead">${question.lead}</p>
-              <div class="goal-amount goal-block">
-                <p class="goal-amount__badge" id="goal-badge" data-tier="${GOAL.tier(initial).id}">${GOAL.tier(initial).label}</p>
-                <label class="goal-amount__field" for="goal-amount-input">
-                  <span class="goal-amount__glow" id="goal-glow" aria-hidden="true" style="opacity:${(0.25 + GOAL.valueToRatio(initial) * 0.75).toFixed(3)}"></span>
-                  <span class="goal-sr">Montant mensuel visé, en euros. Touche pour le saisir.</span>
-                  <input class="goal-amount__input" id="goal-amount-input" type="text" inputmode="numeric" autocomplete="off" enterkeyhint="done" maxlength="7" value="${GOAL.formatNumber(initial)}" aria-describedby="goal-equivalence goal-clients" />
-                  <span class="goal-amount__unit" aria-hidden="true">€ / mois</span>
-                </label>
-                <p class="goal-amount__equiv goal-xfade" id="goal-equivalence" aria-live="polite"><span class="goal-xfade__item is-on">${GOAL.equivalence(initial)}</span><span class="goal-xfade__item"></span></p>
-                <p class="goal-amount__clients" id="goal-clients">≈ <span id="goal-clients-n">${GOAL.formatNumber(clients)}</span> <span id="goal-clients-rest">client${clients > 1 ? "s" : ""} à ${price} €/mois</span></p>
-                <div class="goal-shortcuts" role="group" aria-label="Montants rapides">${shortcuts}</div>
-                <div class="goal-slider" style="--goal-ratio:${GOAL.valueToRatio(initial).toFixed(4)}">
-                  <div class="goal-slider__track" aria-hidden="true"><div class="goal-slider__fill"></div></div>
-                  <input class="goal-slider__input" id="goal-slider" type="range" min="0" max="${GOAL.SLIDER_POSITIONS}" step="1" value="${initialPos}" aria-label="Objectif mensuel" aria-valuetext="${GOAL.formatGoal(initial)}" />
-                  <div class="goal-slider__ticks" aria-hidden="true">${ticks}</div>
-                </div>
-              </div>
-              <div class="quiz-footer goal-footer">
-                <button class="btn btn--primary quiz-next goal-cta" type="button"><span class="goal-cta__label">${question.cta}</span><span class="goal-cta__check" aria-hidden="true">${SPACE_CHECK_SVG}</span></button>
-              </div>
-            </div>
+          </div>
+          ${renderAssistantBubble({ id: "goal-assistant", text: GOAL.assistantMessage(initial) })}
+          <div class="quiz-footer goal-footer">
+            <button class="btn btn--primary quiz-next goal-cta" type="button"><span class="goal-cta__label">${question.cta}</span><span class="goal-cta__check" aria-hidden="true">${SPACE_CHECK_SVG}</span></button>
           </div>
         </div>`;
   }

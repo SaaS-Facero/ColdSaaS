@@ -20,45 +20,70 @@
   var MIN = 0;
   var MAX = 50000;
 
-  // ---- Slider non linéaire --------------------------------------------------
-  // Le <input type="range"> va de 0 à SLIDER_POSITIONS. Les 60 premiers % de
-  // la course couvrent 0 -> 5 000 € (là où se trouvent la plupart des
-  // objectifs, donc là où il faut de la précision), les 40 % restants
-  // couvrent 5 000 -> 50 000 €.
+  // ---- Sliders non linéaires ---------------------------------------------------
+  // Un <input type="range"> va de 0 à SLIDER_POSITIONS. Les 60 premiers % de
+  // la course couvrent 0 -> « coude » (là où se trouvent la plupart des
+  // réponses, donc là où il faut de la précision), les 40 % restants
+  // couvrent coude -> maximum. Une même fabrique sert aux deux écrans :
+  //   - objectif mensuel : 0 -> 5 000 € -> 50 000 € ;
+  //   - revenus actuels  : 0 -> 3 000 € -> 10 000 € (et plus, en saisie).
   var SLIDER_POSITIONS = 1000;
   var KNEE_POSITION = 600;
-  var KNEE_VALUE = 5000;
 
-  // Pas d'arrondi selon la zone : 50 € sous 1 000 €, 100 € jusqu'à
-  // 5 000 €, 500 € au-delà.
-  function snap(value) {
-    var v = Math.max(MIN, Math.min(MAX, Number(value) || 0));
-    var step = v < 1000 ? 50 : v < KNEE_VALUE ? 100 : 500;
-    return Math.min(MAX, Math.round(v / step) * step);
+  // steps : [[seuil, pas], ...] -- pas d'arrondi appliqué sous chaque seuil.
+  function makeScale(max, kneeValue, steps) {
+    function snapValue(value) {
+      var v = Math.max(0, Math.min(max, Number(value) || 0));
+      var step = steps[steps.length - 1][1];
+      for (var i = 0; i < steps.length; i += 1) {
+        if (v < steps[i][0]) {
+          step = steps[i][1];
+          break;
+        }
+      }
+      return Math.min(max, Math.round(v / step) * step);
+    }
+    function toValue(position) {
+      var p = Math.max(0, Math.min(SLIDER_POSITIONS, Number(position) || 0));
+      var raw =
+        p <= KNEE_POSITION
+          ? (p / KNEE_POSITION) * kneeValue
+          : kneeValue + ((p - KNEE_POSITION) / (SLIDER_POSITIONS - KNEE_POSITION)) * (max - kneeValue);
+      return snapValue(raw);
+    }
+    function toPosition(value) {
+      var v = Math.max(0, Math.min(max, Number(value) || 0));
+      var p =
+        v <= kneeValue
+          ? (v / kneeValue) * KNEE_POSITION
+          : KNEE_POSITION + ((v - kneeValue) / (max - kneeValue)) * (SLIDER_POSITIONS - KNEE_POSITION);
+      return Math.round(p);
+    }
+    return {
+      max: max,
+      snap: snapValue,
+      positionToValue: toValue,
+      valueToPosition: toPosition,
+      // Fraction 0..1 de la course (jauges, remplissage de piste).
+      valueToRatio: function (value) {
+        return toPosition(value) / SLIDER_POSITIONS;
+      }
+    };
   }
 
-  function positionToValue(position) {
-    var p = Math.max(0, Math.min(SLIDER_POSITIONS, Number(position) || 0));
-    var raw =
-      p <= KNEE_POSITION
-        ? (p / KNEE_POSITION) * KNEE_VALUE
-        : KNEE_VALUE + ((p - KNEE_POSITION) / (SLIDER_POSITIONS - KNEE_POSITION)) * (MAX - KNEE_VALUE);
-    return snap(raw);
-  }
+  // Objectif : 50 € sous 1 000 €, 100 € jusqu'à 5 000 €, 500 € au-delà.
+  var GOAL_SCALE = makeScale(MAX, 5000, [[1000, 50], [5000, 100], [Infinity, 500]]);
+  var snap = GOAL_SCALE.snap;
+  var positionToValue = GOAL_SCALE.positionToValue;
+  var valueToPosition = GOAL_SCALE.valueToPosition;
+  var valueToRatio = GOAL_SCALE.valueToRatio;
 
-  function valueToPosition(value) {
-    var v = Math.max(MIN, Math.min(MAX, Number(value) || 0));
-    var p =
-      v <= KNEE_VALUE
-        ? (v / KNEE_VALUE) * KNEE_POSITION
-        : KNEE_POSITION + ((v - KNEE_VALUE) / (MAX - KNEE_VALUE)) * (SLIDER_POSITIONS - KNEE_POSITION);
-    return Math.round(p);
-  }
-
-  // Fraction 0..1 de la course (jauges, remplissage de piste).
-  function valueToRatio(value) {
-    return valueToPosition(value) / SLIDER_POSITIONS;
-  }
+  // Revenus actuels : 50 € sous 1 000 €, 100 € jusqu'à 3 000 €, 250 €
+  // au-delà. Le slider s'arrête à 10 000 € (« et plus ») ; la saisie au
+  // clavier accepte jusqu'à REVENUE_INPUT_MAX.
+  var REVENUE_MAX = 10000;
+  var REVENUE_INPUT_MAX = 1000000;
+  var REVENUE_SCALE = makeScale(REVENUE_MAX, 3000, [[1000, 50], [3000, 100], [Infinity, 250]]);
 
   // ---- Paliers ----------------------------------------------------------------
   // Badges affichés au-dessus du montant. La vibration se déclenche quand
@@ -245,6 +270,56 @@
     return ASSISTANT_MESSAGES[tier(v).id];
   }
 
+  // ---- Revenus actuels (écran dédié, avant l'objectif) -----------------------
+  // Équivalence affichée sous le montant. Zéro n'est jamais présenté comme
+  // un manque.
+  function currentEquivalence(revenue) {
+    var v = Number(revenue) || 0;
+    if (v <= 0) return "Rien pour l'instant : tout ce qui viendra sera du plus";
+    return equivalence(v);
+  }
+
+  // Message de l'assistant, bienveillant quel que soit le montant (ou
+  // l'absence de réponse). Jamais de jugement, jamais de promesse.
+  // mode : "montant" | "non_reponse" | "autre".
+  var REVENUE_MESSAGES = {
+    non_reponse: "Aucun souci, cette info reste facultative. On avance avec le reste.",
+    autre: "Merci, c'est noté. Chaque situation est différente, on s'y adapte.",
+    zero: "Zéro, c'est un excellent point de départ : tout ce que tu vas construire sera du plus.",
+    petit: "Un premier revenu, c'est une base. On construit à côté, sans tout chambouler.",
+    moyen: "Une base solide. L'idée : un projet qui grandit en parallèle, à ton rythme.",
+    eleve: "Tu as déjà de bons revenus. Ton projet peut viser plus loin, sans pression."
+  };
+
+  function revenueAssistantMessage(mode, revenue) {
+    if (mode === "non_reponse") return REVENUE_MESSAGES.non_reponse;
+    if (mode === "autre") return REVENUE_MESSAGES.autre;
+    var v = Number(revenue) || 0;
+    if (v <= 0) return REVENUE_MESSAGES.zero;
+    if (v < 1000) return REVENUE_MESSAGES.petit;
+    if (v < 3000) return REVENUE_MESSAGES.moyen;
+    return REVENUE_MESSAGES.eleve;
+  }
+
+  // Écart objectif / revenus actuels, affiché sur l'écran Objectif.
+  // current : nombre (revenus déclarés) ou null/undefined (non renseigné).
+  // 0 ou non renseigné -> « Ton premier objectif ».
+  function formatRatio(r) {
+    var rounded = r < 10 ? Math.round(r * 10) / 10 : Math.round(r);
+    return String(rounded).replace(".", ",");
+  }
+
+  function goalGap(goal, current) {
+    var g = Number(goal) || 0;
+    var c = typeof current === "number" ? current : 0;
+    if (c <= 0) return "Ton premier objectif";
+    if (g <= 0) return "";
+    var r = g / c;
+    if (r < 0.95) return "Moins que tes revenus actuels";
+    if (r <= 1.05) return "Autant que tes revenus actuels";
+    return "× " + formatRatio(r) + " tes revenus actuels";
+  }
+
   // Libellés partagés (titre en écho de l'écran Délai, puce récap).
   function formatGoal(goal) {
     var v = Number(goal) || 0;
@@ -273,6 +348,12 @@
     assess: assess,
     formatGoal: formatGoal,
     assistantMessage: assistantMessage,
+    REVENUE_MAX: REVENUE_MAX,
+    REVENUE_INPUT_MAX: REVENUE_INPUT_MAX,
+    revenueScale: REVENUE_SCALE,
+    currentEquivalence: currentEquivalence,
+    revenueAssistantMessage: revenueAssistantMessage,
+    goalGap: goalGap,
     formatEuro: formatEuro,
     formatNumber: formatNumber
   };

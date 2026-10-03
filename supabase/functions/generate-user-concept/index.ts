@@ -147,6 +147,7 @@ type Profile = {
   situation: string | null;
   revenus: string | null;
   revenusAutre: string | null;
+  revenuActuel: number | null;
   passif: string | null;
   anciennete: string | null;
   plateformes: string | null;
@@ -187,7 +188,21 @@ Règles strictes :
 Format de sortie : JSON strict, aucun texte hors JSON.`;
 
   const sectorText = a.secteur.length ? a.secteur.map((s) => SECTOR_LABELS[s] || s).join(", ") : "non communiqué";
-  const revenusText = a.revenus === "autre" ? (a.revenusAutre ? `"${a.revenusAutre}"` : "non communiqué") : REVENUS_LABELS[a.revenus ?? ""] || "non communiqué";
+  // Écran dédié (montant exact) depuis la migration 0031 ; les anciennes
+  // tranches (REVENUS_LABELS) restent lues pour les clients pas encore
+  // rechargés.
+  const revenusText =
+    typeof a.revenuActuel === "number"
+      ? a.revenuActuel === 0
+        ? "aucun revenu pour l'instant"
+        : `environ ${a.revenuActuel} € / mois`
+      : a.revenus === "non_reponse"
+        ? "préfère ne pas le dire"
+        : a.revenus === "autre"
+          ? a.revenusAutre
+            ? `"${a.revenusAutre}"`
+            : "non communiqué"
+          : REVENUS_LABELS[a.revenus ?? ""] || "non communiqué";
   const passifText = a.passif
     ? (PASSIF_LABELS[a.passif] || a.passif) + (a.anciennete && ANCIENNETE_LABELS[a.anciennete] ? `, ${ANCIENNETE_LABELS[a.anciennete]}` : "")
     : "non communiqué";
@@ -312,6 +327,10 @@ Deno.serve(async (req) => {
     situation: str(body.situation),
     revenus: str(body.revenus),
     revenusAutre: cleanFreeText(body.revenusAutre, 60),
+    revenuActuel:
+      typeof body.revenuActuel === "number" && body.revenuActuel >= 0 && body.revenuActuel <= 1000000
+        ? Math.round(body.revenuActuel)
+        : null,
     passif: str(body.passif),
     anciennete: str(body.anciennete),
     plateformes: str(body.plateformes),
