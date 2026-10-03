@@ -16068,6 +16068,47 @@ html, body {
 /* Chapitre bonus -- même traitement visuel que son équivalent sur l'écran
    résultat du quiz (result-bonus-chapter), adapté aux tokens --color-*
    de /compte. Gratuit, accessible à tout compte connecté. */
+.dossier-optin {
+  margin-top: 24px;
+}
+
+.dossier-optin__row {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  min-height: 44px;
+  padding: 14px 16px;
+  border-radius: var(--radius-lg);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.03);
+  font-size: 14px;
+  line-height: 1.5;
+  cursor: pointer;
+}
+
+.dossier-optin__row input {
+  flex: none;
+  width: 20px;
+  height: 20px;
+  margin: 1px 0 0;
+  accent-color: var(--color-cobalt, #0047FF);
+  cursor: pointer;
+}
+
+.dossier-optin__row input:disabled {
+  cursor: not-allowed;
+}
+
+.dossier-optin__status {
+  margin: 8px 2px 0;
+  font-size: 13px;
+  opacity: 0.75;
+}
+
+.dossier-optin__status:empty {
+  display: none;
+}
+
 .dossier-bonus-chapter {
   display: block;
   margin-top: 24px;
@@ -17400,6 +17441,18 @@ function comptePage() {
         <a class="dossier-project-empty__cta" id="dossier-empty-cta" href="/succes">Voir mes résultats &rarr;</a>
       </div>
 
+      <!-- Consentement aux emails de conseils et de relance (lifecycle,
+           migration 0033). Non coché par défaut ; reflète le choix
+           enregistré ; modifiable à tout moment. -->
+      <section class="dossier-optin" aria-labelledby="dossier-optin-title">
+        <h2 class="dossier__project-title" id="dossier-optin-title">Emails</h2>
+        <label class="dossier-optin__row" for="dossier-optin">
+          <input type="checkbox" id="dossier-optin" />
+          <span>Recevoir par email les conseils et rappels de Max pour lancer mon projet. Désinscription en 1 clic, quand tu veux.</span>
+        </label>
+        <p class="dossier-optin__status" id="dossier-optin-status" aria-live="polite"></p>
+      </section>
+
       <a class="dossier-bonus-chapter" href="/profil-entrepreneur">
         <span class="dossier-bonus-chapter__eyebrow">Chapitre bonus, gratuit</span>
         <span class="dossier-bonus-chapter__title">Ton profil entrepreneur</span>
@@ -17619,6 +17672,39 @@ function comptePage() {
         loadGeneratedConcept(window.ColdTrendSupabase, profile.id, profile);
       }
 
+      // ---- Emails de conseils (consentement marketing) --------------------
+      // marketing_opt_in est écrit par la personne elle-même (policy own-row) ;
+      // son horodatage est posé par la base (trigger stamp_marketing_opt_in).
+      // Cocher après une désinscription réactive les emails : lifecycle-
+      // dispatch compare la date du consentement à celle de la
+      // désinscription. Adresse en erreur (bounce dur, plainte) : case
+      // désactivée, réactivation par le contact uniquement.
+      function initMarketingOptIn(supabase, userId, profile) {
+        var box = document.getElementById("dossier-optin");
+        var status = document.getElementById("dossier-optin-status");
+        if (!box) return;
+        box.checked = profile.marketing_opt_in === true;
+        if (profile.email_suppressed_at) {
+          box.checked = false;
+          box.disabled = true;
+          status.textContent = "Nos emails vers ton adresse ont échoué : écris-nous via la page contact pour les réactiver.";
+          return;
+        }
+        box.addEventListener("change", async function () {
+          var wanted = box.checked;
+          box.disabled = true;
+          var res = await supabase.from("profiles").update({ marketing_opt_in: wanted }).eq("id", userId);
+          box.disabled = false;
+          if (res.error) {
+            box.checked = !wanted;
+            status.textContent = "La mise à jour a échoué, réessaie dans un instant.";
+            return;
+          }
+          status.textContent = "";
+          showToast(wanted ? "C'est noté : tu recevras les conseils de Max." : "C'est noté : plus d'emails de conseils.");
+        });
+      }
+
       function showToast(message) {
         var toastEl = document.getElementById("dossier-toast");
         if (!toastEl) return;
@@ -17680,10 +17766,11 @@ function comptePage() {
 
         var profileRes = await supabase
           .from("profiles")
-          .select("intention, budget, temps, secteur, deja_cherche, match_count, paid_at, created_at, prenom, is_admin, stripe_customer_id")
+          .select("intention, budget, temps, secteur, deja_cherche, match_count, paid_at, created_at, prenom, is_admin, stripe_customer_id, marketing_opt_in, email_suppressed_at")
           .eq("id", user.id)
           .single();
         var profile = profileRes.data || {};
+        initMarketingOptIn(supabase, user.id, profile);
         if (!profile.created_at) profile.created_at = user.created_at;
 
         // Le dossier est accessible à tout compte connecté, payé ou non

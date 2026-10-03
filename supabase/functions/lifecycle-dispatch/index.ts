@@ -71,7 +71,7 @@ Deno.serve(async (req) => {
       const [{ data: profile }, { data: events }, { data: sends }] = await Promise.all([
         admin
           .from("profiles")
-          .select("prenom, paid_at, subscription_status, marketing_opt_in, unsubscribed_at, email_suppressed_at, funnel_last_step, updated_at, objectif_mensuel, delai_mois, temps, secteur, blocage")
+          .select("prenom, paid_at, subscription_status, marketing_opt_in, marketing_opt_in_at, unsubscribed_at, email_suppressed_at, funnel_last_step, updated_at, objectif_mensuel, delai_mois, temps, secteur, blocage")
           .eq("id", userId)
           .maybeSingle(),
         admin.from("events").select("id, type, created_at, amount_cents, metadata").eq("user_id", userId).gte("created_at", since).order("created_at"),
@@ -93,7 +93,11 @@ Deno.serve(async (req) => {
         profile: {
           paid,
           optIn: profile.marketing_opt_in,
-          unsubscribed: !!profile.unsubscribed_at,
+          // Désinscription levée si la personne a recoché la case ensuite
+          // (/compte) : seul le choix le plus récent compte.
+          unsubscribed:
+            !!profile.unsubscribed_at &&
+            !(profile.marketing_opt_in_at && Date.parse(profile.marketing_opt_in_at) > Date.parse(profile.unsubscribed_at)),
           suppressed: !!profile.email_suppressed_at,
           funnelLastStep: profile.funnel_last_step ?? 0,
           updatedAt: profile.updated_at,
