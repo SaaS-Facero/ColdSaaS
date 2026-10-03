@@ -13,6 +13,7 @@
 // des conditions qui excluent des lignes ici.
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { intentScore } from "../_shared/lifecycle-core.js";
 
 const ALLOWED_ORIGINS = new Set([
   "https://coldtrend.com",
@@ -64,11 +65,17 @@ Deno.serve(async (req) => {
     return json({ error: "Accès refusé." }, 403);
   }
 
-  const [profilesRes, entrepreneurRes, conceptsRes, usersRes] = await Promise.all([
+  // Suivi complet (migrations 0030 à 0034) : réponses du quiz, engagement,
+  // statut Stripe, consentement, dernière relance, score d'intention
+  // (même calcul que les relances : _shared/lifecycle-core.js).
+  const since = new Date(Date.now() - 30 * 24 * 3600 * 1000).toISOString();
+  const [profilesRes, entrepreneurRes, conceptsRes, usersRes, eventsRes, sendsRes] = await Promise.all([
     supabaseAdmin
       .from("profiles")
       .select(
-        "id, prenom, intention, budget, temps, secteur, deja_cherche, match_count, funnel_last_step, paid_at, created_at, converted, unsubscribed_at"
+        "id, prenom, intention, budget, temps, secteur, deja_cherche, match_count, funnel_last_step, paid_at, created_at, updated_at, converted, unsubscribed_at, " +
+          "age_range, current_revenue, objectif_mensuel, delai_mois, plateformes, blocage, reve, wants_ai_video, support_level, engagement_signed_at, " +
+          "subscription_status, subscription_duration_months, marketing_opt_in, email_suppressed_at, last_recovery_email_sent_at"
       )
       .order("created_at", { ascending: false }),
     supabaseAdmin.from("entrepreneur_profile_answers").select("user_id, frein, frein_autre, revenu_vise"),
@@ -76,7 +83,9 @@ Deno.serve(async (req) => {
     // plus ce que /admin doit montrer -- user_concepts (concept généré par
     // profil) reflète l'état réel du nouveau funnel.
     supabaseAdmin.from("user_concepts").select("user_id, concept_name"),
-    supabaseAdmin.auth.admin.listUsers({ perPage: 1000 })
+    supabaseAdmin.auth.admin.listUsers({ perPage: 1000 }),
+    supabaseAdmin.from("events").select("user_id, type, created_at").gte("created_at", since).limit(20000),
+    supabaseAdmin.from("lifecycle_sends").select("user_id, sequence, step, status, created_at").eq("status", "sent").order("created_at", { ascending: false }).limit(20000)
   ]);
 
   if (profilesRes.error) {
@@ -87,10 +96,18 @@ Deno.serve(async (req) => {
   const entrepreneurByUser = new Map((entrepreneurRes.data ?? []).map((row) => [row.user_id, row]));
   const conceptByUser = new Map((conceptsRes.data ?? []).map((row) => [row.user_id, row]));
   const emailByUser = new Map((usersRes.data?.users ?? []).map((u) => [u.id, u.email]));
+  const eventsByUser = new Map<string, { type: string; created_at: string }[]>();
+  for (const e of eventsRes.data ?? []) eventsByUser.set(e.user_id, [...(eventsByUser.get(e.user_id) ?? []), e]);
+  const lastSendByUser = new Map<string, { sequence: string; step: number; created_at: string }>();
+  for (const s of sendsRes.data ?? []) if (!lastSendByUser.has(s.user_id)) lastSendByUser.set(s.user_id, s);
+  const now = Date.now();
 
   const rows = profilesRes.data.map((profile) => {
     const entrepreneur = entrepreneurByUser.get(profile.id);
     const concept = conceptByUser.get(profile.id);
+    const lastSend = lastSendByUser.get(profile.id);
+    // Dernière relance : envoi lifecycle, sinon l'ancienne relance unique.
+    const lastRelanceAt = lastSend?.created_at ?? profile.last_recovery_email_sent_at ?? null;
     return {
       id: profile.id,
       email: emailByUser.get(profile.id) ?? null,
@@ -108,7 +125,29 @@ Deno.serve(async (req) => {
       funnel_last_step: profile.funnel_last_step,
       match_count: profile.match_count,
       converted: profile.converted,
-      unsubscribed_at: profile.unsubscribed_at
+      unsubscribed_at: profile.unsubscribed_at,
+      age_range: profile.age_range,
+      current_revenue: profile.current_revenue,
+      objectif_mensuel: profile.objectif_mensuel,
+      delai_mois: profile.delai_mois,
+      plateformes: profile.plateformes,
+      blocage: profile.blocage,
+      reve: profile.reve,
+      wants_ai_video: profile.wants_ai_video,
+      support_level: profile.support_level,
+      engagement_signed_at: profile.engagement_signed_at,
+      subscription_status: profile.subscription_status,
+      subscription_duration_months: profile.subscription_duration_months,
+      marketing_opt_in: profile.marketing_opt_in,
+      email_suppressed_at: profile.email_suppressed_at,
+      last_relance_at: lastRelanceAt,
+      last_relance: lastSend ? `${lastSend.sequence}:${lastSend.step}` : profile.last_recovery_email_sent_at ? "ancienne relance" : null,
+      intent_score: intentScore({
+        funnelLastStep: profile.funnel_last_step ?? 0,
+        events: eventsByUser.get(profile.id) ?? [],
+        lastActivityAt: profile.updated_at,
+        now,
+      }),
     };
   });
 

@@ -4,6 +4,8 @@ import path from "node:path";
 import vm from "node:vm";
 import { siteFooterCss, siteFooterHtml } from "./site-footer.mjs";
 import { consentPixelsConfig, consentPixelsHtml } from "./consent-pixels.mjs";
+import { dashboardPage } from "./dashboard-page.mjs";
+import { adminUsersHtml, adminUsersJs, buildAdminLabels, buildScreenList } from "./admin-users.mjs";
 import {
   mentionsLegalesPage,
   cgvPage,
@@ -5837,7 +5839,7 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
 
   /* Chapitre bonus -- bloc distinct, pas un lien perdu en bas d'écran.
      Pointe vers /compte : le module reste gratuit en soi, mais n'est
-     accessible qu'une fois l'accès débloqué (voir comptePage()). */
+     accessible qu'une fois l'accès débloqué (voir scripts/dashboard-page.mjs). */
   .result-bonus-chapter {
     display: block;
     margin-top: 24px;
@@ -7849,7 +7851,7 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
         return answers.revenus === "montant" && typeof answers.revenuActuel === "number" ? answers.revenuActuel : null;
       }
 
-      // Colonnes profiles (migrations 0030 à 0032) des écrans répondus
+      // Colonnes profiles (migrations 0030 à 0034) des écrans répondus
       // UNIQUEMENT : une colonne absente n'est pas écrite (jamais un null
       // par-dessus une valeur déjà en base). current_revenue vaut null quand
       // l'écran Revenus a été répondu sans montant (Autre, pas de réponse) :
@@ -7864,6 +7866,12 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
         if (answers.accompagnement) fields.support_level = answers.accompagnement;
         // Frein(s) déclaré(s) au quiz (migration 0033) : email objection.
         if (Array.isArray(answers.blocage) && answers.blocage.length) fields.blocage = answers.blocage;
+        // Suivi admin et dashboard (migration 0034). L'âge n'est stocké que
+        // pour une tranche majeure (un mineur n'a jamais de compte).
+        if (isAdultAge(answers.age)) fields.age_range = answers.age;
+        if (answers.plateformes) fields.plateformes = answers.plateformes;
+        if (Array.isArray(answers.reve) && answers.reve.length) fields.reve = answers.reve;
+        if (answers.engagementAt) fields.engagement_signed_at = answers.engagementAt;
         return fields;
       }
 
@@ -10163,6 +10171,8 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
 
       function completeEngagement() {
         answers.engagement = true;
+        // Horodatage de la signature (profiles.engagement_signed_at, 0034).
+        answers.engagementAt = new Date().toISOString();
         try {
           if (navigator.vibrate) navigator.vibrate([20, 40, 30]);
         } catch (err) {
@@ -11623,7 +11633,7 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
 
       // Retour depuis le lien de relance d'abandon (email envoyé par
       // supabase/functions/send-abandon-emails) ou depuis "Mon dossier" dans
-      // le header (voir comptePage() : redirection quand match_count n'est
+      // le header (voir scripts/dashboard-page.mjs : redirection quand match_count n'est
       // pas encore renseigné) : ?resume=quiz redirige ici avec une session
       // déjà établie. Plutôt que de rouvrir directement sur la question
       // suivante (silencieux, aucune indication de ce qui a déjà été
@@ -13406,8 +13416,10 @@ function successPage({ brand, siteUrl }) {
       async function loadResults(supabase, userId) {
         var statusLine = document.getElementById("status-line");
         try {
-          var cacheRes = await supabase.from("user_concepts").select("*").eq("user_id", userId).maybeSingle();
-          var concept = cacheRes.data || (await fetchConceptFromEdge(supabase));
+          // Fiche complète : uniquement via generate-user-concept, qui vérifie
+          // le paiement côté serveur (le client ne peut plus lire les colonnes
+          // payantes de user_concepts, migration 0034).
+          var concept = await fetchConceptFromEdge(supabase);
           if (!concept) {
             statusLine.textContent = "Ton accès est actif.";
             document.getElementById("empty-state").className = "is-visible";
@@ -15085,7 +15097,7 @@ function entrepreneurProfilePage({ brand, siteUrl, stripePaymentLink }) {
 // pas de middleware possible pour protéger /compte AVANT le rendu. La
 // protection réelle est un skeleton affiché immédiatement pendant que
 // `supabase.auth.getSession()` répond en JS, contenu affiché seulement après
-// vérification, redirection sinon (voir comptePage() plus bas).
+// vérification, redirection sinon (voir scripts/dashboard-page.mjs).
 //
 // Chaque page est un rechargement complet (pas de SPA) : la transition douce
 // entre les 5 pages ne peut pas être une transition CSS classique (le DOM est
@@ -17361,639 +17373,7 @@ const VIDEO_MODE_CLIENT_JS = `
           (window.location.protocol === "https:" ? "; Secure" : "");
       }`;
 
-function comptePage() {
-  // /compte n'affiche pas des données, il raconte une progression : le
-  // "dossier" de la personne, dans le même univers vérification/preuve que
-  // le reste du produit. Pas de middleware possible sur du statique : la
-  // protection réelle tient dans l'ordre d'affichage (skeleton fidèle à la
-  // mise en page finale, contenu révélé seulement après vérification JS).
-  const body = `  <div class="account-skeleton" id="account-skeleton" aria-hidden="true">
-    <div class="skeleton-line" style="width:120px;height:14px;"></div>
-    <div class="skeleton-line" style="width:220px;height:26px;"></div>
-    <div class="skeleton-line" style="width:180px;height:16px;"></div>
-    <div class="skeleton-line" style="width:100%;height:60px;"></div>
-    <div class="skeleton-line" style="width:100%;height:60px;"></div>
-    <div class="skeleton-line" style="width:100%;height:60px;"></div>
-  </div>
-  <div class="dossier-shell" id="account-content" hidden>
-    <div class="dossier" id="dossier">
-      <div class="dossier__top">
-        <a class="dossier__logo" href="/">${brand.name}</a>
-        <div class="dossier__user-menu" id="user-menu">
-          <button type="button" class="dossier__user-btn" id="user-menu-btn" aria-haspopup="true" aria-expanded="false">
-            <span id="user-menu-email"></span>
-            <svg class="dossier__user-chevron" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-              <path d="M6 9l6 6 6-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-            </svg>
-          </button>
-          <div class="dossier__user-dropdown" id="user-dropdown">
-            <a class="dossier__user-dropdown-item" id="admin-link-btn" href="/admin" style="display:none;">Accéder à l'admin</a>
-            <button type="button" class="dossier__user-dropdown-item" id="demo-link-btn" style="display:none;">🎬 Mode Vidéo</button>
-            <button type="button" class="dossier__user-dropdown-item" id="demo-off-btn" style="display:none;">Quitter le Mode Vidéo</button>
-            <button type="button" class="dossier__user-dropdown-item" id="manage-subscription-btn" style="display:none;">Gérer mon abonnement</button>
-            <button type="button" class="dossier__user-dropdown-item" id="resend-access-btn" style="display:none;">Renvoyer mon accès par email</button>
-            <button type="button" class="dossier__user-dropdown-item" id="signout-btn">Se déconnecter</button>
-            <button type="button" class="dossier__user-dropdown-item is-danger" id="delete-account-btn">Supprimer mon compte</button>
-          </div>
-        </div>
-      </div>
-      <div class="dossier__header">
-        <span class="dossier__day" id="dossier-day"></span>
-        <h1 class="dossier__title">Ton dossier</h1>
-      </div>
-      <p class="dossier__narrative" id="dossier-narrative"></p>
-      <p class="dossier__context" id="dossier-context"></p>
-
-      <ol class="timeline" id="dossier-timeline"></ol>
-
-      <div class="dossier__project" id="dossier-project" style="display:none">
-        <h2 class="dossier__project-title">Mon concept</h2>
-        <div class="dossier-project-card">
-          <div class="dossier-project-card__top">
-            <p class="dossier-project-card__concept" id="project-concept-name"></p>
-            <span class="dossier-project-card__badge" id="project-badge">Concept généré</span>
-          </div>
-          <p class="dossier-project-card__meta" id="project-meta"></p>
-          <a class="dossier-project-card__concept-link" id="project-concept-link" href="/succes">Revoir le concept complet &rarr;</a>
-        </div>
-      </div>
-
-      <!-- Compte non payé : nom + accroche du concept (déjà visibles
-           gratuitement sur l'écran résultat), le reste verrouillé, et un
-           seul appel à l'action vers le paiement. Jamais le contenu payant. -->
-      <div class="dossier__project" id="dossier-project-locked" style="display:none">
-        <h2 class="dossier__project-title">Mon concept</h2>
-        <div class="dossier-project-card dossier-project-card--locked">
-          <p class="dossier-project-card__concept" id="locked-concept-name"></p>
-          <p class="dossier-project-card__meta" id="locked-concept-tagline"></p>
-          <ul class="dossier-locked-list">
-            <li>${ICON_LOCK} Description complète du concept</li>
-            <li>${ICON_LOCK} Cible et canaux d'acquisition</li>
-            <li>${ICON_LOCK} Direction artistique (palette, logo)</li>
-          </ul>
-          <a class="dossier-unlock-cta" href="/?resume=result">Débloquer mon concept complet</a>
-        </div>
-      </div>
-
-      <div class="dossier__project" id="dossier-project-empty" style="display:none">
-        <h2 class="dossier__project-title">Mon concept</h2>
-        <p class="dossier-project-empty__text" id="dossier-empty-text">Ton concept n'est pas encore généré.</p>
-        <a class="dossier-project-empty__cta" id="dossier-empty-cta" href="/succes">Voir mes résultats &rarr;</a>
-      </div>
-
-      <!-- Consentement aux emails de conseils et de relance (lifecycle,
-           migration 0033). Non coché par défaut ; reflète le choix
-           enregistré ; modifiable à tout moment. -->
-      <section class="dossier-optin" aria-labelledby="dossier-optin-title">
-        <h2 class="dossier__project-title" id="dossier-optin-title">Emails</h2>
-        <label class="dossier-optin__row" for="dossier-optin">
-          <input type="checkbox" id="dossier-optin" />
-          <span>Recevoir par email les conseils et rappels de Max pour lancer mon projet. Désinscription en 1 clic, quand tu veux.</span>
-        </label>
-        <p class="dossier-optin__status" id="dossier-optin-status" aria-live="polite"></p>
-      </section>
-
-      <a class="dossier-bonus-chapter" href="/profil-entrepreneur">
-        <span class="dossier-bonus-chapter__eyebrow">Chapitre bonus, gratuit</span>
-        <span class="dossier-bonus-chapter__title">Ton profil entrepreneur</span>
-        <span class="dossier-bonus-chapter__text">9 questions courtes, un profil généré rien que pour toi.</span>
-      </a>
-
-      <div class="dossier__actions">
-        <a class="dossier__action-link" href="/">Retour à l'accueil</a>
-        <button type="button" class="dossier__action-link" id="signout-btn-bottom">Se déconnecter</button>
-      </div>
-    </div>
-  </div>
-  <div class="dossier-toast" id="dossier-toast" role="status" aria-live="polite"></div>
-  <script>
-    (function () {
-      var SESSION_SEEN_KEY = "coldtrend_dossier_seen";
-      var reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-
-      // racheter/copier : anciennes valeurs (comptes créés avant le retrait
-      // de l'écran "intention" dédié) -- rachat/creation : valeurs actuelles
-      // ("creation" par défaut silencieux, "rachat" via le lien discret de
-      // l'écran résultat).
-      var INTENTION_LABELS = { racheter: "racheter", copier: "copier", rachat: "racheter", creation: "créer" };
-      var SECTOR_LABELS = ${JSON.stringify(quiz.sectorLabels)};
-      var BUDGET_LABELS = ${JSON.stringify(quiz.budgetLabels)};
-      var TIME_LABELS = ${JSON.stringify(quiz.timeLabels)};
-
-      function formatDateFr(iso) {
-        try {
-          return new Date(iso).toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" });
-        } catch (err) {
-          return "";
-        }
-      }
-
-      function daysSince(iso) {
-        var then = new Date(iso).getTime();
-        if (isNaN(then)) return 0;
-        return Math.max(0, Math.floor((Date.now() - then) / 86400000));
-      }
-
-      function sectorText(profile) {
-        var values = profile.secteur || [];
-        if (!values.length) return "généraliste";
-        return values.map(function (v) { return SECTOR_LABELS[v] || v; }).join(" et ");
-      }
-
-      // 4 gabarits de phrase distincts (pas un mad-libs identique pour
-      // tout le monde) — sélection déterministe par profil, pas aléatoire
-      // à chaque chargement. Toujours à la deuxième personne : aucun
-      // prénom n'est collecté par le parcours actuel (écran auth =
-      // email/mot de passe/Google uniquement).
-      function buildNarrative(profile) {
-        var intention = INTENTION_LABELS[profile.intention] || "trouver";
-        var secteur = sectorText(profile);
-        var temps = TIME_LABELS[profile.temps] || profile.temps || "un peu de temps";
-        var budgetPart = profile.budget ? ", avec un budget de " + (BUDGET_LABELS[profile.budget] || profile.budget) : "";
-
-        var seed = String(profile.intention) + String(profile.secteur) + String(profile.budget);
-        var hash = 0;
-        for (var i = 0; i < seed.length; i += 1) hash = (hash * 31 + seed.charCodeAt(i)) | 0;
-        var variant = Math.abs(hash) % 4;
-
-        var templates = [
-          "Tu cherches à " + intention + " un SaaS " + secteur + ", avec " + temps + " par semaine à y consacrer" + budgetPart + ".",
-          temps.charAt(0).toUpperCase() + temps.slice(1) + " par semaine, direction " + secteur + " — objectif " + intention + " un SaaS" + budgetPart + ".",
-          "Profil qualifié : " + intention + " un SaaS " + secteur + budgetPart + ", dans la limite de " + temps + " par semaine.",
-          profile.deja_cherche
-            ? "Tu avais déjà cherché avant ColdTrend — cette fois avec un concept pensé pour ton profil : " + secteur + ", " + temps + " par semaine" + budgetPart + "."
-            : "Première recherche, bien cadrée : SaaS " + secteur + ", " + temps + " par semaine" + budgetPart + "."
-        ];
-
-        return templates[variant];
-      }
-
-      function typeText(el, text, onDone) {
-        if (reduceMotion) {
-          el.textContent = text;
-          if (onDone) onDone();
-          return;
-        }
-        el.textContent = "";
-        var cursor = document.createElement("span");
-        cursor.className = "is-typing-cursor";
-        el.appendChild(cursor);
-        var i = 0;
-        var speed = Math.max(6, Math.min(18, Math.floor(600 / text.length)));
-        (function step() {
-          if (i <= text.length) {
-            el.textContent = text.slice(0, i);
-            el.appendChild(cursor);
-            i += 1;
-            window.setTimeout(step, speed);
-          } else {
-            cursor.remove();
-            if (onDone) onDone();
-          }
-        })();
-      }
-
-      var DOT_CHECK_SVG =
-        '<svg class="timeline__dot-check" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path d="M20 6L9 17l-5-5" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg>';
-
-      function buildTimeline(user, profile) {
-        var items = [];
-        var paid = !!(profile && profile.paid_at);
-
-        items.push({
-          key: "opened",
-          status: "done",
-          label: "Dossier ouvert",
-          meta: "Le " + formatDateFr(user.created_at),
-          watermark: true
-        });
-
-        var hasAnswers = profile && (profile.intention || profile.temps);
-        items.push({
-          key: "qualified",
-          status: hasAnswers ? "done" : "current",
-          label: "Profil qualifié",
-          meta: hasAnswers ? "Réponses enregistrées, concept généré." : "Termine le quiz pour qualifier ton profil."
-        });
-
-        items.push({
-          key: "access",
-          status: paid ? "done" : "current",
-          label: paid ? "Accès débloqué" : "Accès en attente",
-          meta: paid
-            ? "Le " + formatDateFr(profile.paid_at)
-            : "Ton abonnement débloque ton concept complet."
-        });
-
-        items.push({
-          key: "resources",
-          status: "upcoming",
-          locked: !paid,
-          label: "Ressources consultées",
-          // Infrastructure dormante : aucun PDF n'existe encore dans le
-          // produit. Le traçage "Consulté le {date}" s'activera dès qu'une
-          // vraie pièce jointe existera — pas de contenu à inventer ici.
-          meta: "Aucune pièce jointe pour l'instant."
-        });
-
-        items.push({
-          key: "next",
-          status: "upcoming",
-          locked: !paid,
-          label: "À venir",
-          meta: "La suite de ton dossier s'écrit ici."
-        });
-
-        return items;
-      }
-
-      function renderTimeline(items) {
-        var listEl = document.getElementById("dossier-timeline");
-        listEl.innerHTML = items
-          .map(function (item, index) {
-            return (
-              '<li class="timeline__item timeline__item--' +
-              item.status +
-              (item.locked ? " timeline__item--locked" : "") +
-              '" data-item="' +
-              item.key +
-              '" style="animation-delay:' +
-              index * 90 +
-              'ms">' +
-              '<span class="timeline__dot" aria-hidden="true">' +
-              (item.watermark ? '<span class="timeline__dot-seal"></span>' : "") +
-              DOT_CHECK_SVG +
-              "</span>" +
-              '<p class="timeline__label">' +
-              item.label +
-              "</p>" +
-              '<p class="timeline__meta">' +
-              item.meta +
-              "</p>" +
-              "</li>"
-            );
-          })
-          .join("");
-      }
-
-      // Séquence de transformation live : déclenchée par l'événement
-      // Realtime quand paid_at passe de null à une valeur PENDANT que
-      // l'onglet /compte est ouvert (typiquement juste après un paiement
-      // dans un autre onglet). Pas un simple swap de texte au reload.
-      function playAccessConfirmedSequence(profile) {
-        var accessItem = document.querySelector('.timeline__item[data-item="access"]');
-        if (!accessItem) return;
-
-        accessItem.classList.remove("timeline__item--current");
-        accessItem.classList.add("timeline__item--done", "is-stamping");
-        window.setTimeout(function () {
-          accessItem.classList.remove("is-stamping");
-        }, 500);
-
-        var labelEl = accessItem.querySelector(".timeline__label");
-        var metaEl = accessItem.querySelector(".timeline__meta");
-        labelEl.textContent = "Accès débloqué";
-        typeText(metaEl, "Le " + formatDateFr(profile.paid_at));
-
-        showToast("Paiement confirmé — accès débloqué");
-
-        ["resources", "next"].forEach(function (key) {
-          var el = document.querySelector('.timeline__item[data-item="' + key + '"]');
-          if (el) el.classList.remove("timeline__item--locked");
-        });
-
-        var resendBtn = document.getElementById("resend-access-btn");
-        if (resendBtn) resendBtn.style.display = "block";
-        document.getElementById("manage-subscription-btn").style.display = "block";
-
-        // La carte verrouillée laisse place au concept complet, sans reload.
-        document.getElementById("dossier-project-locked").style.display = "none";
-        document.getElementById("dossier-project-empty").style.display = "none";
-        loadGeneratedConcept(window.ColdTrendSupabase, profile.id, profile);
-      }
-
-      // ---- Emails de conseils (consentement marketing) --------------------
-      // marketing_opt_in est écrit par la personne elle-même (policy own-row) ;
-      // son horodatage est posé par la base (trigger stamp_marketing_opt_in).
-      // Cocher après une désinscription réactive les emails : lifecycle-
-      // dispatch compare la date du consentement à celle de la
-      // désinscription. Adresse en erreur (bounce dur, plainte) : case
-      // désactivée, réactivation par le contact uniquement.
-      function initMarketingOptIn(supabase, userId, profile) {
-        var box = document.getElementById("dossier-optin");
-        var status = document.getElementById("dossier-optin-status");
-        if (!box) return;
-        box.checked = profile.marketing_opt_in === true;
-        if (profile.email_suppressed_at) {
-          box.checked = false;
-          box.disabled = true;
-          status.textContent = "Nos emails vers ton adresse ont échoué : écris-nous via la page contact pour les réactiver.";
-          return;
-        }
-        box.addEventListener("change", async function () {
-          var wanted = box.checked;
-          box.disabled = true;
-          var res = await supabase.from("profiles").update({ marketing_opt_in: wanted }).eq("id", userId);
-          box.disabled = false;
-          if (res.error) {
-            box.checked = !wanted;
-            status.textContent = "La mise à jour a échoué, réessaie dans un instant.";
-            return;
-          }
-          status.textContent = "";
-          showToast(wanted ? "C'est noté : tu recevras les conseils de Max." : "C'est noté : plus d'emails de conseils.");
-        });
-      }
-
-      function showToast(message) {
-        var toastEl = document.getElementById("dossier-toast");
-        if (!toastEl) return;
-        toastEl.textContent = message;
-        toastEl.classList.add("is-visible");
-        window.setTimeout(function () {
-          toastEl.classList.remove("is-visible");
-        }, 3200);
-      }
-
-      // Souscription Realtime sur la propre ligne profiles de la personne
-      // (RLS s'applique aussi aux messages Realtime, jamais les changements
-      // d'un autre profil). Le dossier se met à jour sous les yeux de
-      // l'utilisateur au moment exact où stripe-webhook confirme le
-      // paiement, sans reload manuel.
-      function subscribeToProfileChanges(supabase, userId, previousPaidAt) {
-        supabase
-          .channel("profile-changes-" + userId)
-          .on(
-            "postgres_changes",
-            { event: "UPDATE", schema: "public", table: "profiles", filter: "id=eq." + userId },
-            function (payload) {
-              var updated = payload.new || {};
-              if (!previousPaidAt && updated.paid_at) {
-                playAccessConfirmedSequence(updated);
-              }
-              previousPaidAt = updated.paid_at;
-            }
-          )
-          .subscribe();
-      }
-
-      function contextLine(profile) {
-        var paid = profile && profile.paid_at;
-        if (!paid) {
-          var age = profile ? daysSince(profile.created_at || Date.now()) : 0;
-          return age < 1
-            ? "Ton dossier vient de s'ouvrir."
-            : (profile && profile.match_count ? "Ton concept t'attend, à toi de le débloquer." : "Ton profil est enregistré, termine ton quiz.");
-        }
-        var sincePaid = daysSince(profile.paid_at);
-        return sincePaid < 2 ? "Accès confirmé — bienvenue." : "Ton accès est actif depuis " + sincePaid + " jours.";
-      }
-
-      async function check() {
-        var supabase = window.ColdTrendSupabase;
-        if (!supabase) {
-          document.addEventListener("coldtrend:supabase-ready", check, { once: true });
-          return;
-        }
-        var userRes = await supabase.auth.getUser();
-        var user = userRes.data ? userRes.data.user : null;
-
-        if (!user || user.is_anonymous) {
-          var redirect = encodeURIComponent(window.location.pathname);
-          window.location.replace("/connexion?redirect=" + redirect);
-          return;
-        }
-
-        var profileRes = await supabase
-          .from("profiles")
-          .select("intention, budget, temps, secteur, deja_cherche, match_count, paid_at, created_at, prenom, is_admin, stripe_customer_id, marketing_opt_in, email_suppressed_at")
-          .eq("id", user.id)
-          .single();
-        var profile = profileRes.data || {};
-        initMarketingOptIn(supabase, user.id, profile);
-        if (!profile.created_at) profile.created_at = user.created_at;
-
-        // Le dossier est accessible à tout compte connecté, payé ou non
-        // (plus de redirection vers le quiz ou le paiement) : l'état du
-        // compte décide seulement de ce qui est affiché et verrouillé, voir
-        // loadGeneratedConcept().
-        if (profile.is_admin) {
-          // Simple raccourci d'affichage : l'accueil revérifie le rôle côté
-          // serveur (generate-demo-concept) avant d'activer le Mode Vidéo.
-          document.getElementById("admin-link-btn").style.display = "block";
-          document.getElementById("demo-link-btn").style.display = "block";
-          if (videoModeArmed()) document.getElementById("demo-off-btn").style.display = "block";
-        }
-        if (profile.paid_at || profile.stripe_customer_id) {
-          document.getElementById("manage-subscription-btn").style.display = "block";
-        }
-
-        document.getElementById("dossier-day").textContent = "Jour " + (daysSince(profile.created_at) + 1);
-        document.getElementById("dossier-context").textContent = contextLine(profile);
-        document.getElementById("user-menu-email").textContent = (user.email || "").split("@")[0];
-        renderTimeline(buildTimeline(user, profile));
-        subscribeToProfileChanges(supabase, user.id, profile.paid_at);
-
-        document.getElementById("account-skeleton").hidden = true;
-        document.getElementById("account-content").hidden = false;
-
-        var narrativeEl = document.getElementById("dossier-narrative");
-        var narrative = profile.intention ? buildNarrative(profile) : "Termine le quiz pour que ton dossier se qualifie.";
-
-        var alreadySeen;
-        try {
-          alreadySeen = sessionStorage.getItem(SESSION_SEEN_KEY) === "1";
-        } catch (err) {
-          alreadySeen = false;
-        }
-
-        var dossierEl = document.getElementById("dossier");
-        window.requestAnimationFrame(function () {
-          dossierEl.classList.add("is-revealed");
-        });
-
-        if (alreadySeen || reduceMotion) {
-          narrativeEl.textContent = narrative;
-        } else {
-          typeText(narrativeEl, narrative);
-          try {
-            sessionStorage.setItem(SESSION_SEEN_KEY, "1");
-          } catch (err) {
-            /* pas grave si sessionStorage est indisponible */
-          }
-        }
-
-        if (profile.paid_at) {
-          document.getElementById("resend-access-btn").style.display = "block";
-        }
-
-        loadGeneratedConcept(supabase, user.id, profile);
-      }
-
-      function showEmptyConcept(text, ctaLabel, ctaHref) {
-        document.getElementById("dossier-empty-text").textContent = text;
-        var cta = document.getElementById("dossier-empty-cta");
-        cta.textContent = ctaLabel;
-        cta.setAttribute("href", ctaHref);
-        document.getElementById("dossier-project-empty").style.display = "";
-      }
-
-      // Concept généré par utilisateur, mis en cache dans user_concepts
-      // (RLS : lecture limitée à son propre id). Trois cas :
-      // - quiz pas terminé -> reprendre le quiz ;
-      // - quiz terminé, pas payé -> nom + accroche + reste verrouillé ;
-      // - payé -> carte complète avec lien vers le concept.
-      async function loadGeneratedConcept(supabase, userId, profile) {
-        var quizDone = profile.match_count !== null && profile.match_count !== undefined;
-        if (!quizDone) {
-          showEmptyConcept("Termine ton quiz pour générer ton concept.", "Reprendre mon quiz →", "/?resume=quiz");
-          return;
-        }
-        if (!profile.paid_at) {
-          try {
-            var lockedRes = await supabase.from("user_concepts").select("concept_name, tagline").eq("user_id", userId).maybeSingle();
-            if (!lockedRes.data) {
-              showEmptyConcept("Ton concept t'attend sur ton écran résultat.", "Voir mon résultat →", "/?resume=result");
-              return;
-            }
-            document.getElementById("locked-concept-name").textContent = lockedRes.data.concept_name;
-            document.getElementById("locked-concept-tagline").textContent = lockedRes.data.tagline;
-            document.getElementById("dossier-project-locked").style.display = "";
-          } catch (err) {
-            console.error("[compte] échec du chargement du concept :", err);
-            showEmptyConcept("Ton concept t'attend sur ton écran résultat.", "Voir mon résultat →", "/?resume=result");
-          }
-          return;
-        }
-        try {
-          var conceptRes = await supabase.from("user_concepts").select("concept_name, tagline").eq("user_id", userId).maybeSingle();
-          if (!conceptRes.data) {
-            document.getElementById("dossier-project-empty").style.display = "";
-            return;
-          }
-          var concept = conceptRes.data;
-
-          document.getElementById("project-concept-name").textContent = concept.concept_name;
-          document.getElementById("project-meta").textContent = concept.tagline;
-
-          document.getElementById("dossier-project").style.display = "";
-        } catch (err) {
-          console.error("[compte] échec du chargement du concept généré :", err);
-          document.getElementById("dossier-project-empty").style.display = "";
-        }
-      }
-
-      check();
-
-      var userMenuBtn = document.getElementById("user-menu-btn");
-      var userMenuEl = document.getElementById("user-menu");
-      userMenuBtn.addEventListener("click", function (e) {
-        e.stopPropagation();
-        var willOpen = !userMenuEl.classList.contains("is-open");
-        userMenuEl.classList.toggle("is-open", willOpen);
-        userMenuBtn.setAttribute("aria-expanded", String(willOpen));
-      });
-      document.addEventListener("click", function () {
-        userMenuEl.classList.remove("is-open");
-        userMenuBtn.setAttribute("aria-expanded", "false");
-      });
-      document.addEventListener("keydown", function (e) {
-        if (e.key === "Escape") {
-          userMenuEl.classList.remove("is-open");
-          userMenuBtn.setAttribute("aria-expanded", "false");
-        }
-      });
-
-      async function signOut() {
-        await window.ColdTrendSupabase.auth.signOut();
-        window.location.href = "/connexion";
-      }
-      document.getElementById("signout-btn").addEventListener("click", signOut);
-      document.getElementById("signout-btn-bottom").addEventListener("click", signOut);
-
-      // Mode Vidéo : arme puis ouvre l'accueil public (URL normale, aucun
-      // paramètre) ; "Quitter" retire le drapeau et rend le quiz public.
-      ${VIDEO_MODE_CLIENT_JS}
-      document.getElementById("demo-link-btn").addEventListener("click", function () {
-        setVideoMode(true);
-        window.location.href = "/";
-      });
-      document.getElementById("demo-off-btn").addEventListener("click", function () {
-        setVideoMode(false);
-        document.getElementById("demo-off-btn").style.display = "none";
-      });
-
-      async function callEdgeFunction(name) {
-        var supabase = window.ColdTrendSupabase;
-        var sessionRes = await supabase.auth.getSession();
-        var token = sessionRes.data.session ? sessionRes.data.session.access_token : null;
-        if (!token) return { error: "Session invalide." };
-        var res = await fetch(supabase.supabaseUrl + "/functions/v1/" + name, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            apikey: supabase.supabaseKey,
-            Authorization: "Bearer " + token
-          }
-        });
-        return res.json();
-      }
-
-      document.getElementById("resend-access-btn").addEventListener("click", async function () {
-        var btn = this;
-        btn.disabled = true;
-        var result = await callEdgeFunction("resend-access");
-        btn.disabled = false;
-        btn.textContent = result && result.success ? "Email envoyé." : "Échec de l'envoi, réessaie plus tard.";
-      });
-
-      // Redirige vers le Stripe Customer Portal -- décision produit
-      // explicite (gestion/résiliation hébergée par Stripe, jamais une UI de
-      // gestion custom). Si l'utilisateur n'a jamais eu d'abonnement,
-      // create-portal-session renvoie une 404 propre (voir son code) --
-      // pas de crash, juste un message clair.
-      document.getElementById("manage-subscription-btn").addEventListener("click", async function () {
-        var btn = this;
-        var originalText = btn.textContent;
-        btn.disabled = true;
-        btn.textContent = "Ouverture…";
-        var result = await callEdgeFunction("create-portal-session");
-        if (result && typeof result.url === "string") {
-          window.location.href = result.url;
-          return;
-        }
-        btn.disabled = false;
-        btn.textContent = result && result.error ? result.error : "Impossible d'ouvrir la gestion d'abonnement.";
-        window.setTimeout(function () {
-          btn.textContent = originalText;
-        }, 3000);
-      });
-
-      document.getElementById("delete-account-btn").addEventListener("click", async function () {
-        var confirmed = window.confirm(
-          "Supprimer définitivement ton compte et toutes tes données ColdTrend ? Cette action est irréversible."
-        );
-        if (!confirmed) return;
-        var btn = this;
-        btn.disabled = true;
-        var result = await callEdgeFunction("delete-account");
-        if (result && result.success) {
-          await window.ColdTrendSupabase.auth.signOut();
-          window.location.href = "/";
-        } else {
-          btn.disabled = false;
-          btn.textContent = "Échec de la suppression, réessaie plus tard.";
-        }
-      });
-    })();
-  </script>`;
-
-  return authPageShell({
-    title: "Mon compte",
-    description: "Ton dossier ColdTrend.",
-    bodyHtml: body
-  });
-}
+// /compte : dashboard ColdTrend, voir scripts/dashboard-page.mjs.
 
 // ---- /admin — back-office interne (accès is_admin) ------------------------
 //
@@ -18100,52 +17480,8 @@ function adminPage() {
       </div>
     </section>
 
-    <section class="admin-filters" aria-label="Filtres d'affichage">
-      <label>Paiement
-        <select id="filter-paid">
-          <option value="all">Tous</option>
-          <option value="paid">Payé</option>
-          <option value="unpaid">Non payé</option>
-        </select>
-      </label>
-      <label>Quiz
-        <select id="filter-quiz">
-          <option value="all">Tous</option>
-          <option value="complete">Complet</option>
-          <option value="incomplete">Abandonné / en cours</option>
-        </select>
-      </label>
-      <label>Secteur
-        <select id="filter-secteur">
-          <option value="all">Tous</option>
-          <option value="b2b">B2B</option>
-          <option value="b2c">B2C</option>
-          <option value="both">Les deux</option>
-        </select>
-      </label>
-    </section>
-
-    <div class="admin-table-wrap">
-      <table class="admin-table">
-        <thead>
-          <tr>
-            <th></th>
-            <th>Prénom / email</th>
-            <th>Secteur</th>
-            <th>Budget</th>
-            <th>Temps</th>
-            <th>Intention</th>
-            <th>Frein</th>
-            <th>Revenu visé</th>
-            <th>Paiement</th>
-            <th>Concept</th>
-            <th>Inscrit le</th>
-            <th>Étape funnel</th>
-          </tr>
-        </thead>
-        <tbody id="admin-table-body"></tbody>
-      </table>
-    </div>
+    <!-- Suivi des utilisateurs : scripts/admin-users.mjs -->
+    ${adminUsersHtml()}
 
     <section class="admin-campaign" aria-label="Envoi ciblé">
       <h2 class="admin-campaign__title">Envoi ciblé</h2>
@@ -18250,53 +17586,7 @@ function adminPage() {
         return secteur.map(function (s) { return SECTOR_LABELS[s] || s; }).join(", ");
       }
 
-      function quizStatus(row) {
-        if (row.match_count !== null && row.match_count !== undefined) return "complete";
-        return "incomplete";
-      }
-
-      function renderRow(row) {
-        var tr = document.createElement("tr");
-        tr.innerHTML =
-          "<td><input type=\\"checkbox\\" class=\\"admin-row-check\\" data-id=\\"" + row.id + "\\" /></td>" +
-          "<td>" + (row.prenom || "—") + "<br><span class=\\"admin-table__email\\">" + (row.email || "") + "</span></td>" +
-          "<td>" + sectorText(row.secteur) + "</td>" +
-          "<td>" + (BUDGET_LABELS[row.budget] || row.budget || "—") + "</td>" +
-          "<td>" + (TIME_LABELS[row.temps] || row.temps || "—") + "</td>" +
-          "<td>" + (row.intention || "—") + "</td>" +
-          "<td>" + (FREIN_LABELS[row.frein] || row.frein_autre || "—") + "</td>" +
-          "<td>" + (row.revenu_vise != null ? row.revenu_vise + " €" : "—") + "</td>" +
-          "<td>" + (row.paid_at ? "Payé le " + formatDateFr(row.paid_at) : "Non payé") + "</td>" +
-          "<td>" + (row.concept_genere || "—") + "</td>" +
-          "<td>" + formatDateFr(row.created_at) + "</td>" +
-          "<td>" + (row.funnel_last_step != null ? row.funnel_last_step : "—") + "</td>";
-        return tr;
-      }
-
-      function applyFilters() {
-        var paidFilter = document.getElementById("filter-paid").value;
-        var quizFilter = document.getElementById("filter-quiz").value;
-        var secteurFilter = document.getElementById("filter-secteur").value;
-
-        var filtered = rows.filter(function (row) {
-          if (paidFilter === "paid" && !row.paid_at) return false;
-          if (paidFilter === "unpaid" && row.paid_at) return false;
-          if (quizFilter !== "all" && quizStatus(row) !== quizFilter) return false;
-          if (secteurFilter !== "all" && !(row.secteur || []).includes(secteurFilter)) return false;
-          return true;
-        });
-
-        var tbody = document.getElementById("admin-table-body");
-        tbody.innerHTML = "";
-        filtered.forEach(function (row) {
-          tbody.appendChild(renderRow(row));
-        });
-        document.getElementById("admin-count").textContent = filtered.length + " / " + rows.length + " profils";
-      }
-
-      ["filter-paid", "filter-quiz", "filter-secteur"].forEach(function (id) {
-        document.getElementById(id).addEventListener("change", applyFilters);
-      });
+${adminUsersJs({ labels: buildAdminLabels(quiz), screens: buildScreenList(quiz) })}
 
       function updateCampaignPreview() {
         var segment = document.getElementById("campaign-segment").value;
@@ -18304,7 +17594,8 @@ function adminPage() {
         var cutoff = Date.now() - hours * 60 * 60 * 1000;
 
         var matching = rows.filter(function (row) {
-          if (row.unsubscribed_at) return false;
+          // Mêmes règles que le serveur : consentement, adresse valide.
+          if (row.unsubscribed_at || !row.marketing_opt_in || row.email_suppressed_at) return false;
           var updatedAt = new Date(row.created_at).getTime();
           if (segment === "quiz_abandonne") {
             return row.funnel_last_step > 0 && (row.match_count === null || row.match_count === undefined) && updatedAt < cutoff;
@@ -18869,7 +18160,18 @@ writeBuiltFile(path.join(OUT_DIR, "connexion.html"), connexionPage());
 writeBuiltFile(path.join(OUT_DIR, "inscription.html"), inscriptionPage());
 writeBuiltFile(path.join(OUT_DIR, "mot-de-passe-oublie.html"), motDePasseOublieePage());
 writeBuiltFile(path.join(OUT_DIR, "reinitialiser-mot-de-passe.html"), reinitialiserMotDePassePage());
-writeBuiltFile(path.join(OUT_DIR, "compte.html"), comptePage());
+writeBuiltFile(
+  path.join(OUT_DIR, "compte.html"),
+  dashboardPage({
+    brand,
+    siteUrl: SITE_URL,
+    durationPlans: DURATION_PLANS,
+    crispScript: crispWidgetScript(),
+    videoModeJs: VIDEO_MODE_CLIENT_JS
+  })
+);
+// Module du dashboard (missions, série, jalons), servi tel quel.
+writeBuiltFile(path.join(OUT_DIR, "js", "dashboard-plan.js"), readFileSync(path.join(__dirname, "dashboard-plan.js"), "utf8"));
 writeBuiltFile(path.join(OUT_DIR, "admin.html"), adminPage());
 writeBuiltFile(path.join(OUT_DIR, "desabonnement.html"), desabonnementPage());
 

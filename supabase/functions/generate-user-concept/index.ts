@@ -307,13 +307,23 @@ Deno.serve(async (req) => {
     if (error) console.error("[generate-user-concept] project_name non enregistré :", error.message);
   }
 
+  // Contenu payant (migration 0034) : un compte non payé ne reçoit que le
+  // nom et l'accroche, affichés sur l'écran résultat. La fiche complète
+  // (description, cible, canaux, direction artistique) n'est renvoyée
+  // qu'après paiement -- avant, elle transitait dans la réponse réseau.
+  const { data: payState } = await admin.from("profiles").select("paid_at, subscription_status").eq("id", userId).maybeSingle();
+  const hasPaid = !!payState?.paid_at || ["active", "trialing"].includes(payState?.subscription_status ?? "");
+  // deno-lint-ignore no-explicit-any
+  const forClient = (c: any) =>
+    hasPaid ? c : { user_id: c.user_id, concept_name: c.concept_name, tagline: c.tagline, generated_at: c.generated_at, locked: true };
+
   if (!body.forceRegenerate) {
     const { data: cached } = await admin.from("user_concepts").select("*").eq("user_id", userId).maybeSingle();
     if (cached) {
       // Comptes générés avant la migration 0030 : project_name rempli au
       // premier passage par le cache.
       await saveProjectName(cached.concept_name);
-      return json({ concept: cached, cached: true });
+      return json({ concept: forClient(cached), cached: true });
     }
   }
 
@@ -456,5 +466,5 @@ Deno.serve(async (req) => {
 
   await saveProjectName(saved.concept_name);
 
-  return json({ concept: saved, cached: false });
+  return json({ concept: forClient(saved), cached: false });
 });
