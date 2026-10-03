@@ -743,7 +743,7 @@ const quiz = {
       chapterLabel: "Tes revenus",
       chapterIcon: "budget",
       type: "goal-revenue",
-      title: "Combien gagnes-tu par mois aujourd'hui ?",
+      title: "Combien gagnes-tu par mois aujourd'hui ?",
       subtext: "Zéro, c'est un excellent point de départ.",
       shortcuts: [0, 500, 1500, 3000],
       cta: "Continuer"
@@ -761,7 +761,7 @@ const quiz = {
       chapterLabel: "Ton objectif",
       chapterIcon: "objectif",
       type: "goal-amount",
-      title: "Combien veux-tu gagner par mois ?",
+      title: "Combien veux-tu gagner par mois ?",
       // Remplace l'ancien sous-titre en italique : direct et chaleureux.
       lead: "Choisis le montant qui changerait vraiment ton quotidien. Tu pourras l'ajuster quand tu veux.",
       shortcuts: [500, 1000, 5000, 10000],
@@ -785,6 +785,40 @@ const quiz = {
       cta: "Continuer"
     },
     {
+      // Écran Acquisition (après le Délai) -- grandes cartes à icône animée,
+      // sélection en spring, passage automatique (moteur des choix uniques).
+      // Réponse stockée dans profiles.wants_ai_video (true si "oui").
+      id: "videoIA",
+      stepName: "video-ia",
+      chapter: 2,
+      chapterLabel: "Ton acquisition",
+      chapterIcon: "acquisition",
+      type: "choice-cards",
+      title: "Veux-tu que l'IA crée tes vidéos pour attirer tes clients ?",
+      options: [
+        { value: "oui", label: "Oui, l'IA crée mes vidéos automatiquement.", icon: "ai-video" },
+        { value: "non", label: "Non, je crée mes vidéos moi-même.", icon: "self-video" }
+      ]
+    },
+    {
+      // Écran Niveau d'accompagnement -- 3 cartes ; la 3e est mise en avant
+      // visuellement (featured) mais JAMAIS présélectionnée. Stockée dans
+      // profiles.support_level. "automatisation_max" présélectionne l'offre
+      // 6 mois sur l'écran de paiement (voir initDurationCards).
+      id: "accompagnement",
+      stepName: "accompagnement",
+      chapter: 2,
+      chapterLabel: "Ton accompagnement",
+      chapterIcon: "objectif",
+      type: "choice-cards",
+      title: "Jusqu'où veux-tu qu'on t'accompagne ?",
+      options: [
+        { value: "autonome", label: "Je gère tout moi-même", icon: "solo" },
+        { value: "etapes_cles", label: "Aide-moi sur les étapes clés", icon: "steps" },
+        { value: "automatisation_max", label: "Automatise un maximum pour moi", icon: "auto", featured: "Le plus automatisé" }
+      ]
+    },
+    {
       // Phase Loading, écran 17 -- étapes cochées une à une, slogans
       // rotatifs (ex-écrans 15-18), interrompu par 2 pop-ups plein écran.
       // Les réponses (influenceurs, clippers) orientent les canaux du
@@ -792,14 +826,20 @@ const quiz = {
       id: "assemblage",
       stepName: "assemblage",
       type: "assembling",
-      title: "On assemble ton projet",
+      // Loading « On chiffre ton potentiel » (fusion avec l'ancien « On
+      // assemble ton projet ») : étapes en écho aux réponses, durées
+      // inégales et cibles de barre non linéaires (total 7 s hors pop-ups,
+      // fourchette 6-8 s). {objectif} et {delai} sont remplis côté client
+      // (runAssembly) ; fallback si la réponse manque.
+      title: "On chiffre ton potentiel",
       steps: [
-        "Analyse de ton profil",
-        "Choix de ta cible",
-        "Sélection de tes canaux",
-        "Construction de ton concept",
-        "Préparation de ton plan"
+        { text: "Analyse de ton objectif de {objectif}…", fallback: "Analyse de ton objectif…", ms: 1300, to: 22 },
+        { text: "Calcul de ton rythme sur {delai} mois…", fallback: "Calcul de ton rythme…", ms: 1500, to: 45 },
+        { text: "Construction de ta stratégie vidéo…", ms: 1700, to: 72 },
+        { text: "Sélection de tes canaux…", ms: 1200, to: 88 },
+        { text: "Chiffrage prudent de ton potentiel…", ms: 1300, to: 100 }
       ],
+      note: "Chiffrage déterministe et prudent (fourchette basse) · estimation non garantie",
       slogans: [
         "Bienvenue sur ColdTrend.",
         "Trouve les idées qui marchent vraiment.",
@@ -2783,13 +2823,92 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
     overflow: hidden;
   }
 
+  /* Barre non linéaire : transform scaleX uniquement ; la durée et la
+     cible de chaque étape sont posées par runAssembly (data-ms / data-to). */
   .assemble-bar__fill {
     height: 100%;
-    width: 0;
+    width: 100%;
     border-radius: inherit;
     background: linear-gradient(90deg, var(--cobalt-dark), var(--cobalt));
     box-shadow: 0 0 14px rgba(0, 71, 255, 0.7);
-    transition: width 900ms cubic-bezier(0.22, 1, 0.36, 1);
+    transform-origin: left center;
+    transform: scaleX(0);
+    transition: transform 900ms cubic-bezier(0.3, 0.7, 0.4, 1);
+  }
+
+  .assemble-note {
+    margin: -10px 0 16px;
+    font-size: 12px;
+    color: var(--steel);
+  }
+
+  /* ---- Grandes cartes de choix (Acquisition, Accompagnement) ---------- */
+  .choice-cards { gap: 12px; }
+  .choice-card {
+    position: relative;
+    min-height: 76px;
+    padding: 16px 18px;
+    gap: 14px;
+    align-items: center;
+    text-align: left;
+    transition: transform 420ms cubic-bezier(0.34, 1.56, 0.64, 1), border-color 200ms ease, background 200ms ease;
+  }
+  /* Sélection en spring : léger rebond à l'échelle. Sélecteurs renforcés :
+     la cascade d'apparition du quiz (.quiz-screen.is-active .quiz-option)
+     impose transform: none et un transition-delay par carte. */
+  .quiz-screen.is-active .choice-card:active { transform: scale(0.98); transition-delay: 0ms; }
+  .quiz-screen.is-active .choice-card.is-selected {
+    transform: scale(1.025);
+    transition: transform 420ms cubic-bezier(0.34, 1.56, 0.64, 1), border-color 200ms ease, background 200ms ease;
+    transition-delay: 0ms;
+  }
+  .choice-card__icon {
+    flex: none;
+    width: 48px;
+    height: 48px;
+    border-radius: 14px;
+    display: grid;
+    place-items: center;
+    color: #C8D4FF;
+    background: rgba(0, 71, 255, 0.16);
+    border: 1px solid rgba(61, 107, 255, 0.35);
+    transition: transform 420ms cubic-bezier(0.34, 1.56, 0.64, 1);
+  }
+  .choice-card.is-selected .choice-card__icon { transform: rotate(-6deg) scale(1.08); }
+  .choice-card__body { flex: 1; display: flex; flex-direction: column; gap: 4px; }
+  .choice-card__label { font-size: 16px; font-weight: 700; line-height: 1.35; color: #fff; }
+  .choice-card__badge {
+    align-self: flex-start;
+    padding: 2px 9px;
+    border-radius: 999px;
+    background: var(--cobalt);
+    color: #fff;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.03em;
+  }
+  /* Carte mise en avant : bordure et halo, sans présélection. */
+  .choice-card--featured {
+    border-color: rgba(61, 107, 255, 0.6);
+    background: linear-gradient(150deg, rgba(0, 71, 255, 0.18), rgba(255, 255, 255, 0.03));
+    box-shadow: 0 14px 40px -24px rgba(0, 71, 255, 0.9);
+  }
+  /* Icônes animées (transform/opacity). */
+  .ci-anim { transform-box: fill-box; transform-origin: center; }
+  .ci-spark { animation: ci-twinkle 2.4s ease-in-out infinite; }
+  .ci-rec { animation: ci-blink 1.6s ease-in-out infinite; }
+  .ci-float { animation: ci-float 2.6s ease-in-out infinite; }
+  .ci-step { animation: ci-hop 2.2s cubic-bezier(0.34, 1.56, 0.64, 1) infinite; }
+  .ci-bolt { animation: ci-zap 2.4s ease-in-out infinite; }
+  @keyframes ci-twinkle { 0%, 100% { opacity: 0.4; transform: scale(0.8) rotate(0deg); } 50% { opacity: 1; transform: scale(1.1) rotate(20deg); } }
+  @keyframes ci-blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.2; } }
+  @keyframes ci-float { 0%, 100% { opacity: 0.4; transform: translateY(0); } 50% { opacity: 1; transform: translateY(-2px); } }
+  @keyframes ci-hop { 0%, 70%, 100% { transform: translateY(0); } 35% { transform: translateY(-4px); } }
+  @keyframes ci-zap { 0%, 100% { transform: scale(1); opacity: 1; } 45% { transform: scale(1.08); opacity: 0.85; } 55% { transform: scale(0.96); } }
+  @media (prefers-reduced-motion: reduce) {
+    .ci-anim { animation: none; }
+    .choice-card, .choice-card__icon { transition: none; }
+    .quiz-screen.is-active .choice-card.is-selected, .choice-card.is-selected .choice-card__icon { transform: none; }
   }
 
   .assemble-percent {
@@ -7701,7 +7820,7 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
         return answers.revenus === "montant" && typeof answers.revenuActuel === "number" ? answers.revenuActuel : null;
       }
 
-      // Colonnes profiles (migrations 0030 et 0031) des écrans répondus
+      // Colonnes profiles (migrations 0030 à 0032) des écrans répondus
       // UNIQUEMENT : une colonne absente n'est pas écrite (jamais un null
       // par-dessus une valeur déjà en base). current_revenue vaut null quand
       // l'écran Revenus a été répondu sans montant (Autre, pas de réponse) :
@@ -7711,6 +7830,9 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
         if (typeof answers.objectifRevenu === "number") fields.objectif_mensuel = answers.objectifRevenu;
         if (answers.delai) fields.delai_mois = parseInt(answers.delai, 10);
         if (answers.revenus) fields.current_revenue = declaredRevenue();
+        // Acquisition / Accompagnement (migration 0032).
+        if (answers.videoIA) fields.wants_ai_video = answers.videoIA === "oui";
+        if (answers.accompagnement) fields.support_level = answers.accompagnement;
         return fields;
       }
 
@@ -8760,6 +8882,8 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
           delai: ans.delai || null,
           influenceurs: ans.influenceurs || null,
           clippers: ans.clippers || null,
+          videoIA: ans.videoIA || null,
+          accompagnement: ans.accompagnement || null,
           forceRegenerate: !!forceRegenerate
         })
           .then(function (res) {
@@ -9016,7 +9140,14 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
         var returnBanner = document.getElementById("quiz-return-banner");
         if (returnBanner) returnBanner.hidden = !isReturning;
 
-        selectedDuration = isReturning ? storedMonths : 3;
+        // Ordre de priorité : un choix déjà fait par la personne (retour)
+        // > palier suggéré par ses réponses > carte 3 mois mise en avant.
+        // Mapping demandé : « Automatise un maximum » -> palier 3 (6 mois),
+        // vidéos par l'IA -> palier 2 (3 mois). Simple présélection : les
+        // 3 cartes restent visibles et modifiables, aucun texte n'associe
+        // une durée à plus d'automatisation.
+        var suggestedMonths = answers.accompagnement === "automatisation_max" ? 6 : answers.videoIA === "oui" ? 3 : 3;
+        selectedDuration = isReturning ? storedMonths : suggestedMonths;
         updateDurationCardsUI();
       }
 
@@ -10062,11 +10193,44 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
         return stage.querySelector('[data-id="assemblage"]');
       }
 
-      function setAssemblePercent(p) {
+      // Barre non linéaire : chaque étape a sa propre cible (data-to) et sa
+      // propre durée (data-ms), la transition transform suit cette durée
+      // avec une courbe ease-out. Le pourcentage compte en direct (countTo).
+      function setAssemblePercent(p, durationMs) {
         var fill = document.getElementById("assemble-bar-fill");
         var label = document.getElementById("assemble-percent");
-        if (fill) fill.style.width = p + "%";
-        if (label) label.textContent = p + " %";
+        if (fill) {
+          fill.style.transitionDuration = reduceMotion ? "0ms" : (durationMs || 0) + "ms";
+          fill.style.transform = "scaleX(" + p / 100 + ")";
+        }
+        if (label) {
+          if (!durationMs || reduceMotion) {
+            label._ctValue = p;
+            label.textContent = p + " %";
+          } else {
+            countTo(label, p, function (v) {
+              return Math.round(v) + " %";
+            });
+          }
+        }
+      }
+
+      // Étapes en écho aux réponses : {objectif} et {delai} remplacés, sinon
+      // texte de repli (réponse absente, Mode Vidéo...).
+      function fillAssembleSteps(screenEl) {
+        Array.prototype.forEach.call(screenEl.querySelectorAll("[data-assemble-step]"), function (li) {
+          var tpl = li.getAttribute("data-template") || li.textContent;
+          var needsGoal = tpl.indexOf("{objectif}") !== -1;
+          var needsDelay = tpl.indexOf("{delai}") !== -1;
+          var hasGoal = typeof answers.objectifRevenu === "number" && answers.objectifRevenu > 0 && GOAL;
+          if ((needsGoal && !hasGoal) || (needsDelay && !answers.delai)) {
+            li.textContent = li.getAttribute("data-fallback") || tpl;
+            return;
+          }
+          li.textContent = tpl
+            .replace("{objectif}", hasGoal ? GOAL.formatGoal(answers.objectifRevenu) : "")
+            .replace("{delai}", answers.delai || "");
+        });
       }
 
       function hideAssemblePopup() {
@@ -10155,15 +10319,18 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
           }
         }
         var stepEl = steps[assemblyStep];
+        var stepMs = Number(stepEl.getAttribute("data-ms")) || ASSEMBLE_STEP_MS;
+        var stepTo = Number(stepEl.getAttribute("data-to")) || Math.round(((assemblyStep + 1) / total) * 100);
         stepEl.classList.add("is-active");
+        // La barre avance PENDANT l'étape (pas d'un bond à la fin).
+        setAssemblePercent(stepTo, stepMs);
         assemblyStepTimer = window.setTimeout(function () {
           assemblyStepTimer = null;
           stepEl.classList.remove("is-active");
           stepEl.classList.add("is-done");
           assemblyStep += 1;
-          setAssemblePercent(Math.round((assemblyStep / total) * 100));
           activateAssembleStep();
-        }, ASSEMBLE_STEP_MS);
+        }, stepMs);
       }
 
       function runAssembly() {
@@ -10175,7 +10342,11 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
         Array.prototype.forEach.call(screenEl.querySelectorAll("[data-assemble-step]"), function (s) {
           s.classList.remove("is-done", "is-active");
         });
+        fillAssembleSteps(screenEl);
         setAssemblePercent(0);
+        // Reflow : la barre repart vraiment de 0 avant la première étape.
+        var assembleFill = document.getElementById("assemble-bar-fill");
+        if (assembleFill) void assembleFill.offsetWidth;
         updateNextEnabled(screenEl);
         startAssembleSlogans(screenEl);
         activateAssembleStep();
@@ -10758,7 +10929,7 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
             showConnectedBadge();
             return supabase
               .from("profiles")
-              .select("intention, budget, temps, secteur, deja_cherche, funnel_last_step, objectif_mensuel, delai_mois, current_revenue")
+              .select("intention, budget, temps, secteur, deja_cherche, funnel_last_step, objectif_mensuel, delai_mois, current_revenue, wants_ai_video, support_level")
               .eq("id", user.id)
               .single()
               .then(function (profileRes) {
@@ -10779,6 +10950,8 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
                   answers.revenus = "montant";
                   answers.revenuActuel = profile.current_revenue;
                 }
+                if (typeof profile.wants_ai_video === "boolean") answers.videoIA = profile.wants_ai_video ? "oui" : "non";
+                if (profile.support_level) answers.accompagnement = profile.support_level;
                 navHistory = buildNavHistoryUpTo(lastStep);
                 restoreAnswersUI();
                 updateBackVisibility();
@@ -11924,6 +12097,22 @@ function renderSliderTicks(values, ratio, lastLabel) {
     .join("");
 }
 
+// Icônes des grandes cartes de choix (renderQuizQuestionScreen,
+// type "choice-cards"). Les éléments .ci-anim sont animés en CSS
+// (transform/opacity uniquement, coupés en prefers-reduced-motion).
+const CHOICE_CARD_ICONS = {
+  "ai-video":
+    '<svg viewBox="0 0 32 32" width="30" height="30" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="8" width="20" height="16" rx="3"/><path d="m11 13 6 3-6 3z" fill="currentColor"/><path class="ci-anim ci-spark" d="M26 4v4M24 6h4M27.5 12v2.5M26.25 13.25h2.5"/></svg>',
+  "self-video":
+    '<svg viewBox="0 0 32 32" width="30" height="30" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="9" width="17" height="14" rx="3"/><path d="m21 14 6-3v10l-6-3"/><circle class="ci-anim ci-rec" cx="9" cy="13.5" r="1.6" fill="currentColor" stroke="none"/></svg>',
+  solo:
+    '<svg viewBox="0 0 32 32" width="30" height="30" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="16" cy="11" r="5"/><path d="M7 27a9 9 0 0 1 18 0"/><path class="ci-anim ci-float" d="M24 6l2-2M26 9h3"/></svg>',
+  steps:
+    '<svg viewBox="0 0 32 32" width="30" height="30" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 25h6v-6h6v-6h6V7h4"/><circle class="ci-anim ci-step" cx="27" cy="7" r="2" fill="currentColor" stroke="none"/></svg>',
+  auto:
+    '<svg viewBox="0 0 32 32" width="30" height="30" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path class="ci-anim ci-bolt" d="M17 3 7 18h8l-1 11 10-15h-8z"/></svg>'
+};
+
 // Icône + libellé de chapitre au-dessus du titre -- absent sur les
 // écrans sans chapterIcon (intention, intro, mirror, auth...) plutôt que
 // d'inventer une icône pour des écrans qui n'en avaient pas dans le brief.
@@ -12313,19 +12502,52 @@ function renderQuizQuestionScreen(question, index) {
         </div>`;
   }
 
+  // ---- Grandes cartes de choix (Acquisition, Accompagnement) ---------------
+  // Même moteur que les choix uniques (classe quiz-option, data-type
+  // single) : clic = sélection en spring puis passage automatique. Icône
+  // animée en transform/opacity uniquement ; carte featured = mise en avant
+  // visuelle, jamais présélectionnée.
+  if (question.type === "choice-cards") {
+    const cards = question.options
+      .map(
+        (opt) => `<button class="quiz-option choice-card${opt.featured ? " choice-card--featured" : ""}" type="button" data-value="${opt.value}">
+                <span class="choice-card__icon" aria-hidden="true">${CHOICE_CARD_ICONS[opt.icon] || ""}</span>
+                <span class="choice-card__body">
+                  ${opt.featured ? `<span class="choice-card__badge">${opt.featured}</span>` : ""}
+                  <span class="choice-card__label">${opt.label}</span>
+                </span>
+                <span class="quiz-option__check choice-card__check" aria-hidden="true">${ICON_CHECK_SMALL}</span>
+              </button>`
+      )
+      .join("\n              ");
+    return `<div class="quiz-screen choice-screen" data-screen="question" data-index="${index}" data-id="${question.id}" data-step-name="${question.stepName}"${skipAttrs}${question.chapter ? ` data-chapter="${question.chapter}"` : ""}>
+          ${renderChapterHeader(question)}
+          <h2 class="quiz-question-title">${question.title}</h2>
+          <div class="quiz-options choice-cards" data-quiz-options data-type="single">
+              ${cards}
+          </div>
+        </div>`;
+  }
+
   if (question.type === "assembling") {
     // Chargement mis en scène (voir runAssembly) : étapes cochées une à
     // une, slogans rotatifs, pop-ups plein écran (rendus dans l'overlay,
     // #assemble-popup) qui mettent l'assemblage en pause jusqu'à réponse.
     const escAttr = (v) => String(v).replace(/'/g, "&#39;");
+    // Étapes : texte de repli rendu au build (lisible sans JS), modèle et
+    // durée en data-* pour runAssembly.
     const steps = question.steps
-      .map((s, i) => `<li class="audit-step" data-assemble-step="${i}">${s}</li>`)
+      .map(
+        (s, i) =>
+          `<li class="audit-step" data-assemble-step="${i}" data-template="${s.text}" data-fallback="${s.fallback || s.text}" data-ms="${s.ms}" data-to="${s.to}">${s.fallback || s.text}</li>`
+      )
       .join("\n            ");
     return `<div class="quiz-screen quiz-assemble" data-screen="question" data-index="${index}" data-id="${question.id}" data-step-name="${question.stepName}"${skipAttrs} data-slogans='${escAttr(JSON.stringify(question.slogans))}' data-popups='${escAttr(JSON.stringify(question.popups))}'>
           <h2 class="quiz-question-title"${question.echoTitle ? ` data-echo="${question.echoTitle}"` : ""}>${question.title}</h2>
           <p class="assemble-slogan" id="assemble-slogan">${question.slogans[0]}</p>
           <div class="assemble-bar" aria-hidden="true"><div class="assemble-bar__fill" id="assemble-bar-fill"></div></div>
           <p class="assemble-percent" id="assemble-percent" aria-live="polite">0 %</p>
+          ${question.note ? `<p class="assemble-note">${question.note}</p>` : ""}
           <ul class="audit-steps" id="assemble-steps">
             ${steps}
           </ul>

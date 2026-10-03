@@ -56,6 +56,12 @@ const SITUATION_LABELS: Record<string, string> = {
   sans_activite: "Sans activité pour l'instant",
   business_en_ligne: "A déjà un business en ligne",
 };
+// Écran « Jusqu'où veux-tu qu'on t'accompagne ? » (migration 0032).
+const ACCOMPAGNEMENT_LABELS: Record<string, string> = {
+  autonome: "gère tout lui-même",
+  etapes_cles: "veut de l'aide sur les étapes clés",
+  automatisation_max: "veut automatiser un maximum",
+};
 const REVENUS_LABELS: Record<string, string> = {
   zero: "aucun revenu pour l'instant",
   "100_1000": "100 – 1 000 € / mois",
@@ -162,6 +168,8 @@ type Profile = {
   delai: string | null;
   influenceurs: string | null;
   clippers: string | null;
+  videoIA: string | null;
+  accompagnement: string | null;
 };
 
 // Réponses aux pop-ups de l'écran d'assemblage (oui/non).
@@ -227,6 +235,8 @@ Format de sortie : JSON strict, aucun texte hors JSON.`;
 - Délai souhaité (intention, jamais à commenter) : ${a.delai ? `d'ici ${a.delai} mois` : "non communiqué"}
 - Collaborer avec des influenceurs : ${ouiNon(a.influenceurs, "prêt à le faire", "refuse -- ne pas le proposer comme canal")}
 - Faire appel à des clippers (comptes qui republient des extraits) : ${ouiNon(a.clippers, "prêt à le faire", "refuse -- ne pas le proposer comme canal")}
+- Vidéos d'acquisition : ${a.videoIA === "oui" ? "souhaite que l'IA les crée" : a.videoIA === "non" ? "les crée lui-même" : "non communiqué"}
+- Accompagnement souhaité : ${ACCOMPAGNEMENT_LABELS[a.accompagnement ?? ""] || "non communiqué"}
 
 Génère un concept de SaaS pour cette personne. concept_name sert aussi de NOM DU PROJET affiché tout au long du parcours : il doit sonner comme un vrai nom de produit. Réponds au format JSON :
 
@@ -345,6 +355,8 @@ Deno.serve(async (req) => {
     delai: str(body.delai),
     influenceurs: str(body.influenceurs),
     clippers: str(body.clippers),
+    videoIA: body.videoIA === "oui" || body.videoIA === "non" ? body.videoIA : null,
+    accompagnement: typeof body.accompagnement === "string" && ACCOMPAGNEMENT_LABELS[body.accompagnement] ? body.accompagnement : null,
   });
 
   let llmRes: Response;
