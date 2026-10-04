@@ -474,29 +474,16 @@ const quiz = {
   // Le champ chapter marque les 5 questions "réelles" qui comptent pour la
   // barre de progression segmentée -- intro/mirror/auth n'ont pas leur propre
   // segment (framing, pas avancement).
+  // Ordre logique (refonte 2026-10-04) : profil (âge, situation, parcours,
+  // présence, temps) -> motivations (attente, rêve, freins, limites) ->
+  // projet (cible, vidéos, accompagnement) -> objectif (revenus, montant,
+  // délai) -> chargement, engagement, compte. Chapitre 1 = profil.
   questions: [
     {
-      // Phase Hook, écran 1 -- ouverture sur l'intention (engagement
-      // immédiat) plutôt que sur l'âge. Distinct de answers.intention
-      // (creation/rachat, colonne profiles) : ici c'est l'attente du jour,
-      // réutilisée en écho dès l'écran suivant.
-      id: "attente",
-      stepName: "attente",
-      chapter: 1,
-      chapterLabel: "Ton objectif du jour",
-      chapterIcon: "objectif",
-      title: "Tu attends quoi aujourd'hui ?",
-      type: "single",
-      options: [
-        { value: "premiers_euros", label: "Générer mes premiers euros", emoji: "💶" },
-        { value: "idee_gagnante", label: "Trouver l'idée gagnante", emoji: "💡" },
-        { value: "saas_en_ligne", label: "Mettre mon SaaS en ligne", emoji: "🚀" }
-      ]
-    },
-    {
-      // Phase Hook, écran 2 -- service réservé aux 18+. "moins_18" ne mène
-      // jamais à la suite du quiz : écran de sortie, aucune réponse
-      // conservée (voir handleMinorExit côté client).
+      // Écran 1 -- service réservé aux 18+. "moins_18" ne mène jamais à la
+      // suite du quiz : écran de sortie, aucune réponse conservée (voir
+      // handleMinorExit côté client). Premier écran : aucun évènement n'est
+      // retenu avant de connaître l'âge.
       id: "age",
       stepName: "age",
       chapter: 1,
@@ -504,24 +491,14 @@ const quiz = {
       chapterIcon: "age",
       title: "Tu as quel âge ?",
       subtext: "On adapte tout à ton âge.",
-      echoSubtext: "Pour {attente}, on adapte tout à ton âge.",
       type: "single",
       options: [
-        { value: "moins_18", label: "Moins de 18 ans" },
-        { value: "18_24", label: "18–24 ans" },
-        { value: "25_34", label: "25–34 ans" },
-        { value: "35_50", label: "35–50 ans" },
-        { value: "50_plus", label: "50 ans et plus" }
+        { value: "moins_18", label: "Moins de 18 ans", icon: "🌱", subtitle: "On se retrouve à ta majorité" },
+        { value: "18_24", label: "18–24 ans", icon: "⚡", subtitle: "Le meilleur moment pour tester" },
+        { value: "25_34", label: "25–34 ans", icon: "🚀", subtitle: "Ton expérience devient un atout" },
+        { value: "35_50", label: "35–50 ans", icon: "🧭", subtitle: "Ton réseau fait la différence" },
+        { value: "50_plus", label: "50 ans et plus", icon: "🌟", subtitle: "Ton recul est une vraie force" }
       ]
-    },
-    {
-      // Phase Hook, écran 3 -- preuve sociale, uniquement sur données
-      // réelles (voir le rendu "mirror" et social_proof_stats).
-      id: "mirror",
-      stepName: "miroir",
-      type: "mirror",
-      title: "Tu n'es pas le seul à te lancer.",
-      subtext: "personnes se sont déjà inscrites sur ColdTrend."
     },
     {
       // Phase Situation, écran 4 -- « comment tu gagnes ta vie ». Les revenus
@@ -538,14 +515,23 @@ const quiz = {
         {
           field: "situation",
           options: [
-            { value: "etudiant", label: "Étudiant", emoji: "🎓" },
-            { value: "salarie", label: "Salarié", emoji: "💼" },
-            { value: "independant", label: "Freelance ou indépendant", emoji: "🧑‍💻" },
-            { value: "sans_activite", label: "Sans activité pour l'instant", emoji: "🌱" },
-            { value: "business_en_ligne", label: "Déjà un business en ligne", emoji: "📈" }
+            { value: "etudiant", label: "Étudiant", icon: "🎓", subtitle: "Le temps d'apprendre en testant" },
+            { value: "salarie", label: "Salarié", icon: "💼", subtitle: "Un revenu stable pour te lancer" },
+            { value: "independant", label: "Freelance ou indépendant", icon: "🧑‍💻", subtitle: "Tu sais déjà gérer ton activité" },
+            { value: "sans_activite", label: "Sans activité pour l'instant", icon: "🌱", subtitle: "Le bon moment pour construire" },
+            { value: "business_en_ligne", label: "Déjà un business en ligne", icon: "📈", subtitle: "On t'aide à passer un cap" }
           ]
         }
       ]
+    },
+    {
+      // Phase Hook, écran 3 -- preuve sociale, uniquement sur données
+      // réelles (voir le rendu "mirror" et social_proof_stats).
+      id: "mirror",
+      stepName: "miroir",
+      type: "mirror",
+      title: "Tu n'es pas le seul à te lancer.",
+      subtext: "personnes se sont déjà inscrites sur ColdTrend."
     },
     {
       // Écran 5 -- fusion "depuis combien de temps tu fais du SaaS" + "où
@@ -560,9 +546,9 @@ const quiz = {
       subtext: "On part de là où tu en es vraiment.",
       type: "single",
       options: [
-        { value: "jamais_lance", label: "Je n'ai jamais rien lancé", emoji: "🌱", hint: "Premier projet, rien à désapprendre." },
-        { value: "lance_abandonne", label: "J'ai lancé, puis abandonné", emoji: "🔁", hint: "Tu sais déjà où ça coince." },
-        { value: "ca_tourne", label: "J'ai déjà un truc qui tourne", emoji: "⚙️", hint: "Tu cherches à aller plus loin." }
+        { value: "jamais_lance", label: "Je n'ai jamais rien lancé", icon: "🌱", subtitle: "Rien à désapprendre" },
+        { value: "lance_abandonne", label: "J'ai lancé, puis abandonné", icon: "🔁", subtitle: "Tu sais déjà où ça coince" },
+        { value: "ca_tourne", label: "J'ai déjà un truc qui tourne", icon: "⚙️", subtitle: "On t'aide à aller plus loin" }
       ]
     },
     {
@@ -575,26 +561,9 @@ const quiz = {
       type: "single",
       skipIf: { field: "passif", equals: "jamais_lance" },
       options: [
-        { value: "moins_1_an", label: "Moins d'un an" },
-        { value: "1_2_ans", label: "Entre 1 et 2 ans" },
-        { value: "plus_2_ans", label: "Plus de 2 ans" }
-      ]
-    },
-    {
-      id: "plateformes",
-      stepName: "plateformes",
-      chapter: 1,
-      chapterLabel: "Ta présence en ligne",
-      chapterIcon: "acquisition",
-      title: "Tu postes sur combien de plateformes ?",
-      subtext: "TikTok, Insta, YouTube… on compte tout.",
-      type: "single",
-      options: [
-        { value: "aucune", label: "Aucune pour l'instant", emoji: "🙈" },
-        { value: "1", label: "Une seule", emoji: "📱" },
-        { value: "2", label: "Deux", emoji: "📱" },
-        { value: "3", label: "Trois", emoji: "📱" },
-        { value: "4_plus", label: "Quatre ou plus", emoji: "🔥" }
+        { value: "moins_1_an", label: "Moins d'un an", icon: "🌱", subtitle: "Les bases sont posées" },
+        { value: "1_2_ans", label: "Entre 1 et 2 ans", icon: "📈", subtitle: "Assez de recul pour accélérer" },
+        { value: "plus_2_ans", label: "Plus de 2 ans", icon: "🏔️", subtitle: "Ton expérience compte double" }
       ]
     },
     {
@@ -606,8 +575,8 @@ const quiz = {
       title: "Tu as déjà un SaaS en ligne ?",
       type: "single",
       options: [
-        { value: "oui", label: "Oui", emoji: "✅", hint: "On te l'analyse gratuitement juste après." },
-        { value: "non", label: "Non, pas encore", emoji: "✨", hint: "Aucun souci, c'est justement le but." }
+        { value: "oui", label: "Oui", icon: "✅", subtitle: "On te l'analyse gratuitement" },
+        { value: "non", label: "Non, pas encore", icon: "✨", subtitle: "C'est justement le but" }
       ]
     },
     {
@@ -625,6 +594,56 @@ const quiz = {
       skipIf: { field: "saasEnLigne", equals: "non" }
     },
     {
+      id: "plateformes",
+      stepName: "plateformes",
+      chapter: 1,
+      chapterLabel: "Ta présence en ligne",
+      chapterIcon: "acquisition",
+      title: "Tu postes sur combien de plateformes ?",
+      subtext: "TikTok, Insta, YouTube… on compte tout.",
+      type: "single",
+      options: [
+        { value: "aucune", label: "Aucune pour l'instant", icon: "🙈", subtitle: "On démarre ensemble" },
+        { value: "1", label: "Une seule", icon: "📱", subtitle: "Une base pour commencer" },
+        { value: "2", label: "Deux", icon: "✌️", subtitle: "Deux fois plus de portée" },
+        { value: "3", label: "Trois", icon: "📣", subtitle: "Une belle présence déjà" },
+        { value: "4_plus", label: "Quatre ou plus", icon: "🔥", subtitle: "Une vraie force de frappe" }
+      ]
+    },
+    {
+      id: "temps",
+      stepName: "temps",
+      chapter: 1,
+      chapterLabel: "Ton temps",
+      chapterIcon: "temps",
+      title: "Tu peux y consacrer combien d'heures par semaine ?",
+      subtext: "On cale le plan sur ton vrai temps.",
+      echoSubtext: "Avec {plateformes}, on cale le plan sur ton vrai temps.",
+      type: "single",
+      options: [
+        { value: "low", label: "Moins de 5h", icon: "🕐", subtitle: "Assez pour bien démarrer" },
+        { value: "mid", label: "5 à 15h", icon: "🕒", subtitle: "Un rythme solide" },
+        { value: "high", label: "Plus de 15h", icon: "🕘", subtitle: "De quoi avancer vite" }
+      ]
+    },
+    {
+      // Ouvre le bloc « motivations », après le profil. Distinct de
+      // answers.intention (creation/rachat, colonne profiles) : ici c'est
+      // l'attente du jour.
+      id: "attente",
+      stepName: "attente",
+      chapter: 2,
+      chapterLabel: "Ton objectif du jour",
+      chapterIcon: "objectif",
+      title: "Tu attends quoi aujourd'hui ?",
+      type: "single",
+      options: [
+        { value: "premiers_euros", label: "Générer mes premiers euros", icon: "💶", subtitle: "Le cap le plus motivant" },
+        { value: "idee_gagnante", label: "Trouver l'idée gagnante", icon: "💡", subtitle: "On part de ton profil" },
+        { value: "saas_en_ligne", label: "Mettre mon SaaS en ligne", icon: "🚀", subtitle: "Du projet au lancement" }
+      ]
+    },
+    {
       // Phase Introspection, écran 8 -- fusion "rêve ultime" + "tu
       // cherches quoi".
       id: "reve",
@@ -636,12 +655,28 @@ const quiz = {
       subtext: "Choisis tout ce qui te parle.",
       type: "multi",
       options: [
-        { value: "liberte", label: "Être libre de mon temps", emoji: "🕊️" },
-        { value: "quitter_job", label: "Quitter mon job", emoji: "🚪" },
-        { value: "nomade", label: "Bosser d'où je veux", emoji: "🌍" },
-        { value: "famille", label: "Mettre ma famille à l'abri", emoji: "🏡" },
-        { value: "independance", label: "Ne dépendre de personne", emoji: "💪" },
-        { value: "creer", label: "Créer un truc qui me ressemble", emoji: "🎨" }
+        { value: "liberte", label: "Être libre de mon temps", icon: "🕊️", subtitle: "Tes journées, tes règles" },
+        { value: "quitter_job", label: "Quitter mon job", icon: "🚪", subtitle: "Un projet qui prend le relais" },
+        { value: "nomade", label: "Bosser d'où je veux", icon: "🌍", subtitle: "Ton bureau, où tu veux" },
+        { value: "famille", label: "Mettre ma famille à l'abri", icon: "🏡", subtitle: "Bâtir une vraie sécurité" },
+        { value: "independance", label: "Ne dépendre de personne", icon: "💪", subtitle: "Décider par toi-même" },
+        { value: "creer", label: "Créer un truc qui me ressemble", icon: "🎨", subtitle: "Un projet à ton image" }
+      ]
+    },
+    {
+      id: "enervement",
+      stepName: "enervement",
+      chapter: 2,
+      chapterLabel: "Ta situation actuelle",
+      chapterIcon: "situation",
+      title: "Qu'est-ce qui t'énerve le plus aujourd'hui ?",
+      type: "single",
+      options: [
+        { value: "patron", label: "Dépendre d'un patron", icon: "😤", subtitle: "Tu veux décider toi-même" },
+        { value: "fins_de_mois", label: "Les fins de mois serrées", icon: "🧾", subtitle: "Un revenu en plus change tout" },
+        { value: "tourner_en_rond", label: "Tourner en rond", icon: "🌀", subtitle: "Un plan pour avancer enfin" },
+        { value: "autres_avancent", label: "Voir les autres avancer sans moi", icon: "👀", subtitle: "Ton tour arrive" },
+        { value: "temps_perdu", label: "Perdre mon temps au travail", icon: "⌛", subtitle: "Ton temps a de la valeur" }
       ]
     },
     {
@@ -656,28 +691,12 @@ const quiz = {
       subtext: "Sois honnête, personne ne juge.",
       type: "multi",
       options: [
-        { value: "par_ou_commencer", label: "Je ne sais pas par où commencer", emoji: "🧭" },
-        { value: "pas_idee", label: "Je n'ai pas la bonne idée", emoji: "💭" },
-        { value: "peur_argent", label: "Peur de perdre de l'argent", emoji: "💸" },
-        { value: "pas_temps", label: "Pas assez de temps", emoji: "⏳" },
-        { value: "technique", label: "Je ne sais pas coder", emoji: "🛠️" },
-        { value: "motivation", label: "Je lâche vite", emoji: "🔋" }
-      ]
-    },
-    {
-      id: "enervement",
-      stepName: "enervement",
-      chapter: 2,
-      chapterLabel: "Ta situation actuelle",
-      chapterIcon: "situation",
-      title: "Qu'est-ce qui t'énerve le plus aujourd'hui ?",
-      type: "single",
-      options: [
-        { value: "patron", label: "Dépendre d'un patron", emoji: "😤" },
-        { value: "fins_de_mois", label: "Les fins de mois serrées", emoji: "🧾" },
-        { value: "tourner_en_rond", label: "Tourner en rond", emoji: "🌀" },
-        { value: "autres_avancent", label: "Voir les autres avancer sans moi", emoji: "👀" },
-        { value: "temps_perdu", label: "Perdre mon temps au travail", emoji: "⌛" }
+        { value: "par_ou_commencer", label: "Je ne sais pas par où commencer", icon: "🧭", subtitle: "On te donne un plan clair" },
+        { value: "pas_idee", label: "Je n'ai pas la bonne idée", icon: "💭", subtitle: "On la trouve avec toi" },
+        { value: "peur_argent", label: "Peur de perdre de l'argent", icon: "💸", subtitle: "On teste avant d'investir" },
+        { value: "pas_temps", label: "Pas assez de temps", icon: "⏳", subtitle: "Un plan calé sur ton agenda" },
+        { value: "technique", label: "Je ne sais pas coder", icon: "🛠️", subtitle: "Le no-code suffit pour démarrer" },
+        { value: "motivation", label: "Je lâche vite", icon: "🔋", subtitle: "Un pas par semaine, ça suffit" }
       ]
     },
     {
@@ -692,12 +711,12 @@ const quiz = {
       subtext: "On en tient compte, sans compromis.",
       type: "multi",
       options: [
-        { value: "formations", label: "Vendre des formations bidon", emoji: "🚫" },
-        { value: "argent_facile", label: "Promettre de l'argent facile", emoji: "🎰" },
-        { value: "visage", label: "Montrer mon visage", emoji: "🙈" },
-        { value: "demarchage", label: "Faire du démarchage agressif", emoji: "📞" },
-        { value: "dropshipping", label: "Faire du dropshipping", emoji: "📦" },
-        { value: "aucune", label: "Rien de tout ça ne me gêne", emoji: "🤷" }
+        { value: "formations", label: "Vendre des formations bidon", icon: "🚫", subtitle: "On reste sur du concret" },
+        { value: "argent_facile", label: "Promettre de l'argent facile", icon: "🎰", subtitle: "Que du réaliste, promis" },
+        { value: "visage", label: "Montrer mon visage", icon: "🙈", subtitle: "Des vidéos sans visage existent" },
+        { value: "demarchage", label: "Faire du démarchage agressif", icon: "📞", subtitle: "Les clients viennent à toi" },
+        { value: "dropshipping", label: "Faire du dropshipping", icon: "📦", subtitle: "On bâtit un vrai produit" },
+        { value: "aucune", label: "Rien de tout ça ne me gêne", icon: "🤷", subtitle: "Tu restes ouvert à tout" }
       ]
     },
     {
@@ -712,25 +731,43 @@ const quiz = {
       title: "Tu préfères vendre à qui ?",
       type: "single",
       options: [
-        { value: "b2b", label: "Aux professionnels", emoji: "🏢", hint: "Des entreprises qui paient pour gagner du temps." },
-        { value: "b2c", label: "Aux particuliers", emoji: "🙋", hint: "Des gens comme toi, en direct." },
-        { value: "both", label: "Les deux me vont", emoji: "🤝" }
+        { value: "b2b", label: "Aux professionnels", icon: "🏢", subtitle: "Ils paient pour gagner du temps" },
+        { value: "b2c", label: "Aux particuliers", icon: "🙋", subtitle: "Des gens comme toi, en direct" },
+        { value: "both", label: "Les deux me vont", icon: "🤝", subtitle: "On choisit selon ton idée" }
       ]
     },
     {
-      id: "temps",
-      stepName: "temps",
+      // Écran Acquisition (après le Délai) -- grandes cartes à icône animée,
+      // sélection en spring, passage automatique (moteur des choix uniques).
+      // Réponse stockée dans profiles.wants_ai_video (true si "oui").
+      id: "videoIA",
+      stepName: "video-ia",
       chapter: 2,
-      chapterLabel: "Ton temps",
-      chapterIcon: "temps",
-      title: "Tu peux y consacrer combien d'heures par semaine ?",
-      subtext: "On cale le plan sur ton vrai temps.",
-      echoSubtext: "Avec {plateformes}, on cale le plan sur ton vrai temps.",
-      type: "single",
+      chapterLabel: "Ton acquisition",
+      chapterIcon: "acquisition",
+      type: "choice-cards",
+      title: "Veux-tu que l'IA crée tes vidéos pour attirer tes clients ?",
       options: [
-        { value: "low", label: "Moins de 5h", emoji: "🕐" },
-        { value: "mid", label: "5 à 15h", emoji: "🕒" },
-        { value: "high", label: "Plus de 15h", emoji: "🕘" }
+        { value: "oui", label: "Oui, l'IA crée mes vidéos automatiquement.", icon: "ai-video", subtitle: "On adapte ta stratégie vidéo" },
+        { value: "non", label: "Non, je crée mes vidéos moi-même.", icon: "self-video", subtitle: "Ta voix, ton style" }
+      ]
+    },
+    {
+      // Écran Niveau d'accompagnement -- 3 cartes ; la 3e est mise en avant
+      // visuellement (featured) mais JAMAIS présélectionnée. Stockée dans
+      // profiles.support_level. "automatisation_max" présélectionne l'offre
+      // 6 mois sur l'écran de paiement (voir initDurationCards).
+      id: "accompagnement",
+      stepName: "accompagnement",
+      chapter: 2,
+      chapterLabel: "Ton accompagnement",
+      chapterIcon: "objectif",
+      type: "choice-cards",
+      title: "Jusqu'où veux-tu qu'on t'accompagne ?",
+      options: [
+        { value: "autonome", label: "Je gère tout moi-même", icon: "solo", subtitle: "Tu gardes la main sur tout" },
+        { value: "etapes_cles", label: "Aide-moi sur les étapes clés", icon: "steps", subtitle: "Un coup de pouce au bon moment" },
+        { value: "automatisation_max", label: "Automatise un maximum pour moi", icon: "auto", subtitle: "Tu te concentres sur l'essentiel", featured: "Le plus automatisé" }
       ]
     },
     {
@@ -787,40 +824,6 @@ const quiz = {
       subtext: "Pas de mauvaise réponse. On adapte ton plan à ton rythme.",
       months: [1, 2, 3, 4, 5, 6],
       cta: "Continuer"
-    },
-    {
-      // Écran Acquisition (après le Délai) -- grandes cartes à icône animée,
-      // sélection en spring, passage automatique (moteur des choix uniques).
-      // Réponse stockée dans profiles.wants_ai_video (true si "oui").
-      id: "videoIA",
-      stepName: "video-ia",
-      chapter: 2,
-      chapterLabel: "Ton acquisition",
-      chapterIcon: "acquisition",
-      type: "choice-cards",
-      title: "Veux-tu que l'IA crée tes vidéos pour attirer tes clients ?",
-      options: [
-        { value: "oui", label: "Oui, l'IA crée mes vidéos automatiquement.", icon: "ai-video" },
-        { value: "non", label: "Non, je crée mes vidéos moi-même.", icon: "self-video" }
-      ]
-    },
-    {
-      // Écran Niveau d'accompagnement -- 3 cartes ; la 3e est mise en avant
-      // visuellement (featured) mais JAMAIS présélectionnée. Stockée dans
-      // profiles.support_level. "automatisation_max" présélectionne l'offre
-      // 6 mois sur l'écran de paiement (voir initDurationCards).
-      id: "accompagnement",
-      stepName: "accompagnement",
-      chapter: 2,
-      chapterLabel: "Ton accompagnement",
-      chapterIcon: "objectif",
-      type: "choice-cards",
-      title: "Jusqu'où veux-tu qu'on t'accompagne ?",
-      options: [
-        { value: "autonome", label: "Je gère tout moi-même", icon: "solo" },
-        { value: "etapes_cles", label: "Aide-moi sur les étapes clés", icon: "steps" },
-        { value: "automatisation_max", label: "Automatise un maximum pour moi", icon: "auto", featured: "Le plus automatisé" }
-      ]
     },
     {
       // Phase Loading, écran 17 -- étapes cochées une à une, slogans
@@ -8805,6 +8808,9 @@ ${questionScreenCss}
         window.setTimeout(function () {
           nextEl.style.pointerEvents = "auto";
           transitionInProgress = false;
+          // Puces récap recalculées une fois l'écran posé : aucune puce
+          // périmée ne survit à un rendu intermédiaire.
+          if (currentScreenEl === nextEl) renderTags();
         }, enterMs);
 
         if (prevEl) {
@@ -8818,6 +8824,7 @@ ${questionScreenCss}
         }
 
         currentScreenEl = nextEl;
+        renderTags();
 
         var isProofScreen = nextEl.getAttribute("data-id") === "proof";
         var proofBgEl = document.getElementById("proof-bg");
@@ -10809,13 +10816,32 @@ ${questionScreenCss}
         }, 2200);
       }
 
+      // Puces récap : seulement les réponses des écrans situés AVANT l'écran
+      // courant. Une réponse future (brouillon repris, retour arrière) n'est
+      // jamais montrée en avance. En modification (clic sur une puce), la
+      // limite est l'écran d'où l'on vient, et la puce modifiée reste visible.
+      function tagScreenIndex(id) {
+        for (var i = 0; i < questionScreens.length; i += 1) {
+          if (questionScreens[i].getAttribute("data-id") === id) return i;
+        }
+        return -1;
+      }
+      function tagFrontier() {
+        if (editContext) return editContext.returnIndex === "result" ? Infinity : Number(editContext.returnIndex);
+        var idx = currentScreenEl ? currentScreenEl.getAttribute("data-index") : null;
+        // Hors écrans de questions (résultat, paiement...) : tout est répondu.
+        return idx === null ? Infinity : Number(idx);
+      }
+
       function renderTags() {
         if (!quizTagsEl) return;
         var html = "";
+        var frontier = tagFrontier();
         TAG_ORDER.forEach(function (id) {
           var valueLabel = tagValueLabel(id);
           if (valueLabel === null) return;
           var isEditing = editContext && editContext.questionId === id;
+          if (!isEditing && tagScreenIndex(id) >= frontier) return;
           html +=
             '<button type="button" class="quiz-tag' +
             (isEditing ? " is-editing" : "") +
@@ -11130,7 +11156,7 @@ ${questionScreenCss}
           } else if (isAdultAge(answers.age)) {
             clearAgeGate();
           } else if (ageIndex !== -1 && startIndex > ageIndex) {
-            startIndex = answers.attente ? ageIndex : 0;
+            startIndex = ageIndex;
             navHistory = buildNavHistoryUpTo(startIndex);
             updateBackVisibility();
           }

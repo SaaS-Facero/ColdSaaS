@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------------
 // QuestionScreen — composant unique de tous les écrans de questions du
-// funnel ColdTrend (choix unique, choix multiple, cartes à icône).
+// funnel ColdTrend (choix unique, choix multiple, cartes à icône SVG).
 //
 // Objectif : comprendre et répondre en moins de 3 secondes.
 //
@@ -9,40 +9,64 @@
 //   .qs__center (flex, centrage optique : espace au-dessus < espace dessous)
 //     .qs__block (max 560px, centré)
 //       étiquette MAJUSCULES  (chapterLabel)
-//       titre 28px mobile / 36px desktop
-//       sous-titre (une ligne visée)
-//       indication « 1 choix » / « Plusieurs choix possibles »
+//       titre 28px mobile / 36px desktop, centré
+//       sous-titre, puis « 1 choix » / « Plusieurs choix possibles »
 //       cartes de réponse (radiogroup ou group de checkbox)
 //   .qs__cta sticky « Continuer (n) »          <- choix multiple, ou « Autre »
 //
-// Disposition des cartes (choisie au build, voir pickLayout) :
-//   - 4 options ou moins          -> pile pleine largeur, hauteur 64px min ;
-//   - 5-6 options aux libellés courts -> grille 2 colonnes, cartes carrées ;
-//   - plus de 6 options            -> erreur de build (règle du brief).
+// Disposition selon le nombre d'options, jamais de carte orpheline
+// (pickLayout, choisie au build) :
+//   2 options    -> "duo"  : 2 colonnes, grandes cartes verticales ;
+//   3 options    -> "trio" : lignes empilées en mobile, 3 colonnes (cartes
+//                            verticales) à partir de 768px ;
+//   4 options    -> "quad" : grille 2 x 2, cartes verticales ;
+//   5-6 options  -> "list" : liste verticale pleine largeur (max 480px).
+//   Moins de 2 ou plus de 6 options : erreur de build.
 //
-// Option « Autre » : { value: "autre", label: "Autre", other: { placeholder,
-// maxLength } }. La carte contient son propre champ de saisie, révélé à la
-// sélection ; le texte est stocké dans answers[champ + "Autre"] (même
-// convention que l'ancien champ libre). Une carte « Autre » n'est pas un
-// <button> (un champ ne peut pas vivre dans un bouton) : div role=radio /
-// checkbox, tabindex=0, activée au clavier par le script client.
+// Anatomie d'une carte en ligne (76px, rayon 16px) :
+//   [pastille 48px dégradée + emoji/icône] [titre 17px · sous-titre 13px] [radio]
+// En carte verticale (duo / trio desktop / quad), mêmes éléments empilés et
+// centrés, radio en haut à droite.
+//
+// Chaque option porte { value, label, icon, subtitle } : icon = emoji, ou
+// nom d'icône SVG (deps.icons, cartes Acquisition / Accompagnement) ;
+// subtitle = une ligne positive, 40 caractères maximum (vérifié au build).
+// La pastille prend le dégradé de rang i de QS_GRADIENTS : chaque option
+// d'un écran a le sien.
+//
+// Option « Autre » : { value: "autre", label: "Autre", icon, subtitle,
+// other: { placeholder, maxLength } }. La carte contient son propre champ,
+// révélé à la sélection ; texte dans answers[champ + "Autre"]. Une carte
+// « Autre » n'est pas un <button> (pas de champ dans un bouton) : div
+// role=radio / checkbox, tabindex=0, activée au clavier par le script.
 //
 // Le moteur existant du quiz est réutilisé tel quel : classes quiz-option /
 // is-selected / data-quiz-options / quiz-next, et answers[]. Le script
 // client (questionScreenClientJs) ajoute : états ARIA, compteur du CTA,
-// passage automatique à 250 ms, touches 1-6 / Entrée / flèches.
+// pulsation de la pastille, passage automatique à 250 ms, touches 1-6 /
+// Entrée / flèches.
 //
 // Attention (voir mémoire build.mjs) : ce fichier contient du CSS et du JS
 // client dans des template literals. Pas de backtick ni d'antislash dans le
 // JS client.
 // ---------------------------------------------------------------------------
 
+export const QS_MIN_OPTIONS = 2;
 export const QS_MAX_OPTIONS = 6;
-// Au-delà, une grille de cartes carrées couperait le libellé en 4 lignes :
-// on reste en pile.
-export const QS_GRID_MAX_LABEL = 34;
+export const QS_SUBTITLE_MAX = 40;
 export const QS_AUTO_ADVANCE_MS = 250;
 export const QS_STAGGER_MS = 40;
+
+// Dégradés des pastilles, par rang d'option. Tons soutenus : l'icône SVG
+// blanche y garde plus de 3:1 (élément graphique, WCAG 1.4.11).
+export const QS_GRADIENTS = [
+  ["#2F6BFF", "#6D3DF5"], // cobalt -> violet
+  ["#0E9F9A", "#2563EB"], // sarcelle -> bleu
+  ["#E8603C", "#D63A78"], // corail -> framboise
+  ["#7C4DDB", "#C026D3"], // violet -> fuchsia
+  ["#0F9F6E", "#0284C7"], // vert -> ciel
+  ["#D97706", "#DC4C1F"]  // ambre -> orange brûlé
+];
 
 const CHECK_SVG =
   '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" aria-hidden="true"><path class="qs-check__path" d="M5 12.5l4.5 4.5L19 7.5" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg>';
@@ -51,9 +75,9 @@ function escAttr(v) {
   return String(v).replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;");
 }
 
-// Normalise les trois formes de questions à options vers { field, mode,
-// options } : "single" / "multi" (options), "groups" (un seul groupe) et
-// "choice-cards" (options à icône SVG, éventuellement « featured »).
+// Normalise les formes de questions à options vers { field, mode, options } :
+// "single" / "multi" (options), "groups" (un seul groupe) et "choice-cards"
+// (icônes SVG, éventuellement « featured »). Vérifie le contenu des options.
 export function questionModel(question) {
   let field = question.id;
   let options = question.options;
@@ -64,19 +88,25 @@ export function questionModel(question) {
     field = question.groups[0].field || question.id;
     options = question.groups[0].options;
   }
-  if (!Array.isArray(options) || options.length === 0) {
-    throw new Error(`QuestionScreen « ${question.id} » : aucune option.`);
+  if (!Array.isArray(options) || options.length < QS_MIN_OPTIONS || options.length > QS_MAX_OPTIONS) {
+    throw new Error(`QuestionScreen « ${question.id} » : ${options ? options.length : 0} options, entre ${QS_MIN_OPTIONS} et ${QS_MAX_OPTIONS} attendues.`);
   }
-  if (options.length > QS_MAX_OPTIONS) {
-    throw new Error(`QuestionScreen « ${question.id} » : ${options.length} options, maximum ${QS_MAX_OPTIONS}.`);
+  for (const opt of options) {
+    if (!opt.icon) throw new Error(`QuestionScreen « ${question.id} » / ${opt.value} : icon manquant.`);
+    if (!opt.subtitle) throw new Error(`QuestionScreen « ${question.id} » / ${opt.value} : subtitle manquant.`);
+    if (opt.subtitle.length > QS_SUBTITLE_MAX) {
+      throw new Error(`QuestionScreen « ${question.id} » / ${opt.value} : subtitle de ${opt.subtitle.length} caractères (max ${QS_SUBTITLE_MAX}).`);
+    }
   }
   return { field, mode: question.type === "multi" ? "multi" : "single", options };
 }
 
 export function pickLayout(options) {
-  if (options.length <= 4) return "stack";
-  const longest = Math.max(...options.map((o) => String(o.label).length));
-  return longest <= QS_GRID_MAX_LABEL ? "grid" : "stack";
+  const n = options.length;
+  if (n === 2) return "duo";
+  if (n === 3) return "trio";
+  if (n === 4) return "quad";
+  return "list";
 }
 
 export const QUESTION_SCREEN_TYPES = ["single", "multi", "groups", "choice-cards"];
@@ -85,7 +115,7 @@ export const QUESTION_SCREEN_TYPES = ["single", "multi", "groups", "choice-cards
  * Rendu HTML d'un écran de question.
  * @param {object} question  entrée de quiz.questions
  * @param {number} index     position dans le funnel (data-index)
- * @param {object} deps      { icons: {nom: svg} } pour les cartes à icône
+ * @param {object} deps      { icons: {nom: svg} } pour les icônes SVG
  */
 export function renderQuestionScreen(question, index, deps = {}) {
   const icons = deps.icons || {};
@@ -110,17 +140,17 @@ export function renderQuestionScreen(question, index, deps = {}) {
   const role = isMulti ? "checkbox" : "radio";
   const cards = options
     .map((opt, i) => {
-      // Visuel : emoji, sinon icône SVG nommée (cartes Acquisition /
-      // Accompagnement). Jamais d'icône inventée si aucune n'est fournie.
-      const visual = opt.emoji
-        ? `<span class="qs-card__icon qs-card__icon--emoji" aria-hidden="true">${opt.emoji}</span>`
-        : opt.icon && icons[opt.icon]
-          ? `<span class="qs-card__icon" aria-hidden="true">${icons[opt.icon]}</span>`
-          : `<span class="qs-card__icon" aria-hidden="true"></span>`;
+      const [g1, g2] = QS_GRADIENTS[i % QS_GRADIENTS.length];
+      const visual = icons[opt.icon]
+        ? `<span class="qs-card__glyph qs-card__glyph--svg">${icons[opt.icon]}</span>`
+        : `<span class="qs-card__glyph">${opt.icon}</span>`;
       const badge = opt.featured ? `<span class="qs-card__badge">${opt.featured}</span>` : "";
-      const common = `class="quiz-option qs-card${opt.featured ? " qs-card--featured" : ""}${opt.other ? " qs-card--other" : ""}" role="${role}" aria-checked="false" data-value="${escAttr(opt.value)}" data-key="${i + 1}" style="--i:${i}"`;
-      const inner = `${badge}${visual}
-                <span class="qs-card__label">${opt.label}</span>
+      const common = `class="quiz-option qs-card${opt.featured ? " qs-card--featured" : ""}${opt.other ? " qs-card--other" : ""}" role="${role}" aria-checked="false" data-value="${escAttr(opt.value)}" data-key="${i + 1}" style="--i:${i};--g1:${g1};--g2:${g2}"`;
+      const inner = `${badge}<span class="qs-card__pastille" aria-hidden="true">${visual}</span>
+                <span class="qs-card__text">
+                  <span class="qs-card__label">${opt.label}</span>
+                  <span class="qs-card__sub">${opt.subtitle}</span>
+                </span>
                 <span class="qs-card__check" aria-hidden="true">${CHECK_SVG}</span>`;
       if (opt.other) {
         const max = opt.other.maxLength || 60;
@@ -164,9 +194,9 @@ export function renderQuestionScreen(question, index, deps = {}) {
 
 // ---------------------------------------------------------------------------
 // CSS — échelle 8pt (8/16/24/32/48), une seule famille (celle de
-// l'overlay), contrastes AA sur #0A0E1A : texte #F5F6F8 (18:1), gris
-// --steel #8A8F98 (6,2:1), bordure sélectionnée cobalt #0047FF (3,2:1,
-// composant d'interface).
+// l'overlay). Contrastes AA sur la carte (#12151F environ) : titre #F5F6F8
+// (16:1), sous-titre #A3A9B4 (7,5:1, 6:1 sur le fond teinté sélectionné),
+// bordure sélectionnée cobalt #0047FF (3,2:1, composant d'interface).
 // Les sélecteurs commencent par .quiz-screen.qs pour passer devant les
 // règles historiques (.quiz-screen.is-active .quiz-option:nth-child(n)).
 // ---------------------------------------------------------------------------
@@ -179,7 +209,7 @@ export const questionScreenCss = `
   }
   /* Centrage optique : deux ressorts, plus grand en bas, donc le bloc
      se pose un peu au-dessus du milieu. Quand le contenu dépasse, les
-     ressorts tombent à 0 et l'écran défile normalement. */
+     ressorts tombent au minimum et l'écran défile normalement. */
   .qs__center { flex: 1 0 auto; display: flex; flex-direction: column; }
   .qs__center::before { content: ""; flex: 2 1 0; min-height: 8px; }
   .qs__center::after { content: ""; flex: 3 1 0; min-height: 8px; }
@@ -230,102 +260,134 @@ export const questionScreenCss = `
     .quiz-screen.qs .qs__title { font-size: 36px; }
   }
 
-  /* ---- Cartes de réponse ------------------------------------------------ */
-  .quiz-screen.qs .qs__options { gap: 8px; }
-  .quiz-screen.qs .qs__options--grid {
+  /* ---- Dispositions ----------------------------------------------------- */
+  .quiz-screen.qs .qs__options { gap: 8px; text-align: left; }
+  .quiz-screen.qs .qs__options--list { width: 100%; max-width: 480px; margin: 0 auto; }
+  .quiz-screen.qs .qs__options--duo,
+  .quiz-screen.qs .qs__options--quad {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
-    width: 100%;
-    /* Côté d'une carte carrée = 17 % de la hauteur d'écran, entre 144px et
-       180px : 3 rangées + titre + CTA tiennent sans défilement de 812px
-       (mobile) à 900px (portable), et les libellés de 2 lignes restent
-       entiers. En dessous (iPhone SE), l'écran défile, CTA toujours collé. */
-    max-width: clamp(296px, calc(34vh + 8px), 368px);
-    max-width: clamp(296px, calc(34dvh + 8px), 368px);
-    margin: 0 auto;
+    gap: 8px;
+  }
+  @media (min-width: 768px) {
+    .quiz-screen.qs .qs__options--duo,
+    .quiz-screen.qs .qs__options--quad { gap: 16px; }
+    .quiz-screen.qs .qs__options--trio {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 16px;
+    }
   }
 
+  /* ---- Carte en ligne (76px) -------------------------------------------- */
   .quiz-screen.qs .qs-card {
     position: relative;
     display: grid;
-    grid-template-columns: 32px 1fr 32px;
+    grid-template-columns: 48px minmax(0, 1fr) 24px;
     align-items: center;
-    gap: 8px;
-    min-height: 64px;
-    padding: 8px 16px;
+    gap: 16px;
+    min-height: 76px;
+    padding: 12px 16px;
     border-radius: 16px;
     border: 1px solid rgba(255, 255, 255, 0.1);
     background: rgba(255, 255, 255, 0.04);
     -webkit-backdrop-filter: blur(12px);
     backdrop-filter: blur(12px);
-    color: var(--paper-soft);
-    font-size: 16px;
-    line-height: 22px;
-    text-align: center;
+    color: var(--paper);
+    text-align: left;
     cursor: pointer;
     box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06);
     -webkit-tap-highlight-color: transparent;
-    transition: border-color 160ms ease, background-color 160ms ease, box-shadow 160ms ease,
+    transition: border-color 160ms ease, background-color 160ms ease, box-shadow 200ms ease,
       opacity 320ms cubic-bezier(0.16, 1, 0.3, 1), transform 320ms cubic-bezier(0.16, 1, 0.3, 1);
   }
-  .quiz-screen.qs .qs__options--grid .qs-card {
+
+  .qs-card__pastille {
+    display: grid;
+    place-items: center;
+    width: 48px;
+    height: 48px;
+    border-radius: 14px;
+    background: linear-gradient(135deg, var(--g1), var(--g2));
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.25), 0 8px 20px -10px var(--g1);
+    color: #fff;
+  }
+  .qs-card__glyph { font-size: 24px; line-height: 1; }
+  .qs-card__glyph--svg { display: grid; place-items: center; }
+  .qs-card__glyph--svg svg { width: 26px; height: 26px; }
+
+  .qs-card__text { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+  .qs-card__label { font-size: 17px; line-height: 22px; font-weight: 600; color: #F5F6F8; }
+  .qs-card__sub { font-size: 13px; line-height: 18px; color: #A3A9B4; }
+
+  /* ---- Carte verticale (duo, quad, trio desktop) -------------------------- */
+  .quiz-screen.qs .qs__options--duo .qs-card,
+  .quiz-screen.qs .qs__options--quad .qs-card {
     grid-template-columns: 1fr;
-    grid-template-rows: auto auto;
     justify-items: center;
-    align-content: center;
-    aspect-ratio: 1 / 1;
-    min-height: 0;
-    padding: 16px 8px;
-    gap: 8px;
+    align-content: start;
+    gap: 12px;
+    min-height: 168px;
+    padding: 24px 16px 16px;
+    text-align: center;
+  }
+  .qs__options--duo .qs-card__text,
+  .qs__options--quad .qs-card__text { align-items: center; }
+  .qs__options--duo .qs-card__check,
+  .qs__options--quad .qs-card__check { position: absolute; top: 12px; right: 12px; }
+  @media (min-width: 768px) {
+    .quiz-screen.qs .qs__options--trio .qs-card {
+      grid-template-columns: 1fr;
+      justify-items: center;
+      align-content: start;
+      gap: 12px;
+      min-height: 176px;
+      padding: 24px 16px 16px;
+      text-align: center;
+    }
+    .qs__options--trio .qs-card__text { align-items: center; }
+    .qs__options--trio .qs-card__check { position: absolute; top: 12px; right: 12px; }
   }
 
-  /* Entrée en cascade : 40 ms d'écart entre cartes (--i posé au build). */
+  /* ---- Entrée en cascade : 40 ms d'écart (--i posé au build) --------------- */
   .quiz-screen.qs.is-active .qs-card.quiz-option {
     transition-delay: calc(160ms + var(--i, 0) * 40ms);
   }
   .quiz-screen.qs.is-active .qs__cta { transition-delay: 320ms; }
 
-  /* Survol (pointeur fin seulement), pressé, sélectionné. */
+  /* ---- États : survol (pointeur fin), pressé, sélectionné ----------------- */
   @media (hover: hover) and (pointer: fine) {
     .quiz-screen.qs.is-active .qs-card.quiz-option:hover {
-      transform: none;
+      transform: translateY(-2px);
+      transition-delay: 0ms;
       border-color: rgba(255, 255, 255, 0.24);
       background: rgba(255, 255, 255, 0.07);
-      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08), 0 16px 32px -20px rgba(0, 0, 0, 0.9);
     }
   }
   .quiz-screen.qs.is-active .qs-card.quiz-option:active {
-    transform: scale(0.97);
+    transform: scale(0.98);
     transition-delay: 0ms;
     transition-duration: 90ms;
   }
+  /* Bordure 2px sans décalage de mise en page : 1px de bordure + 1px d'ombre. */
   .quiz-screen.qs .qs-card.is-selected,
   .quiz-screen.qs.is-active .qs-card.quiz-option.is-selected:hover {
     border-color: var(--cobalt);
-    background: rgba(0, 71, 255, 0.16);
-    box-shadow: 0 0 0 1px var(--cobalt), 0 12px 32px -16px rgba(0, 71, 255, 0.8);
+    background: rgba(0, 71, 255, 0.14);
+    box-shadow: 0 0 0 1px var(--cobalt), 0 12px 36px -12px rgba(0, 71, 255, 0.75);
   }
   .quiz-screen.qs.is-active .qs-card.quiz-option.is-selected { animation: none; }
-
-  .qs-card__icon {
-    display: grid;
-    place-items: center;
-    width: 32px;
-    height: 32px;
-    color: var(--paper);
+  /* La pastille pulse une fois, au choix seulement (classe is-picked posée
+     par qsAfterPick), jamais à la restauration d'une réponse. */
+  .qs-card.is-picked .qs-card__pastille { animation: qs-pulse 420ms cubic-bezier(0.34, 1.56, 0.64, 1); }
+  @keyframes qs-pulse {
+    0% { transform: scale(1); box-shadow: 0 0 0 0 rgba(61, 107, 255, 0.6); }
+    45% { transform: scale(1.12); box-shadow: 0 0 0 8px rgba(61, 107, 255, 0); }
+    100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(61, 107, 255, 0); }
   }
-  .qs-card__icon svg { width: 28px; height: 28px; }
-  .qs-card__icon--emoji { font-size: 24px; line-height: 1; }
-  .qs__options--grid .qs-card__icon { width: 40px; height: 40px; }
-  .qs__options--grid .qs-card__icon--emoji { font-size: 32px; }
-  .qs-card__label {
-    font-weight: 600;
-    overflow-wrap: anywhere;
-    hyphens: auto;
-  }
-  .qs__options--grid .qs-card__label { font-size: 15px; line-height: 20px; }
 
-  /* Coche animée : cercle qui se remplit + tracé dessiné. */
+  /* ---- Radio / case : se remplit d'un check dessiné ----------------------- */
   .qs-card__check {
     justify-self: end;
     display: grid;
@@ -333,11 +395,11 @@ export const questionScreenCss = `
     width: 24px;
     height: 24px;
     border-radius: 50%;
-    border: 1.5px solid rgba(255, 255, 255, 0.24);
+    border: 2px solid rgba(255, 255, 255, 0.28);
     color: #fff;
     transition: background-color 160ms ease, border-color 160ms ease, transform 240ms cubic-bezier(0.34, 1.56, 0.64, 1);
   }
-  .qs__options--grid .qs-card__check { position: absolute; top: 8px; right: 8px; }
+  .qs__options[data-type="multi"] .qs-card__check { border-radius: 7px; }
   .qs-check__path {
     stroke-dasharray: 24;
     stroke-dashoffset: 24;
@@ -351,7 +413,14 @@ export const questionScreenCss = `
   .qs-card.is-selected .qs-check__path { stroke-dashoffset: 0; }
 
   /* Carte mise en avant (jamais présélectionnée) : pastille sur la bordure. */
-  .quiz-screen.qs .qs-card--featured { border-color: rgba(61, 107, 255, 0.45); margin-top: 8px; }
+  .quiz-screen.qs .qs-card--featured { border-color: rgba(61, 107, 255, 0.45); }
+  /* En liste, place pour la pastille « featured » qui déborde de 10px ; en
+     grille (trio desktop), les cartes restent alignées. */
+  .qs__options--trio .qs-card--featured,
+  .qs__options--list .qs-card--featured { margin-top: 8px; }
+  @media (min-width: 768px) {
+    .qs__options--trio .qs-card--featured { margin-top: 0; }
+  }
   .qs-card__badge {
     position: absolute;
     top: -10px;
@@ -368,7 +437,7 @@ export const questionScreenCss = `
   }
 
   /* « Autre » : le champ s'ouvre dans la carte, sur toute sa largeur. */
-  .qs-card__other { grid-column: 1 / -1; width: 100%; padding: 0 0 8px; }
+  .qs-card__other { grid-column: 1 / -1; width: 100%; padding: 0 0 4px; }
   .qs-card__other[hidden] { display: none; }
   .qs-card__other-input {
     width: 100%;
@@ -381,7 +450,6 @@ export const questionScreenCss = `
     font: inherit;
     font-size: 16px; /* 16px : pas de zoom automatique sur iOS */
   }
-  .qs__options--grid .qs-card--other.is-selected { aspect-ratio: auto; grid-column: 1 / -1; }
 
   /* CTA sticky des choix multiples. */
   .quiz-screen.qs .qs__cta { margin-top: 0; padding-top: 16px; padding-bottom: 16px; }
@@ -393,15 +461,17 @@ export const questionScreenCss = `
   .quiz-screen.qs .qs-card:focus-visible,
   .qs-card__other-input:focus-visible {
     outline: 2px solid var(--cobalt-soft);
-    outline-offset: 2px;
+    outline-offset: 3px;
   }
 
   @media (prefers-reduced-motion: reduce) {
     .quiz-screen.qs .qs-card,
     .qs-card__check,
     .qs-check__path { transition: none; }
+    .quiz-screen.qs.is-active .qs-card.quiz-option:hover,
     .quiz-screen.qs.is-active .qs-card.quiz-option:active { transform: none; }
     .qs-card.is-selected .qs-card__check { transform: none; }
+    .qs-card.is-picked .qs-card__pastille { animation: none; }
   }
 `;
 
@@ -455,10 +525,18 @@ export const questionScreenClientJs = `
         if (!isMulti) footer.hidden = !otherOn;
       }
 
-      // Après un choix : unique -> écran suivant en 250 ms (le temps de voir
-      // la coche), sauf « Autre » qui attend sa saisie ; multiple -> rien,
-      // le CTA sticky « Continuer (n) » valide.
+      // Après un choix : la pastille pulse une fois ; unique -> écran suivant
+      // en 250 ms (le temps de voir la coche), sauf « Autre » qui attend sa
+      // saisie ; multiple -> rien, le CTA sticky « Continuer (n) » valide.
       function qsAfterPick(screenEl, optBtn, type) {
+        // Pulsation unique de la pastille : rejouée à chaque nouveau choix.
+        Array.prototype.forEach.call(screenEl.querySelectorAll(".qs-card.is-picked"), function (c) {
+          c.classList.remove("is-picked");
+        });
+        if (optBtn.classList.contains("is-selected")) {
+          void optBtn.offsetWidth;
+          optBtn.classList.add("is-picked");
+        }
         if (type === "multi") return;
         if (optBtn.hasAttribute("data-other")) {
           var input = optBtn.querySelector(".qs-card__other-input");
