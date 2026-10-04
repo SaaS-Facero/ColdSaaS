@@ -320,6 +320,20 @@
     return "× " + formatRatio(r) + " tes revenus actuels";
   }
 
+  // Ligne de contexte unique sous le montant de l'écran Objectif :
+  // « ≈ 3,5 SMIC · ≈ 250 clients à 20 € ». Une seule ligne à 375px
+  // (≤ 36 caractères) : les petits montants passent en « ≈ 19 €/jour »
+  // au lieu de « de plus par jour ». Le prix moyen reste affiché
+  // (hypothèse visible, jamais cachée).
+  function contextLine(goal, secteur) {
+    var v = Number(goal) || 0;
+    if (v <= 0) return "Choisis un montant pour voir l'équivalent";
+    var price = averagePrice(secteur);
+    var clients = clientsNeeded(v, price);
+    var eq = v / SMIC_NET_MENSUEL < 0.4 ? "≈ " + formatEuro(v / 30) + "/jour" : equivalence(v);
+    return eq + " · ≈ " + formatNumber(clients) + " client" + (clients > 1 ? "s" : "") + " à " + price + " €";
+  }
+
   // Libellés partagés (titre en écho de l'écran Délai, puce récap).
   function formatGoal(goal) {
     var v = Number(goal) || 0;
@@ -342,6 +356,7 @@
     averagePrice: averagePrice,
     clientsNeeded: clientsNeeded,
     equivalence: equivalence,
+    contextLine: contextLine,
     clientsPerWeek: clientsPerWeek,
     formatPerWeek: formatPerWeek,
     suggestedMonths: suggestedMonths,

@@ -103,3 +103,13 @@ test("copie Edge Functions identique (supabase/functions/_shared/goal-math.js)",
   const b = readFileSync(new URL("../supabase/functions/_shared/goal-math.js", import.meta.url), "utf8");
   assert.equal(b, a, "Recopier scripts/goal-math.js vers supabase/functions/_shared/goal-math.js");
 });
+
+test("ligne de contexte : une ligne courte, prix moyen visible", () => {
+  assert.equal(G.contextLine(0), "Choisis un montant pour voir l'équivalent");
+  assert.equal(G.contextLine(5000, ["b2c"]), "≈ 3,5 SMIC · ≈ 250 clients à 20 €");
+  assert.match(G.contextLine(500, ["b2c"]), /^≈ 17 €\/jour · ≈ 25 clients à 20 €$/);
+  assert.match(G.contextLine(20, ["b2b"]), /≈ 1 client à 49 €$/);
+  for (const v of [10, 300, 560, 900, 1500, 5000, 12000, 25000, 50000]) {
+    for (const s of [["b2c"], ["b2b"], ["both"], undefined]) assert.ok(G.contextLine(v, s).length <= 36, G.contextLine(v, s));
+  }
+});

@@ -773,8 +773,8 @@ const quiz = {
     {
       // Écran « Revenus actuels » -- même niveau de soin que l'écran
       // Objectif : montant en grand modifiable au tap, raccourcis, slider
-      // non linéaire 0 -> 10 000 € et plus, équivalence SMIC, réaction de
-      // l'assistant (bienveillante quel que soit le montant). « Je préfère
+      // non linéaire 0 -> 10 000 € et plus, équivalence SMIC (mise à jour
+      // au relâchement du slider, jamais pendant le geste). « Je préfère
       // ne pas répondre » toujours visible, « Autre » avec saisie libre.
       // Calculs et messages : scripts/goal-math.js. Stockage :
       // profiles.current_revenue (null si pas de montant).
@@ -792,8 +792,9 @@ const quiz = {
     {
       // Écran A « Montant » -- une colonne centrée (520px) : mini-stepper
       // « Ton plan » sous les puces récap, montant + écart avec les revenus
-      // actuels, jauge sous le montant, raccourcis, slider, puis la bulle
-      // « Assistant ColdTrend ». Tous les chiffres (paliers, slider non
+      // actuels, ligne de contexte, jauge (badge de palier), raccourcis,
+      // slider. Pas de bulle d'assistant : elle cassait la fluidité du
+      // glissement (2026-10-04). Tous les chiffres (paliers, slider non
       // linéaire, prix moyen, équivalences, écart) viennent de
       // scripts/goal-math.js. Le délai a son propre écran juste après.
       id: "objectifRevenu",
@@ -3088,9 +3089,9 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
     font-size: 12px;
     font-weight: 700;
     letter-spacing: 0.04em;
-    transition: opacity 150ms ease;
+    transition: opacity 150ms ease, transform 200ms cubic-bezier(0.16, 1, 0.3, 1), filter 150ms ease, background-color 200ms ease, border-color 200ms ease;
   }
-  .goal-amount__badge.is-changing { opacity: 0; }
+  .goal-amount__badge.is-changing { opacity: 0; transform: scale(0.92); filter: blur(2px); }
   .goal-amount__badge[data-tier="tres_ambitieux"] { border-color: var(--cobalt); color: #fff; box-shadow: 0 0 18px rgba(0, 71, 255, 0.45); }
 
   /* Montant en grand, modifiable au tap (champ texte numérique). */
@@ -3118,8 +3119,9 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
   }
   .goal-amount__input:focus { outline: none; border-bottom-color: var(--cobalt-soft); }
   .goal-amount__unit { font-size: 18px; font-weight: 700; color: var(--steel); }
-  .goal-amount__equiv { margin: 8px 0 0; font-size: 16px; font-weight: 700; color: var(--paper-soft); min-height: 1.4em; }
-  .goal-amount__clients { margin: 2px 0 0; font-size: 13px; color: var(--steel); min-height: 1.4em; }
+  /* Ligne de contexte : une ligne, hauteur réservée (24px), jamais de
+     retour à la ligne -> rien ne bouge sous elle. */
+  .goal-amount__equiv { margin: 8px 0 0; height: 24px; font-size: 15px; line-height: 24px; font-weight: 700; color: var(--paper-soft); white-space: nowrap; }
 
   .goal-shortcuts { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; margin: 18px 0 6px; }
   .goal-shortcut {
@@ -3156,6 +3158,7 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
     background: linear-gradient(90deg, var(--cobalt-dark), var(--cobalt-soft));
     transform-origin: left center;
     transform: scaleX(var(--goal-ratio, 0));
+    will-change: transform;
   }
   .goal-slider__input {
     position: relative;
@@ -3223,6 +3226,10 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
   .goal-mesh--1 { left: -35vmax; top: -40vmax; background: #0047FF; opacity: 0.2; animation: goal-mesh-1 24s ease-in-out infinite alternate; }
   .goal-mesh--2 { right: -38vmax; top: -10vmax; background: #3D6BFF; opacity: 0.12; animation: goal-mesh-2 28s ease-in-out infinite alternate; }
   .goal-mesh--3 { left: 5vmax; bottom: -50vmax; background: #0033B8; opacity: 0.16; animation: goal-mesh-3 32s ease-in-out infinite alternate; }
+  /* Pendant le glissement d'un slider (classe is-sliding sur l'overlay), les
+     lueurs floues se figent : leur animation coûtait l'essentiel de chaque
+     image sur les appareils modestes. Elles reprennent au relâchement. */
+  .quiz-overlay.is-sliding .goal-mesh { animation-play-state: paused; }
   @keyframes goal-mesh-1 { to { transform: translate3d(10vmax, 6vmax, 0) scale(1.1); } }
   @keyframes goal-mesh-2 { to { transform: translate3d(-8vmax, 8vmax, 0) scale(0.92); } }
   @keyframes goal-mesh-3 { to { transform: translate3d(6vmax, -8vmax, 0) scale(1.08); } }
@@ -3262,6 +3269,7 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
     filter: blur(6px);
     pointer-events: none;
     transition: opacity 200ms ease;
+    will-change: opacity; /* calque composité : le flou n'est pas repeint */
   }
   .goal-amount__input, .goal-amount__unit { position: relative; }
 
@@ -3270,10 +3278,9 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
   .goal-xfade__item {
     grid-area: 1 / 1;
     opacity: 0;
-    transform: translateY(4px);
-    transition: opacity 260ms ease, transform 260ms ease;
+    transition: opacity 150ms ease;
   }
-  .goal-xfade__item.is-on { opacity: 1; transform: none; }
+  .goal-xfade__item.is-on { opacity: 1; }
 
   /* Impulsion du badge au franchissement d'un palier. */
   .goal-amount__badge { position: relative; }
@@ -3354,6 +3361,10 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
   /* -- Ligne d'écart avec les revenus actuels (« × 3 tes revenus actuels »). */
   .goal-amount__gap {
     margin: 0 0 4px;
+    height: 16px; /* hauteur réservée : le montant ne bouge jamais */
+    line-height: 16px;
+    white-space: nowrap;
+    transition: opacity 150ms ease;
     font-size: 13px;
     font-weight: 700;
     color: #9DB4FF;
@@ -3403,24 +3414,10 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
     pointer-events: none;
   }
   .sp-gauge__center { position: absolute; left: 0; right: 0; bottom: 2px; display: flex; justify-content: center; }
-  .sp-gauge__center .goal-amount__badge { margin: 0; white-space: nowrap; }
+  /* Largeur fixe (libellé le plus long : « Très ambitieux ») : la boîte ne
+     change jamais de taille ni de position d'un palier à l'autre (CLS = 0). */
+  .sp-gauge__center .goal-amount__badge { margin: 0; white-space: nowrap; box-sizing: border-box; width: 128px; text-align: center; }
   .sp-gauge__scale { display: flex; justify-content: space-between; max-width: 230px; margin: 4px auto 0; font-size: 12px; font-weight: 600; color: var(--paper-soft); }
-
-  /* -- Assistant : présenté comme tel (icône robot, « réponses
-     automatiques »), indicateur de saisie avant chaque réponse. */
-  .sp-assistant { display: flex; align-items: flex-start; gap: 8px; margin-top: 16px; text-align: left; }
-  .sp-assistant__avatar { flex: none; width: 30px; height: 30px; border-radius: 9px; display: grid; place-items: center; background: rgba(0, 71, 255, 0.25); color: #C8D4FF; border: 1px solid rgba(61, 107, 255, 0.4); }
-  .sp-assistant__bubble { position: relative; flex: 1; min-width: 0; padding: 10px 12px; border-radius: 4px 14px 14px 14px; background: rgba(255, 255, 255, 0.06); border: 1px solid rgba(255, 255, 255, 0.08); }
-  .sp-assistant__name { margin: 0 0 3px; font-size: 11px; font-weight: 700; color: #9DB4FF; }
-  .sp-assistant__name span { font-weight: 400; color: var(--steel); }
-  .sp-assistant__text { margin: 0; font-size: 14px; line-height: 1.45; color: var(--paper-soft); transition: opacity 220ms ease, transform 220ms ease; }
-  .sp-assistant__typing { position: absolute; left: 12px; bottom: 13px; margin: 0; display: flex; gap: 4px; opacity: 0; transition: opacity 160ms ease; }
-  .sp-assistant__typing i { width: 6px; height: 6px; border-radius: 50%; background: #9DB4FF; animation: sp-typing 1s ease-in-out infinite; }
-  .sp-assistant__typing i:nth-child(2) { animation-delay: 150ms; }
-  .sp-assistant__typing i:nth-child(3) { animation-delay: 300ms; }
-  @keyframes sp-typing { 0%, 100% { opacity: 0.3; transform: translateY(0); } 50% { opacity: 1; transform: translateY(-3px); } }
-  .sp-assistant[data-state="typing"] .sp-assistant__typing { opacity: 1; }
-  .sp-assistant[data-state="typing"] .sp-assistant__text { opacity: 0; transform: translateY(3px); }
 
   /* -- Écran Revenus actuels. -- */
   /* Montant « en attente » tant que rien n'est choisi, estompé quand une
@@ -3468,18 +3465,14 @@ function page({ brand, hero, socialProof, notificationStack, pricing, faq, quiz 
     .sp-gauge__scale { max-width: 190px; }
     .goal-screen .goal-shortcuts { margin-top: 12px; }
     .goal-screen .goal-slider { margin-top: 10px; }
-    .sp-assistant { margin-top: 12px; }
-    .sp-assistant__avatar { width: 26px; height: 26px; }
-    .sp-assistant__bubble { padding: 8px 10px; }
-    .sp-assistant__text { font-size: 13px; }
   }
 
   @media (prefers-reduced-motion: reduce) {
     .goal-mesh { animation: none; }
     .goal-halo { display: none; }
-    .sp-step__shimmer, .sp-assistant__typing i { animation: none; }
+    .sp-step__shimmer { animation: none; }
     .sp-step[data-status="current"] .sp-step__pulse { animation: none; opacity: 0.8; transform: none; }
-    .goal-xfade__item, .goal-cta__label, .goal-cta__check, .sp-step__check, .sp-gauge__tone, .sp-assistant__text, .goal-amount__glow, .revenue-alt__btn { transition: none; }
+    .goal-xfade__item, .goal-cta__label, .goal-cta__check, .sp-step__check, .sp-gauge__tone, .goal-amount__glow, .revenue-alt__btn { transition: none; }
   }
 
   /* -- Écran B : frise de 6 jalons. -- */
@@ -7747,7 +7740,7 @@ ${questionScreenCss}
       var EMAIL_RE = /^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/;
 
       // ---- Écrans Revenus actuels, Objectif (A) et Délai (B) ----------------
-      // Tous les chiffres et les messages de l'assistant viennent de
+      // Tous les chiffres et les textes viennent de
       // window.ColdTrendGoal (scripts/goal-math.js, servi en
       // /js/goal-math.js). Ici : affichage et mouvement uniquement.
       //
@@ -7762,13 +7755,15 @@ ${questionScreenCss}
       //   140 ms   titre, 200 ms sous-titre, 220 ms bloc montant (cascade CSS
       //            commune à tout le quiz, voir .quiz-screen.is-active)
       //   240 ms   jauge : ressort 0 -> objectif (raideur 170, amort. 18)
-      //   700 ms   bulle Assistant : apparition (translateY 8 -> 0, 260 ms)
-      //            + indicateur de saisie
-      //   900 ms   texte de l'assistant (fondu 220 ms) -> fin à ~1,12 s
+      //            -> fin à ~0,8 s
       //
-      // TIMELINE D'ENTRÉE — écran Revenus (playRevenueIntro, < 1 s)
-      //   220 ms   bloc montant (cascade CSS)
-      //   560 ms   bulle Assistant + saisie ; 760 ms texte -> fin à ~0,98 s
+      // RETOUR PENDANT LE GLISSEMENT (Revenus et Objectif)
+      //   à chaque position : montant, halo, slider, jauge (ressort) et badge
+      //   de palier (morph 150 ms + vibration au franchissement) ;
+      //   au relâchement ou après 300 ms sans mouvement (settleMessages) :
+      //   ligne d'écart et ligne de contexte, en fondu croisé de 150 ms.
+      //   Aucun texte ne change pendant le geste, aucune zone ne change de
+      //   hauteur (CLS = 0).
       //
       // TIMELINE DE VALIDATION — écran Objectif (playGoalValidation, t = clic)
       //   0 ms     bouton -> check (libellé opacity 0, check scale .3 -> 1)
@@ -7785,8 +7780,13 @@ ${questionScreenCss}
       var goalBadgeTimer = null;
       var goalIntroPlayed = false;
       var goalValidating = false;
-      var revenueIntroPlayed = false;
-      var welcomeFirstName = null;
+      // Une mise à jour par image pendant le glissement (queueSliderFrame).
+      var sliderFrames = { goal: null, revenue: null };
+      // Messages au repos (voir settleMessages) : un minuteur par écran.
+      var SETTLE_MS = 300;
+      var settleTimers = { goal: null, revenue: null };
+      // Count-up du montant sur les raccourcis (rAF, valeur du champ).
+      var amountTweens = {};
 
       function goalVibrate(pattern) {
         try {
@@ -7907,35 +7907,90 @@ ${questionScreenCss}
         on.setAttribute("aria-hidden", "true");
       }
 
-      // ---- Bulle de l'assistant (composant renderAssistantBubble) ----------
-      // Indicateur de saisie, puis le texte. Un minuteur par bulle.
-      function assistantSay(box, text, typingMs) {
-        if (!box) return;
-        var textEl = box.querySelector(".sp-assistant__text");
-        box._said = text;
-        window.clearTimeout(box._timer);
-        if (reduceMotion || !typingMs) {
-          textEl.textContent = text;
-          box.setAttribute("data-state", "idle");
-          return;
-        }
-        box.setAttribute("data-state", "typing");
-        box._timer = window.setTimeout(function () {
-          textEl.textContent = text;
-          box.setAttribute("data-state", "idle");
-        }, typingMs);
+      // ---- Écritures DOM économes --------------------------------------------
+      // Pendant le glissement, chaque écriture (attribut, style, valeur)
+      // déclenche un recalcul de style : on n'écrit que ce qui change.
+      function setAttrIfChanged(el, name, value) {
+        if (el && el.getAttribute(name) !== value) el.setAttribute(name, value);
+      }
+      function setStyleIfChanged(el, prop, value) {
+        if (el && el.style.getPropertyValue(prop) !== value) el.style.setProperty(prop, value);
+      }
+      function setValueIfChanged(el, value) {
+        if (el && el.value !== value) el.value = value;
+      }
+      // Remplissage du slider : transform posé directement sur la barre
+      // (calque composité), plutôt qu'une variable CSS sur le parent qui
+      // recalculait tout le sous-arbre à chaque position.
+      function paintSliderFill(slider, ratio) {
+        var fill = slider && slider.parentNode.querySelector(".goal-slider__fill");
+        setStyleIfChanged(fill, "transform", "scaleX(" + ratio.toFixed(4) + ")");
       }
 
-      // Réaction une fois le geste posé (650 ms sans changement), et
-      // seulement si le message change. Rien pendant une chorégraphie
-      // d'entrée (box._intro).
-      function scheduleAssistant(box, message) {
-        if (!box || box._intro) return;
-        window.clearTimeout(box._timer);
-        if (message === box._said) return;
-        box._timer = window.setTimeout(function () {
-          assistantSay(box, message, 450);
-        }, 650);
+      // ---- Une mise à jour par image ---------------------------------------
+      // Les événements « input » d'un slider peuvent arriver plusieurs fois
+      // par image : on note seulement qu'il faut redessiner, et la position
+      // est relue dans requestAnimationFrame (une seule mise à jour du DOM
+      // par image).
+      function applySliderFrame(key) {
+        var el = document.getElementById(key + "-slider");
+        if (!el || !GOAL) return;
+        if (key === "goal") setGoal(GOAL.positionToValue(el.value), "slider");
+        else setRevenue(GOAL.revenueScale.positionToValue(el.value), "slider");
+      }
+      function queueSliderFrame(key) {
+        if (sliderFrames[key]) return;
+        sliderFrames[key] = window.requestAnimationFrame(function () {
+          sliderFrames[key] = null;
+          applySliderFrame(key);
+        });
+      }
+      // Relâchement : la dernière position est appliquée tout de suite.
+      function flushSliderFrame(key) {
+        if (!sliderFrames[key]) return;
+        window.cancelAnimationFrame(sliderFrames[key]);
+        sliderFrames[key] = null;
+        applySliderFrame(key);
+      }
+
+      // ---- Messages au repos -------------------------------------------------
+      // Les textes (écart, contexte) ne changent jamais pendant le glissement :
+      // live = true (slider, frappe) -> mise à jour 300 ms après le dernier
+      // mouvement ; live = false (relâchement, raccourci, restauration) ->
+      // immédiate. Le relâchement du slider (« change ») vide le minuteur.
+      function settleMessages(key, render, live) {
+        window.clearTimeout(settleTimers[key]);
+        settleTimers[key] = null;
+        if (!live) {
+          render();
+          return;
+        }
+        settleTimers[key] = window.setTimeout(function () {
+          settleTimers[key] = null;
+          render();
+        }, SETTLE_MS);
+      }
+
+      // Count-up du montant affiché dans le champ (raccourcis uniquement :
+      // pendant le glissement, la valeur suit le doigt sans délai).
+      function countInputTo(input, from, to) {
+        if (!input) return;
+        var id = input.id;
+        if (amountTweens[id]) window.cancelAnimationFrame(amountTweens[id]);
+        amountTweens[id] = null;
+        if (reduceMotion || from === to) {
+          input.value = GOAL.formatNumber(to);
+          return;
+        }
+        var start = null;
+        var DURATION = 320;
+        (function frame(now) {
+          if (start === null) start = now;
+          var t = Math.min(1, (now - start) / DURATION);
+          var eased = 1 - Math.pow(1 - t, 3);
+          input.value = GOAL.formatNumber(Math.round(from + (to - from) * eased));
+          amountTweens[id] = t < 1 ? window.requestAnimationFrame(frame) : null;
+        })(window.performance.now());
       }
 
       // ---- Jauge en ressort (rAF -> transform: rotate uniquement) ---------
@@ -8023,11 +8078,8 @@ ${questionScreenCss}
       // answers.revenus : "montant" | "non_reponse" | "autre" (absent tant
       // que rien n'est choisi). answers.revenuActuel : euros si "montant".
       // answers.revenusAutre : saisie libre si "autre".
-      function revenueAssistantBox() {
-        return document.getElementById("revenue-assistant");
-      }
-
-      function renderRevenue() {
+      // live : true pendant le glissement / la frappe (textes différés).
+      function renderRevenue(live) {
         var screenEl = revenueScreen();
         if (!screenEl || !GOAL) return;
         var R = GOAL.revenueScale;
@@ -8035,29 +8087,34 @@ ${questionScreenCss}
         var v = typeof answers.revenuActuel === "number" ? answers.revenuActuel : 0;
         var ratio = R.valueToRatio(v);
 
-        var amount = document.getElementById("revenue-amount");
-        if (amount) amount.setAttribute("data-mode", mode);
+        setAttrIfChanged(document.getElementById("revenue-amount"), "data-mode", mode);
         var slider = document.getElementById("revenue-slider");
         if (slider) {
-          slider.setAttribute("aria-valuetext", v >= GOAL.REVENUE_MAX ? GOAL.formatEuro(v) + " par mois (10 000 € et plus)" : GOAL.formatEuro(v) + " par mois");
-          slider.parentNode.style.setProperty("--goal-ratio", ratio.toFixed(4));
+          setAttrIfChanged(slider, "aria-valuetext", v >= GOAL.REVENUE_MAX ? GOAL.formatEuro(v) + " par mois (10 000 € et plus)" : GOAL.formatEuro(v) + " par mois");
+          paintSliderFill(slider, ratio);
         }
-        var glow = screenEl.querySelector(".goal-amount__glow");
-        if (glow) glow.style.opacity = (0.25 + ratio * 0.6).toFixed(3);
-        crossfadeText(
-          document.getElementById("revenue-equivalence"),
-          mode === "non_reponse" ? "Pas de souci, c'est facultatif" : mode === "autre" ? "Dis-nous en quelques mots" : GOAL.currentEquivalence(v)
-        );
+        setStyleIfChanged(screenEl.querySelector(".goal-amount__glow"), "opacity", (0.25 + ratio * 0.6).toFixed(3));
+        settleMessages("revenue", renderRevenueMessage, live);
         Array.prototype.forEach.call(screenEl.querySelectorAll("[data-revenue-shortcut]"), function (btn) {
           btn.classList.toggle("is-selected", mode === "montant" && Number(btn.getAttribute("data-revenue-shortcut")) === v);
         });
         Array.prototype.forEach.call(screenEl.querySelectorAll("[data-revenue-mode]"), function (btn) {
-          btn.setAttribute("aria-pressed", btn.getAttribute("data-revenue-mode") === mode ? "true" : "false");
+          setAttrIfChanged(btn, "aria-pressed", btn.getAttribute("data-revenue-mode") === mode ? "true" : "false");
         });
         var other = document.getElementById("revenue-other");
-        if (other) other.hidden = mode !== "autre";
+        if (other && other.hidden !== (mode !== "autre")) other.hidden = mode !== "autre";
         updateNextEnabled(screenEl);
-        scheduleAssistant(revenueAssistantBox(), GOAL.revenueAssistantMessage(mode || "montant", v));
+      }
+
+      // Ligne d'équivalence de l'écran Revenus, lue sur l'état courant au
+      // moment où elle s'affiche (jamais une valeur intermédiaire du geste).
+      function renderRevenueMessage() {
+        var mode = answers.revenus || "";
+        var v = typeof answers.revenuActuel === "number" ? answers.revenuActuel : 0;
+        crossfadeText(
+          document.getElementById("revenue-equivalence"),
+          mode === "non_reponse" ? "Pas de souci, c'est facultatif" : mode === "autre" ? "Dis-nous en quelques mots" : GOAL.currentEquivalence(v)
+        );
       }
 
       // source : "slider" | "input" | "commit" | "shortcut" | "restore"
@@ -8073,8 +8130,9 @@ ${questionScreenCss}
         var slider = document.getElementById("revenue-slider");
         if (slider && source !== "slider") slider.value = String(R.valueToPosition(v));
         var input = document.getElementById("revenue-amount-input");
-        if (input && source !== "input") input.value = GOAL.formatNumber(v);
-        renderRevenue();
+        if (input && source === "shortcut") countInputTo(input, amountFromInput(input.value, GOAL.REVENUE_INPUT_MAX), v);
+        else if (input && source !== "input") setValueIfChanged(input, GOAL.formatNumber(v));
+        renderRevenue(source === "slider" || source === "input");
       }
 
       // « Autre » / « Je préfère ne pas répondre » : un second appui revient
@@ -8099,21 +8157,6 @@ ${questionScreenCss}
         }
       }
 
-      function playRevenueIntro() {
-        var box = revenueAssistantBox();
-        var message = GOAL.revenueAssistantMessage(answers.revenus || "montant", answers.revenuActuel || 0);
-        if (reduceMotion || !box || !box.animate) {
-          assistantSay(box, message, 0);
-          return;
-        }
-        box._intro = true;
-        animateFrom(box, { opacity: 0, transform: "translateY(8px)" }, 560, 260);
-        window.setTimeout(function () {
-          box._intro = false;
-          assistantSay(box, message, 200);
-        }, 560);
-      }
-
       // Champs de l'écran Revenus alignés sur answers (entrée, retour
       // arrière, reprise de brouillon), sans chorégraphie.
       function syncRevenueUI() {
@@ -8128,20 +8171,10 @@ ${questionScreenCss}
       }
 
       function enterRevenue() {
-        var box = revenueAssistantBox();
-        if (box && !revenueIntroPlayed) box._intro = true;
         syncRevenueUI();
-        if (!revenueIntroPlayed) {
-          revenueIntroPlayed = true;
-          playRevenueIntro();
-        }
       }
 
       // ==== Écran Objectif =====================================================
-      function goalAssistantBox() {
-        return document.getElementById("goal-assistant");
-      }
-
       // source :
       //   "slider"   -> ne réécrit pas la position (évite les sauts), vibre
       //                 au passage d'un palier ;
@@ -8157,19 +8190,17 @@ ${questionScreenCss}
         var slider = document.getElementById("goal-slider");
         if (slider) {
           if (source !== "slider") slider.value = String(GOAL.valueToPosition(v));
-          slider.setAttribute("aria-valuetext", GOAL.formatGoal(v));
-          slider.parentNode.style.setProperty("--goal-ratio", ratio.toFixed(4));
+          setAttrIfChanged(slider, "aria-valuetext", GOAL.formatGoal(v));
+          paintSliderFill(slider, ratio);
         }
         var input = document.getElementById("goal-amount-input");
-        if (input && source !== "input") input.value = GOAL.formatNumber(v);
-        var glow = document.getElementById("goal-glow");
-        if (glow) glow.style.opacity = (0.25 + ratio * 0.75).toFixed(3);
+        if (input && source === "shortcut") countInputTo(input, goalFromInput(input.value), v);
+        else if (input && source !== "input") setValueIfChanged(input, GOAL.formatNumber(v));
+        setStyleIfChanged(document.getElementById("goal-glow"), "opacity", (0.25 + ratio * 0.75).toFixed(3));
 
-        // Écart avec les revenus actuels (« × 3 tes revenus actuels »).
-        setTextById("goal-gap", GOAL.goalGap(v, declaredRevenue()));
-
-        // Palier : badge (au centre de la jauge) en fondu croisé +
-        // impulsion, vibration au franchissement pendant le glissé.
+        // Palier : badge (au centre de la jauge), seul retour visuel pendant
+        // le glissement. Morph doux (fondu + contraction + flou, 150 ms) et
+        // vibration au franchissement.
         var idx = GOAL.tierIndex(v);
         var tierChanged = goalTierIndex !== null && idx !== goalTierIndex;
         var badge = document.getElementById("goal-badge");
@@ -8189,35 +8220,30 @@ ${questionScreenCss}
             badge.classList.add("is-changing");
             goalBadgeTimer = window.setTimeout(applyTier, 150);
           }
-          if (tierChanged && !reduceMotion && badge.animate) {
-            badge.animate([{ transform: "scale(1)" }, { transform: "scale(1.14)" }, { transform: "scale(1)" }], { duration: 420, easing: GOAL_SPRING });
-          }
         }
         gaugeTo(ratio);
         paintGaugeTier(idx, tierChanged);
 
-        var price = GOAL.averagePrice(answers.secteur);
-        var clients = GOAL.clientsNeeded(v, price);
-        crossfadeText(document.getElementById("goal-equivalence"), GOAL.equivalence(v));
-        if (v > 0) {
-          countTo(document.getElementById("goal-clients-n"), clients, function (n) {
-            return GOAL.formatNumber(n);
-          });
-          setTextById("goal-clients-rest", "client" + (clients > 1 ? "s" : "") + " à " + price + " €/mois");
-        } else {
-          setTextById("goal-clients-n", "0");
-          setTextById("goal-clients-rest", "client pour l'instant : choisis un montant");
-        }
+        // Écart et contexte : au repos seulement (voir settleMessages).
+        settleMessages("goal", renderGoalMessages, source === "slider" || source === "input");
 
         Array.prototype.forEach.call(stage.querySelectorAll("[data-goal-shortcut]"), function (btn) {
           btn.classList.toggle("is-selected", Number(btn.getAttribute("data-goal-shortcut")) === v);
         });
 
-        scheduleAssistant(goalAssistantBox(), GOAL.assistantMessage(v));
         if (quizTagsEl && quizTagsEl.querySelector('[data-tag-id="objectifRevenu"]')) renderTags();
         else refreshEditBar();
         var screenEl = goalScreen();
         if (screenEl) updateNextEnabled(screenEl);
+      }
+
+      // Écart avec les revenus actuels (« × 3 tes revenus actuels ») et ligne
+      // de contexte (« ≈ 3,5 SMIC · ≈ 250 clients à 20 € »), lus sur l'état
+      // courant au moment de l'affichage.
+      function renderGoalMessages() {
+        var v = typeof answers.objectifRevenu === "number" ? answers.objectifRevenu : 0;
+        setTextById("goal-gap", GOAL.goalGap(v, declaredRevenue()));
+        crossfadeText(document.getElementById("goal-context"), GOAL.contextLine(v, answers.secteur));
       }
 
       // Chorégraphie d'entrée (voir TIMELINE ci-dessus).
@@ -8225,14 +8251,9 @@ ${questionScreenCss}
         var screenEl = goalScreen();
         if (!screenEl || !GOAL) return;
         var goal = typeof answers.objectifRevenu === "number" ? answers.objectifRevenu : defaultGoal();
-        var box = goalAssistantBox();
-        // Accueil avec le prénom Google s'il existe, puis la réaction au
-        // montant (messages fixes de goal-math.js).
-        var message = (welcomeFirstName ? "Bienvenue " + welcomeFirstName + " ! " : "") + GOAL.assistantMessage(goal);
         syncPlan();
         if (reduceMotion || !screenEl.animate) {
           gaugeTo(GOAL.valueToRatio(goal), true);
-          assistantSay(box, message, 0);
           return;
         }
         var stepper = screenEl.querySelector(".goal-stepper");
@@ -8244,31 +8265,6 @@ ${questionScreenCss}
         window.setTimeout(function () {
           gaugeTo(GOAL.valueToRatio(typeof answers.objectifRevenu === "number" ? answers.objectifRevenu : goal));
         }, 240);
-        if (box) {
-          box._intro = true;
-          animateFrom(box, { opacity: 0, transform: "translateY(8px)" }, 700, 260);
-          window.setTimeout(function () {
-            box._intro = false;
-            assistantSay(box, message, 200);
-          }, 700);
-        }
-      }
-
-      // Prénom Google pour l'accueil : uniquement s'il existe dans la
-      // session (connexion Google) ; jamais en Mode Vidéo (vue visiteur).
-      function resolveWelcomeName() {
-        welcomeFirstName = null;
-        if (demoMode) return;
-        var supabase = window.ColdTrendSupabase;
-        if (!supabase) return;
-        supabase.auth.getSession().then(function (res) {
-          var user = res.data.session ? res.data.session.user : null;
-          if (!user || user.is_anonymous) return;
-          var meta = user.user_metadata || {};
-          var raw = meta.given_name || meta.first_name || String(meta.full_name || meta.name || "").split(" ")[0];
-          var name = String(raw || "").trim().slice(0, 24);
-          if (name && /^[A-Za-zÀ-ÖØ-öø-ÿ' -]+$/.test(name)) welcomeFirstName = name;
-        });
       }
 
       // Entrée sur l'écran Objectif : chorégraphie complète la première
@@ -8279,8 +8275,6 @@ ${questionScreenCss}
         var screenEl = goalScreen();
         var cta = screenEl && screenEl.querySelector(".goal-cta");
         if (cta) cta.classList.remove("is-validated");
-        var box = goalAssistantBox();
-        if (box) box._intro = !goalIntroPlayed;
         setGoal(typeof answers.objectifRevenu === "number" ? answers.objectifRevenu : defaultGoal(), "restore");
         if (!goalIntroPlayed) {
           goalIntroPlayed = true;
@@ -8297,15 +8291,6 @@ ${questionScreenCss}
         if (!GOAL) return;
         goalTierIndex = null;
         goalIntroPlayed = false;
-        revenueIntroPlayed = false;
-        [goalAssistantBox(), revenueAssistantBox()].forEach(function (box) {
-          if (!box) return;
-          window.clearTimeout(box._timer);
-          box._said = "";
-          box._intro = false;
-          box.setAttribute("data-state", "idle");
-        });
-        resolveWelcomeName();
         setGoal(defaultGoal(), "restore");
         delete answers.objectifRevenu;
         renderDelay();
@@ -8345,6 +8330,7 @@ ${questionScreenCss}
           screenEl.addEventListener("pointermove", function (e) {
             // Le halo vit dans l'overlay (fixed, plein écran) : coordonnées
             // directes de la fenêtre.
+            if (overlay.classList.contains("is-sliding")) return;
             x = e.clientX;
             y = e.clientY;
             halo.classList.add("is-on");
@@ -8358,6 +8344,22 @@ ${questionScreenCss}
             halo.classList.remove("is-on");
           });
         });
+      })();
+
+      // Glissement en cours sur un slider Revenus / Objectif : classe
+      // is-sliding sur l'overlay (fond figé, halo immobile). Retirée au
+      // relâchement, où qu'il ait lieu (pointerup sur la fenêtre), et à la
+      // perte de focus.
+      (function initSlidingState() {
+        function stop() {
+          overlay.classList.remove("is-sliding");
+        }
+        stage.addEventListener("pointerdown", function (e) {
+          if (e.target.classList && e.target.classList.contains("goal-slider__input")) overlay.classList.add("is-sliding");
+        });
+        window.addEventListener("pointerup", stop);
+        window.addEventListener("pointercancel", stop);
+        window.addEventListener("blur", stop);
       })();
 
       // ---- Validation de l'objectif (voir TIMELINE ci-dessus) ---------------
@@ -11390,13 +11392,13 @@ ${questionScreenCss}
           updateNextEnabled(e.target.closest(".quiz-screen"));
         }
         if (e.target.id === "goal-slider" && GOAL) {
-          setGoal(GOAL.positionToValue(e.target.value), "slider");
+          queueSliderFrame("goal");
         }
         if (e.target.id === "goal-amount-input") {
           setGoal(goalFromInput(e.target.value), "input");
         }
         if (e.target.id === "revenue-slider" && GOAL) {
-          setRevenue(GOAL.revenueScale.positionToValue(e.target.value), "slider");
+          queueSliderFrame("revenue");
         }
         if (e.target.id === "revenue-amount-input" && GOAL) {
           setRevenue(amountFromInput(e.target.value, GOAL.REVENUE_INPUT_MAX), "input");
@@ -11413,6 +11415,17 @@ ${questionScreenCss}
       // pendant le drag) -- la pulsation de confirmation ne doit jouer
       // qu'une fois le choix arrêté.
       stage.addEventListener("change", function (e) {
+        // Relâchement des sliders Objectif / Revenus : messages immédiats.
+        if (e.target.id === "goal-slider" && GOAL) {
+          flushSliderFrame("goal");
+          settleMessages("goal", renderGoalMessages, false);
+          return;
+        }
+        if (e.target.id === "revenue-slider" && GOAL) {
+          flushSliderFrame("revenue");
+          settleMessages("revenue", renderRevenueMessage, false);
+          return;
+        }
         // Opt-in emails (gate).
         if (e.target.id === "quiz-optin") {
           answers.marketingOptIn = !!e.target.checked;
@@ -12091,8 +12104,6 @@ const QUIZ_CHAPTER_ICONS = {
 // - renderGoalGauge : jauge demi-cercle 100 % transform (demi-disque tourné
 //   de 0 à 180° dans un cadran masqué en anneau, couleurs de palier en
 //   calques superposés), badge de palier au centre.
-// - renderAssistantBubble : bulle « Assistant ColdTrend », présentée comme
-//   un assistant à réponses automatiques, jamais comme un humain.
 //
 // Aucune donnée fictive : réponses réelles, objectif choisi, messages fixes
 // de scripts/goal-math.js. Jamais de revenu, de courbe de ventes ni de
@@ -12100,9 +12111,6 @@ const QUIZ_CHAPTER_ICONS = {
 // ---------------------------------------------------------------------------
 const SPACE_CHECK_SVG =
   '<svg viewBox="0 0 24 24" width="12" height="12" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg>';
-const SPACE_BOT_SVG =
-  '<svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="8" width="16" height="11" rx="3"/><path d="M12 4v4M9 13h.01M15 13h.01M9.5 16.5h5"/></svg>';
-
 function renderPlanStepper({ id }) {
   const step = (key, label, status) =>
     `<li class="sp-step" data-step="${key}" data-status="${status}">
@@ -12133,17 +12141,6 @@ function renderGoalGauge({ goal }) {
                   <div class="sp-gauge__center"><p class="goal-amount__badge" id="goal-badge" data-tier="${tierInfo.id}">${tierInfo.label}</p></div>
                 </div>
                 <p class="sp-gauge__scale" aria-hidden="true"><span>0 €</span><span>${GOAL.formatEuro(GOAL.MAX)}</span></p>`;
-}
-
-function renderAssistantBubble({ id, text }) {
-  return `<div class="sp-assistant" id="${id}" data-state="idle">
-                <span class="sp-assistant__avatar" aria-hidden="true">${SPACE_BOT_SVG}</span>
-                <div class="sp-assistant__bubble">
-                  <p class="sp-assistant__name">Assistant ${brand.name} <span>· réponses automatiques</span></p>
-                  <p class="sp-assistant__typing" aria-hidden="true"><i></i><i></i><i></i></p>
-                  <p class="sp-assistant__text" aria-live="polite">${text}</p>
-                </div>
-              </div>`;
 }
 
 // Graduations d'un slider non linéaire : trait exact sous chaque valeur,
@@ -12427,7 +12424,6 @@ function renderQuizQuestionScreen(question, index) {
             <label class="goal-sr" for="revenue-other-input">Décris ta situation</label>
             <input class="quiz-text-input" id="revenue-other-input" type="text" maxlength="60" placeholder="Ex : variable selon les mois" autocomplete="off" />
           </div>
-          ${renderAssistantBubble({ id: "revenue-assistant", text: GOAL.revenueAssistantMessage("montant", 0) })}
           <div class="quiz-footer goal-footer">
             <button class="btn btn--primary quiz-next" type="button" disabled>${question.cta}</button>
           </div>
@@ -12436,8 +12432,9 @@ function renderQuizQuestionScreen(question, index) {
 
   // ---- Écran A « Montant » (objectif) --------------------------------------
   // Une colonne centrée (520px) sur toutes les tailles : stepper « Ton
-  // plan », titre, montant + écart avec les revenus actuels, jauge,
-  // raccourcis, slider, assistant, CTA collé en bas. Valeurs initiales
+  // plan », titre, montant + écart avec les revenus actuels, ligne de
+  // contexte, jauge (badge de palier = seul retour visuel), raccourcis,
+  // slider, CTA collé en bas. Valeurs initiales
   // calculées au build avec le même module que le client (GOAL).
   if (question.type === "goal-amount") {
     const initial = GOAL.snap(question.initial);
@@ -12448,8 +12445,6 @@ function renderQuizQuestionScreen(question, index) {
     const shortcuts = question.shortcuts
       .map((v) => `<button type="button" class="goal-shortcut" data-goal-shortcut="${v}">${GOAL.formatEuro(v)}</button>`)
       .join("");
-    const price = GOAL.averagePrice();
-    const clients = GOAL.clientsNeeded(initial, price);
     return `<div class="quiz-screen goal-screen goal-screen--amount" data-screen="question" data-index="${index}" data-id="${question.id}" data-step-name="${question.stepName}"${skipAttrs}${question.chapter ? ` data-chapter="${question.chapter}"` : ""}>
           ${renderPlanStepper({ id: "goal-stepper" })}
           ${renderChapterHeader(question)}
@@ -12460,11 +12455,10 @@ function renderQuizQuestionScreen(question, index) {
             <label class="goal-amount__field" for="goal-amount-input">
               <span class="goal-amount__glow" id="goal-glow" aria-hidden="true" style="opacity:${(0.25 + GOAL.valueToRatio(initial) * 0.75).toFixed(3)}"></span>
               <span class="goal-sr">Montant mensuel visé, en euros. Touche pour le saisir.</span>
-              <input class="goal-amount__input" id="goal-amount-input" type="text" inputmode="numeric" autocomplete="off" enterkeyhint="done" maxlength="7" value="${GOAL.formatNumber(initial)}" aria-describedby="goal-gap goal-equivalence goal-clients" />
+              <input class="goal-amount__input" id="goal-amount-input" type="text" inputmode="numeric" autocomplete="off" enterkeyhint="done" maxlength="7" value="${GOAL.formatNumber(initial)}" aria-describedby="goal-gap goal-context" />
               <span class="goal-amount__unit" aria-hidden="true">€ / mois</span>
             </label>
-            <p class="goal-amount__equiv goal-xfade" id="goal-equivalence" aria-live="polite"><span class="goal-xfade__item is-on">${GOAL.equivalence(initial)}</span><span class="goal-xfade__item"></span></p>
-            <p class="goal-amount__clients" id="goal-clients">≈ <span id="goal-clients-n">${GOAL.formatNumber(clients)}</span> <span id="goal-clients-rest">client${clients > 1 ? "s" : ""} à ${price} €/mois</span></p>
+            <p class="goal-amount__equiv goal-amount__context goal-xfade" id="goal-context" aria-live="polite"><span class="goal-xfade__item is-on">${GOAL.contextLine(initial)}</span><span class="goal-xfade__item" aria-hidden="true"></span></p>
             ${renderGoalGauge({ goal: initial })}
             <div class="goal-shortcuts" role="group" aria-label="Montants rapides">${shortcuts}</div>
             <div class="goal-slider" style="--goal-ratio:${GOAL.valueToRatio(initial).toFixed(4)}">
@@ -12473,7 +12467,6 @@ function renderQuizQuestionScreen(question, index) {
               <div class="goal-slider__ticks" aria-hidden="true">${ticks}</div>
             </div>
           </div>
-          ${renderAssistantBubble({ id: "goal-assistant", text: GOAL.assistantMessage(initial) })}
           <div class="quiz-footer goal-footer">
             <button class="btn btn--primary quiz-next goal-cta" type="button"><span class="goal-cta__label">${question.cta}</span><span class="goal-cta__check" aria-hidden="true">${SPACE_CHECK_SVG}</span></button>
           </div>
